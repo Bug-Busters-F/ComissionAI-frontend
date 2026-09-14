@@ -1,5 +1,7 @@
 <template>
-  <div id="root" class="min-h-screen bg-gray-50 text-gray-900">
-    <router-view />
-  </div>
+  <AppShell />
 </template>
+
+<script setup>
+import AppShell from '@/components/layout/AppShell.vue'
+</script>

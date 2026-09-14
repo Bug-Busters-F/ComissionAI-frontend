@@ -1,10 +1,34 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import HomeView from '@/views/HomeView.vue'
+import DataView from '@/views/DataView.vue'
+import CampaignsView from '@/views/CampaignsView.vue'
 
 const routes = [
   {
     path: '/',
+    redirect: '/home'
+  },
+  {
+    path: '/home',
     name: 'home',
-    component: { template: '<div class="p-6 text-blue-800 font-sans"><h1 class="text-2xl font-bold">Dom Rock - Rule Engine</h1><p class="text-sm text-gray-500 mt-1">Ambiente frontend inicializado com sucesso.</p></div>' }
+    component: HomeView,
+    meta: { section: 'home', label: 'Home' }
+  },
+  {
+    path: '/dados',
+    name: 'dados',
+    component: DataView,
+    meta: { section: 'dados', label: 'Dados' }
+  },
+  {
+    path: '/campanhas',
+    name: 'campanhas',
+    component: CampaignsView,
+    meta: { section: 'campanhas', label: 'Campanhas' }
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/home'
   }
 ]
 
