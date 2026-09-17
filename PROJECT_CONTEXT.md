@@ -22,7 +22,12 @@
   - CRUD manual de regras de negócio (canal, taxa, validade).
   - Validação mandatória de vigência: campo 'data_fim' obrigatório para evitar regras com vigência indeterminada.
   - Criação de regras via NLP: tradução de texto livre (ex: "pagar 5% no ecommerce em dezembro") em JSON estruturado.
-  - Carga em lote (XLSX): importação e validação rígida de bases de RH, vendas e comissões com feedback de erros impeditivos por linha/coluna.
+  - Carga em lote (XLSX) [Implementado no Frontend]:
+    - Upload multipart/form-data para as bases de RH, VENDAS e COMISS.
+    - Contratos específicos: Competência (MM/AAAA) para RH e Vendas; Vigência com data de término obrigatória para Comissões.
+    - Relatório de validação com apontamentos estruturados por Linha, Campo, Motivo e Severidade (IMPEDITIVO vs AVISO).
+    - Regra estrita de integridade: em caso de erro impeditivo ou bloqueio (duplicidade/sobreposição), mensagem mandatória *"Planilha com pendências: corrija e envie novamente"* com bloqueio total (sem importação parcial ou forçada).
+    - Carga com avisos não impeditivos permitindo conclusão e reenvio após correções externas.
   - Logs imutáveis para cálculos de comissão.
 - Sprint 2:
   - Sandbox de Simulação: cálculo de impacto financeiro de regras em 'draft' contra massa histórica sem comitar comissões reais no banco.
@@ -43,13 +48,15 @@ src/
 ├── components/              # Componentes Vue reutilizáveis organizados por domínio
 │   ├── audit/               # Componentes de auditoria, rastreabilidade e logs imutáveis de comissões
 │   ├── common/              # Componentes de UI genéricos e utilitários (botões, inputs, modais, badges)
+│   ├── data/                # Ingestão de dados (UploadBaseModal.vue, ValidationReport.vue)
+│   ├── layout/              # Cascas de layout compartilhadas (AppShell, SidebarNav, Topbar)
 │   ├── rules/               # Componentes de gestão de regras (formulário de CRUD e input de regras via NLP)
 │   └── simulation/          # Componentes da sandbox de simulação de impacto financeiro e métricas de XAI
-├── layouts/                 # Cascas/estruturas de layout compartilhadas (Navbar, Sidebar, Container principal)
+├── layouts/                 # Estruturas de layout complementares
 ├── router/                  # Definição e configuração de rotas via Vue Router (index.js)
-├── services/                # Camada de integração HTTP com Axios centralizando chamadas à API Spring Boot
-├── stores/                  # Gerenciamento de estado global com Pinia (regras, simulações, rascunhos, uploads)
-├── views/                   # Telas/páginas principais conectadas às rotas da aplicação
+├── services/                # Camada de integração HTTP com Axios centralizando chamadas ao Spring Boot (api.js, dataService.js)
+├── stores/                  # Gerenciamento de estado global com Pinia (dataStore.js, regras, simulações)
+├── views/                   # Telas/páginas principais conectadas às rotas (HomeView, DataView, CampaignsView)
 ├── App.vue                  # Componente raiz da aplicação
 └── main.js                  # Ponto de entrada da aplicação (instanciação do Vue, Pinia e plugins)
 ```
@@ -57,5 +64,7 @@ src/
 # Padrões Técnicos do Frontend
 
 - Serviços HTTP em `src/services/` encapsulando Axios e centralizando endpoints do Spring Boot.
-- Pinia stores gerenciando o estado de rascunhos, bases importadas e resultados de simulação.
-- Interfaces limpas, scannable e focadas na explicabilidade visual das regras sugeridas pela IA.
+- Proxy de desenvolvimento configurado no Vite (`/api` -> `http://localhost:8080`), eliminando barreiras de CORS no ambiente local.
+- Pinia stores gerenciando o estado reativo de uploads, competências, regras e relatórios de validação.
+- Interfaces responsivas (mobile-first a ultrawide), scannable e focadas na explicabilidade visual das regras e diagnósticos de integridade.
+- Aderência estrita à identidade visual Wise (paleta Sage `#e8ebe6`, acento CTA `#9fe870`, tipografia robusta e cards acolhedores `#fff7d9`).
