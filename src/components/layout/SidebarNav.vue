@@ -2,12 +2,12 @@
   <aside class="fixed inset-y-0 left-0 z-30 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto bg-white px-5 py-8 overscroll-contain md:flex">
     <RouterLink to="/home" class="focus-ring flex items-center gap-3 rounded-xl" aria-label="ComissionAI - Home">
       <img :src="comissionaiIcon" alt="" class="h-10 w-10 rounded-xl object-cover" />
-      <span class="text-[20px] font-extrabold tracking-[-0.04em]">ComissionAI</span>
+      <span class="text-[20px] font-extrabold tracking-[-0.04em] text-brand-dark">ComissionAI</span>
     </RouterLink>
 
-    <div class="mt-12 flex items-center gap-2 text-[11px] font-semibold tracking-[0.16em] text-[#646862]">
+    <div class="mt-12 flex items-center gap-2 text-[11px] font-semibold tracking-[0.16em] text-sage-muted">
       <span>BUG BUSTERS</span>
-      <span class="rounded-md border border-[#d7dcd5] px-1.5 py-1 text-[10px] tracking-normal text-[#0e0f0c]">DOM ROCK</span>
+      <span class="rounded-md border border-sage-border-dark px-1.5 py-1 text-[10px] tracking-normal text-brand-dark">DOM ROCK</span>
     </div>
 
     <nav class="mt-7 space-y-2" aria-label="Navegação principal">
@@ -18,8 +18,8 @@
         :class="[
           'focus-ring flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-colors',
           route.meta.section === item.section
-            ? 'bg-[#9fe870] text-[#0e0f0c]'
-            : 'text-[#646862] hover:bg-[#f1f4ef] hover:text-[#0e0f0c]'
+            ? 'bg-brand text-brand-dark font-bold'
+            : 'text-sage-muted hover:bg-sage-light hover:text-brand-dark'
         ]"
       >
         <component :is="item.icon" :size="18" :stroke-width="1.8" aria-hidden="true" />
@@ -27,12 +27,12 @@
       </RouterLink>
     </nav>
 
-    <div class="mt-auto border-t border-[#e1e5df] pt-6">
+    <div class="mt-auto border-t border-sage-border-light pt-6">
       <div class="flex items-center gap-3">
-        <span class="grid h-10 w-10 place-items-center rounded-full bg-[#e7f8d9] text-xs font-bold text-[#4c8d27]">US</span>
+        <span class="grid h-10 w-10 place-items-center rounded-full bg-success-bg text-xs font-bold text-success-text">US</span>
         <div>
-          <p class="text-sm font-bold">Usuário</p>
-          <p class="mt-0.5 text-xs text-[#646862]">Administrador</p>
+          <p class="text-sm font-bold text-brand-dark">Usuário</p>
+          <p class="mt-0.5 text-xs text-sage-muted">Administrador</p>
         </div>
       </div>
     </div>

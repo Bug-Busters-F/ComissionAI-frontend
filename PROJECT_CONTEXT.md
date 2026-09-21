@@ -63,8 +63,14 @@ src/
 
 # Padrões Técnicos do Frontend
 
-- Serviços HTTP em `src/services/` encapsulando Axios e centralizando endpoints do Spring Boot.
-- Proxy de desenvolvimento configurado no Vite (`/api` -> `http://localhost:8080`), eliminando barreiras de CORS no ambiente local.
-- Pinia stores gerenciando o estado reativo de uploads, competências, regras e relatórios de validação.
-- Interfaces responsivas (mobile-first a ultrawide), scannable e focadas na explicabilidade visual das regras e diagnósticos de integridade.
-- Aderência estrita à identidade visual Wise (paleta Sage `#e8ebe6`, acento CTA `#9fe870`, tipografia robusta e cards acolhedores `#fff7d9`).
+- **Serviços HTTP**: Camada em `src/services/` encapsulando Axios e centralizando endpoints do Spring Boot.
+- **Proxy Reverso no Vite**: Configurado no `vite.config.js` (`/api` -> `http://localhost:8080`), eliminando barreiras de CORS no ambiente local.
+- **Gerenciamento de Estado**: Pinia stores (`dataStore.js`, regras e simulações) gerenciando o ciclo de vida reativo dos uploads, competências, regras e diagnósticos de integridade.
+- **Fechamento Atômico de Ciclo**: Ingestão conjunta e obrigatória das bases de RH e Vendas para cada competência mensal, impedindo estados parciais e validando integridade cruzada relacional (vendedor x matrícula).
+- **Design System & Arquitetura de Cores**:
+  - Tokens de cores centralizados como **Variáveis CSS Dinâmicas** (`:root` em `src/assets/main.css`), consumidas semanticamente no `tailwind.config.js` (`brand`, `sage`, `success`, `warning`, `danger`).
+  - **Zero Cores Hardcoded**: Eliminação total de valores hexadecimais soltos nos componentes Vue, garantindo manutenibilidade em ponto único.
+  - **HMR Instantâneo**: Atualização em tempo real de estilos e cores pelo Vite sem necessidade de reinício do servidor de desenvolvimento.
+  - **Pronto para Modo Noturno**: Suporte a Dark Mode com chaveamento de variáveis via classe `.dark` no `main.css`, sem necessidade de alterar templates Vue.
+- **Aderência Estrita à Identidade Wise**: Paleta Sage para fundos e superfícies, acento verde CTA, cards arredondados (`rounded-2xl`) e feedback visual de alta legibilidade.
+

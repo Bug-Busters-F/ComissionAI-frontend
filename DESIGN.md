@@ -542,3 +542,68 @@ The brand uses surface contrast (`{colors.canvas-soft}` background vs `{colors.c
 - Don't render CTAs as sharp rectangles. The 24 px pill geometry is non-negotiable.
 - Don't pair the green CTA with a green background. The brand always sits Wise green on neutral surfaces (sage / white / ink).
 - Don't replace Wise Sans with a generic geometric sans for hero typography — the proprietary face IS the brand's voice.
+
+---
+
+## Frontend Implementation: Tailwind CSS & Dynamic CSS Variables
+
+The design language is implemented in the Vue 3 codebase using a decoupled **CSS Variables + Tailwind CSS** architecture. All color tokens are centralized in `:root` inside `src/assets/main.css` and mapped to semantic utility classes in `tailwind.config.js`.
+
+### 1. Token Mapping & Utility Classes
+
+| Token Group | CSS Variable (`main.css`) | Default Hex | Tailwind Class (`tailwind.config.js`) | Role |
+|---|---|---|---|---|
+| **Brand** | `--color-brand` | `#9fe870` | `bg-brand`, `text-brand` | Primary CTA and signature lime-green accent |
+| | `--color-brand-hover` | `#8fe25f` | `hover:bg-brand-hover` | Interactive hover state for primary buttons |
+| | `--color-brand-ring` | `#8dd95f` | `focus-visible:ring-brand-ring` | Accessible focus ring outline |
+| | `--color-brand-dark` | `#0e0f0c` | `bg-brand-dark`, `text-brand-dark` | Deep charcoal for headings, body text and dark buttons |
+| | `--color-brand-dark-hover` | `#252824` | `hover:bg-brand-dark-hover` | Hover state for dark charcoal buttons |
+| **Sage / Canvas** | `--color-sage` | `#e8ebe6` | `bg-sage` | Soft sage page canvas background |
+| | `--color-sage-light` | `#f1f4ef` | `bg-sage-light` | Secondary card background and neutral panels |
+| | `--color-sage-pill` | `#eef1ec` | `bg-sage-pill` | Table headers (`thead`), badge backgrounds and pills |
+| | `--color-sage-muted` | `#646862` | `text-sage-muted` | Subtitles, labels, and secondary metadata |
+| | `--color-sage-subtle` | `#454745` | `text-sage-subtle` | Descriptive body copy |
+| | `--color-sage-border` | `#dfe4dd` | `border-sage-border` | Standard card and form input borders |
+| | `--color-sage-border-light` | `#edf0eb` | `border-sage-border-light` | Subtle horizontal dividers and table borders |
+| | `--color-sage-border-dark` | `#d7dcd5` | `border-sage-border-dark` | High-contrast borders and badge outlines |
+| **Success** | `--color-success` | `#2ead4b` | `text-success`, `border-success` | Green indicator for valid entries and approved cycles |
+| | `--color-success-bg` | `#eef8e6` | `bg-success-bg` | Soft tinted background for dropzones and valid cards |
+| | `--color-success-surface` | `#e3f6d8` | `bg-success-surface` | Badge and notification fill |
+| | `--color-success-dark` | `#054d28` | `text-success-dark` | High-contrast green text for accessibility |
+| **Warning** | `--color-warning` | `#b86700` | `text-warning`, `border-warning` | Ochre / amber warning indicator |
+| | `--color-warning-bg` | `#fff7d9` | `bg-warning-bg` | Warm welcoming card background for review banners |
+| | `--color-warning-light` | `#fff0bb` | `bg-warning-light` | Badge fill for pending cycles or warnings |
+| | `--color-warning-border` | `#eadca9` | `border-warning-border` | Border for attention banners |
+| | `--color-warning-dark` | `#8c6e1e` | `text-warning-dark` | Eyebrow title text for attention cards |
+| **Danger** | `--color-danger` | `#d03238` | `text-danger`, `border-danger` | Impeditivo / destructive error indicator |
+| | `--color-danger-bg` | `#fce8e8` | `bg-danger-bg` | Error banner background |
+| | `--color-danger-light` | `#fffbfb` | `bg-danger-light` | Highlighted error rows in diagnostic tables |
+| | `--color-danger-dark` | `#a7000d` | `text-danger-dark` | Critical rejection headline text |
+
+### 2. Live HMR & Hot Theming
+- **Zero Restart**: Editing any variable in `src/assets/main.css` triggers instant Hot Module Replacement (HMR) in Vite without restarting the development server.
+- **DevTools Live Preview**: Designers and developers can inspect `<html>` / `:root` in browser DevTools and interactively modify any `--color-*` property with the native color picker to test adjustments live.
+
+### 3. Dark Mode Architecture
+Dark mode is natively supported by overriding the CSS variables under `.dark` in `src/assets/main.css`. No modifications to Vue templates or Tailwind utility classes are required:
+
+```css
+/* src/assets/main.css */
+.dark {
+  --color-sage: #121411;
+  --color-sage-light: #1c1f1a;
+  --color-sage-pill: #252923;
+  --color-brand-dark: #f3f5f1;
+  --color-sage-muted: #9aa098;
+  --color-sage-border: #2e332c;
+  --color-sage-border-light: #1f231d;
+  --color-sage-border-dark: #3a4038;
+}
+```
+
+### 4. Data Ingestion & Closed Cycle UI Patterns
+- **Closed Cycle Cards**: Visual representation of monthly competencies (`Dezembro`, `Novembro`, `Outubro`) with dual-base requirements (RH + Vendas).
+- **StatusBadges**: Canonical status pills (`neutral`, `success`, `warning`, `danger`) dynamically colored by semantic tone classes.
+- **Atomic Validation Banner**: If impeditivo errors or relational cross-check failures occur, the strict mandatory alert is displayed:
+  > *"Planilha com pendências: corrija e envie novamente"*
+

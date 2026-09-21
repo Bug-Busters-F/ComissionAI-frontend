@@ -1,7 +1,7 @@
 <template>
-  <header class="border-b border-[#dfe4dd] bg-[#e8ebe6] px-5 py-4 sm:px-8 lg:px-[42px]">
+  <header class="border-b border-sage-border bg-sage px-5 py-4 sm:px-8 lg:px-[42px]">
     <div class="flex min-h-11 items-center justify-between gap-4">
-      <p class="text-xs font-medium text-[#646862]">Workspace / {{ currentLabel }}</p>
+      <p class="text-xs font-medium text-sage-muted">Workspace / {{ currentLabel }}</p>
     </div>
 
     <nav class="mt-4 flex gap-2 overflow-x-auto md:hidden" aria-label="Navegação móvel">
@@ -11,7 +11,7 @@
         :to="item.to"
         :class="[
           'focus-ring whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold',
-          route.meta.section === item.section ? 'bg-[#9fe870]' : 'bg-white text-[#646862]'
+          route.meta.section === item.section ? 'bg-brand text-brand-dark' : 'bg-white text-sage-muted'
         ]"
       >
         {{ item.label }}

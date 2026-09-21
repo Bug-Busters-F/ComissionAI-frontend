@@ -1,21 +1,21 @@
 <template>
   <div
     v-if="store.uploadModal.isOpen"
-    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#0e0f0c]/60 p-4 backdrop-blur-sm transition-opacity"
+    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-brand-dark/60 p-4 backdrop-blur-sm transition-opacity"
     @click.self="store.closeUploadModal"
   >
     <div
-      class="w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl border border-[#dfe4dd] bg-white p-5 shadow-2xl transition-all sm:p-8"
+      class="w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl border border-sage-border bg-white p-5 shadow-2xl transition-all sm:p-8"
       role="dialog"
       aria-modal="true"
     >
       <!-- HEADER DO MODAL -->
-      <div class="flex items-start justify-between gap-4 border-b border-[#edf0eb] pb-5">
+      <div class="flex items-start justify-between gap-4 border-b border-sage-border-light pb-5">
         <div>
-          <span class="rounded-md bg-[#eef1ec] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#646862]">
-            Carga de Dados
+          <span class="rounded-md bg-sage-pill px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-sage-muted">
+            Carga de Dados • Sprint 1
           </span>
-          <h2 class="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-[#0e0f0c]">
+          <h2 class="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">
             <template v-if="store.uploadModal.report">
               Resultado da Validação
             </template>
@@ -26,7 +26,7 @@
               Importação de Taxas (COMISS)
             </template>
           </h2>
-          <p class="mt-1 text-xs text-[#646862]">
+          <p class="mt-1 text-xs text-sage-muted">
             <template v-if="store.uploadModal.report">
               Confira o diagnóstico estrutural e regras de consistência relacional antes de efetivar os dados.
             </template>
@@ -42,7 +42,7 @@
         <button
           type="button"
           @click="store.closeUploadModal"
-          class="focus-ring grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#646862] hover:bg-[#eef1ec] hover:text-[#0e0f0c]"
+          class="focus-ring grid h-9 w-9 shrink-0 place-items-center rounded-full text-sage-muted hover:bg-sage-pill hover:text-brand-dark"
           aria-label="Fechar modal"
         >
           <X class="h-5 w-5" />
@@ -62,7 +62,7 @@
       <div v-else class="mt-6 space-y-6">
         <!-- SELEÇÃO DA MODALIDADE (CICLO VS COMISSÕES) -->
         <div>
-          <label class="block text-xs font-bold uppercase tracking-wider text-[#646862]">
+          <label class="block text-xs font-bold uppercase tracking-wider text-sage-muted">
             1. Modalidade de Carga
           </label>
           <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -72,16 +72,16 @@
               :class="[
                 'focus-ring flex items-start gap-3 rounded-xl border p-4 text-left transition',
                 store.uploadModal.modo === 'CICLO'
-                  ? 'border-[#0e0f0c] bg-[#f1f4ef] shadow-sm'
-                  : 'border-[#dfe4dd] bg-white hover:border-[#b0b8ac]'
+                  ? 'border-brand-dark bg-sage-light shadow-sm'
+                  : 'border-sage-border bg-white hover:border-sage-border-dark'
               ]"
             >
-              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white border border-[#d7dcd5]">
-                <Layers class="h-5 w-5 text-[#0e0f0c]" />
+              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white border border-sage-border-dark">
+                <Layers class="h-5 w-5 text-brand-dark" />
               </div>
               <div>
-                <p class="text-sm font-extrabold text-[#0e0f0c]">Ciclo Mensal (RH + Vendas)</p>
-                <p class="mt-0.5 text-xs text-[#646862]">Envio conjunto mandatório para a competência mensal.</p>
+                <p class="text-sm font-extrabold text-brand-dark">Ciclo Mensal (RH + Vendas)</p>
+                <p class="mt-0.5 text-xs text-sage-muted">Envio conjunto mandatório para a competência mensal.</p>
               </div>
             </button>
 
@@ -91,16 +91,16 @@
               :class="[
                 'focus-ring flex items-start gap-3 rounded-xl border p-4 text-left transition',
                 store.uploadModal.modo === 'COMISS'
-                  ? 'border-[#0e0f0c] bg-[#f1f4ef] shadow-sm'
-                  : 'border-[#dfe4dd] bg-white hover:border-[#b0b8ac]'
+                  ? 'border-brand-dark bg-sage-light shadow-sm'
+                  : 'border-sage-border bg-white hover:border-sage-border-dark'
               ]"
             >
-              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white border border-[#d7dcd5]">
-                <Percent class="h-5 w-5 text-[#0e0f0c]" />
+              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white border border-sage-border-dark">
+                <Percent class="h-5 w-5 text-brand-dark" />
               </div>
               <div>
-                <p class="text-sm font-extrabold text-[#0e0f0c]">Taxas de Comissões</p>
-                <p class="mt-0.5 text-xs text-[#646862]">Tabelas percentuais com período de vigência definido.</p>
+                <p class="text-sm font-extrabold text-brand-dark">Taxas de Comissões</p>
+                <p class="mt-0.5 text-xs text-sage-muted">Tabelas percentuais com período de vigência definido.</p>
               </div>
             </button>
           </div>
@@ -109,8 +109,8 @@
         <!-- MODO CICLO MENSAL (RH + VENDAS JUNTOS) -->
         <template v-if="store.uploadModal.modo === 'CICLO'">
           <!-- COMPETÊNCIA -->
-          <div class="rounded-xl border border-[#dfe4dd] bg-[#fbfcfb] p-4">
-            <label for="competenciaInput" class="block text-xs font-bold uppercase tracking-wider text-[#0e0f0c]">
+          <div class="rounded-xl border border-sage-border bg-sage-light/40 p-4">
+            <label for="competenciaInput" class="block text-xs font-bold uppercase tracking-wider text-brand-dark">
               2. Competência do Ciclo (Mês/Ano)
             </label>
             <div class="mt-2 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
@@ -119,19 +119,19 @@
                 type="text"
                 v-model="store.uploadModal.competencia"
                 placeholder="Ex: 12/2025"
-                class="focus-ring w-full sm:max-w-xs rounded-xl border border-[#dfe4dd] bg-white px-4 py-2.5 text-sm font-semibold outline-none"
+                class="focus-ring w-full sm:max-w-xs rounded-xl border border-sage-border bg-white px-4 py-2.5 text-sm font-semibold text-brand-dark outline-none"
               />
-              <span class="text-xs text-[#646862]">Formato MM/AAAA. Utilizado para cruzamento relacional e integridade.</span>
+              <span class="text-xs text-sage-muted">Formato MM/AAAA. Utilizado para cruzamento relacional e integridade.</span>
             </div>
           </div>
 
           <!-- DROPZONES CONJUNTOS DE RH E VENDAS -->
           <div>
             <div class="flex items-center justify-between">
-              <label class="block text-xs font-bold uppercase tracking-wider text-[#646862]">
+              <label class="block text-xs font-bold uppercase tracking-wider text-sage-muted">
                 3. Anexe as duas planilhas (.xlsx) do ciclo
               </label>
-              <span class="text-[11px] font-bold text-[#b86700]">Envio conjunto obrigatório</span>
+              <span class="text-[11px] font-bold text-warning">Envio conjunto obrigatório</span>
             </div>
 
             <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -143,10 +143,10 @@
                 :class="[
                   'flex flex-col justify-between rounded-2xl border-2 border-dashed p-5 text-center transition min-h-[190px]',
                   store.uploadModal.rhFile
-                    ? 'border-[#2ead4b] bg-[#eef8e6]/40'
+                    ? 'border-success bg-success-bg/40'
                     : isDraggingRh
-                    ? 'border-[#9fe870] bg-[#eef8e6]'
-                    : 'border-[#d0d7cd] bg-white hover:border-[#9fe870]'
+                    ? 'border-brand bg-success-bg'
+                    : 'border-sage-border-dark bg-white hover:border-brand'
                 ]"
               >
                 <input
@@ -159,18 +159,18 @@
 
                 <!-- Se arquivo de RH foi anexado -->
                 <div v-if="store.uploadModal.rhFile" class="flex flex-col items-center justify-center flex-1 py-2">
-                  <div class="grid h-12 w-12 place-items-center rounded-xl bg-[#eef8e6] text-[#2ead4b]">
+                  <div class="grid h-12 w-12 place-items-center rounded-xl bg-success-bg text-success">
                     <CheckCircle2 class="h-6 w-6" />
                   </div>
-                  <p class="mt-2 text-xs font-bold uppercase tracking-wider text-[#2ead4b]">Base de RH Anexada</p>
-                  <p class="mt-1 break-all text-xs font-extrabold text-[#0e0f0c] max-w-[220px]">
+                  <p class="mt-2 text-xs font-bold uppercase tracking-wider text-success">Base de RH Anexada</p>
+                  <p class="mt-1 break-all text-xs font-extrabold text-brand-dark max-w-[220px]">
                     {{ store.uploadModal.rhFile.name }}
                   </p>
-                  <p class="text-[11px] text-[#646862]">{{ formatFileSize(store.uploadModal.rhFile.size) }}</p>
+                  <p class="text-[11px] text-sage-muted">{{ formatFileSize(store.uploadModal.rhFile.size) }}</p>
                   <button
                     type="button"
                     @click="store.setRhFile(null)"
-                    class="focus-ring mt-3 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-[#d03238] hover:bg-[#fce8e8]"
+                    class="focus-ring mt-3 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger-bg"
                   >
                     <Trash2 class="h-3.5 w-3.5" />
                     <span>Substituir</span>
@@ -179,12 +179,12 @@
 
                 <!-- Se pendente RH -->
                 <div v-else class="cursor-pointer flex flex-col items-center justify-center flex-1 py-3" @click="triggerRhInput">
-                  <div class="grid h-11 w-11 place-items-center rounded-xl bg-[#f1f4ef] text-[#0e0f0c]">
+                  <div class="grid h-11 w-11 place-items-center rounded-xl bg-sage-light text-brand-dark">
                     <Users class="h-5 w-5" />
                   </div>
-                  <p class="mt-2.5 text-xs font-extrabold text-[#0e0f0c]">1. Base de Recursos Humanos</p>
-                  <p class="mt-0.5 text-[11px] text-[#646862]">Colaboradores, cargos e filiais</p>
-                  <span class="mt-3 inline-block rounded-full bg-[#0e0f0c] px-3 py-1 text-[11px] font-bold text-white hover:bg-[#282a27]">
+                  <p class="mt-2.5 text-xs font-extrabold text-brand-dark">1. Base de Recursos Humanos</p>
+                  <p class="mt-0.5 text-[11px] text-sage-muted">Colaboradores, cargos e filiais</p>
+                  <span class="mt-3 inline-block rounded-full bg-brand-dark px-3 py-1 text-[11px] font-bold text-white hover:bg-brand-dark-hover">
                     Anexar RH (.xlsx)
                   </span>
                 </div>
@@ -198,10 +198,10 @@
                 :class="[
                   'flex flex-col justify-between rounded-2xl border-2 border-dashed p-5 text-center transition min-h-[190px]',
                   store.uploadModal.vendasFile
-                    ? 'border-[#2ead4b] bg-[#eef8e6]/40'
+                    ? 'border-success bg-success-bg/40'
                     : isDraggingVendas
-                    ? 'border-[#9fe870] bg-[#eef8e6]'
-                    : 'border-[#d0d7cd] bg-white hover:border-[#9fe870]'
+                    ? 'border-brand bg-success-bg'
+                    : 'border-sage-border-dark bg-white hover:border-brand'
                 ]"
               >
                 <input
@@ -214,18 +214,18 @@
 
                 <!-- Se arquivo de Vendas foi anexado -->
                 <div v-if="store.uploadModal.vendasFile" class="flex flex-col items-center justify-center flex-1 py-2">
-                  <div class="grid h-12 w-12 place-items-center rounded-xl bg-[#eef8e6] text-[#2ead4b]">
+                  <div class="grid h-12 w-12 place-items-center rounded-xl bg-success-bg text-success">
                     <CheckCircle2 class="h-6 w-6" />
                   </div>
-                  <p class="mt-2 text-xs font-bold uppercase tracking-wider text-[#2ead4b]">Base de Vendas Anexada</p>
-                  <p class="mt-1 break-all text-xs font-extrabold text-[#0e0f0c] max-w-[220px]">
+                  <p class="mt-2 text-xs font-bold uppercase tracking-wider text-success">Base de Vendas Anexada</p>
+                  <p class="mt-1 break-all text-xs font-extrabold text-brand-dark max-w-[220px]">
                     {{ store.uploadModal.vendasFile.name }}
                   </p>
-                  <p class="text-[11px] text-[#646862]">{{ formatFileSize(store.uploadModal.vendasFile.size) }}</p>
+                  <p class="text-[11px] text-sage-muted">{{ formatFileSize(store.uploadModal.vendasFile.size) }}</p>
                   <button
                     type="button"
                     @click="store.setVendasFile(null)"
-                    class="focus-ring mt-3 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-[#d03238] hover:bg-[#fce8e8]"
+                    class="focus-ring mt-3 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger-bg"
                   >
                     <Trash2 class="h-3.5 w-3.5" />
                     <span>Substituir</span>
@@ -234,12 +234,12 @@
 
                 <!-- Se pendente Vendas -->
                 <div v-else class="cursor-pointer flex flex-col items-center justify-center flex-1 py-3" @click="triggerVendasInput">
-                  <div class="grid h-11 w-11 place-items-center rounded-xl bg-[#f1f4ef] text-[#0e0f0c]">
+                  <div class="grid h-11 w-11 place-items-center rounded-xl bg-sage-light text-brand-dark">
                     <TrendingUp class="h-5 w-5" />
                   </div>
-                  <p class="mt-2.5 text-xs font-extrabold text-[#0e0f0c]">2. Base de Vendas</p>
-                  <p class="mt-0.5 text-[11px] text-[#646862]">Transações e faturamento por vendedor</p>
-                  <span class="mt-3 inline-block rounded-full bg-[#0e0f0c] px-3 py-1 text-[11px] font-bold text-white hover:bg-[#282a27]">
+                  <p class="mt-2.5 text-xs font-extrabold text-brand-dark">2. Base de Vendas</p>
+                  <p class="mt-0.5 text-[11px] text-sage-muted">Transações e faturamento por vendedor</p>
+                  <span class="mt-3 inline-block rounded-full bg-brand-dark px-3 py-1 text-[11px] font-bold text-white hover:bg-brand-dark-hover">
                     Anexar Vendas (.xlsx)
                   </span>
                 </div>
@@ -251,39 +251,39 @@
         <!-- MODO COMISSÕES (VIGÊNCIA) -->
         <template v-else>
           <!-- VIGÊNCIA MANDATÓRIA COM DATA FIM -->
-          <div class="rounded-xl border border-[#dfe4dd] bg-[#fbfcfb] p-4">
+          <div class="rounded-xl border border-sage-border bg-sage-light/40 p-4">
             <div class="flex items-center justify-between">
-              <label class="block text-xs font-bold uppercase tracking-wider text-[#0e0f0c]">
+              <label class="block text-xs font-bold uppercase tracking-wider text-brand-dark">
                 2. Período de Vigência das Taxas
               </label>
-              <span class="text-[10px] font-bold uppercase tracking-wider text-[#b86700]">Data fim obrigatória</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-warning">Data fim obrigatória</span>
             </div>
             <div class="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <span class="block text-xs font-medium text-[#646862]">Início da vigência:</span>
+                <span class="block text-xs font-medium text-sage-muted">Início da vigência:</span>
                 <input
                   type="date"
                   v-model="store.uploadModal.dataInicio"
-                  class="focus-ring mt-1 w-full rounded-xl border border-[#dfe4dd] bg-white px-3 py-2.5 text-sm font-semibold outline-none"
+                  class="focus-ring mt-1 w-full rounded-xl border border-sage-border bg-white px-3 py-2.5 text-sm font-semibold text-brand-dark outline-none"
                 />
               </div>
               <div>
-                <span class="block text-xs font-medium text-[#646862]">Término da vigência (Obrigatório):</span>
+                <span class="block text-xs font-medium text-sage-muted">Término da vigência (Obrigatório):</span>
                 <input
                   type="date"
                   v-model="store.uploadModal.dataFim"
-                  class="focus-ring mt-1 w-full rounded-xl border border-[#dfe4dd] bg-white px-3 py-2.5 text-sm font-semibold outline-none"
+                  class="focus-ring mt-1 w-full rounded-xl border border-sage-border bg-white px-3 py-2.5 text-sm font-semibold text-brand-dark outline-none"
                 />
               </div>
             </div>
-            <p class="mt-2 text-xs text-[#646862]">
+            <p class="mt-2 text-xs text-sage-muted">
               Taxas sem vigência determinada geram inconsistências operacionais e sobreposição de regras.
             </p>
           </div>
 
           <!-- DROPZONE DE COMISSÕES -->
           <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-[#646862]">
+            <label class="block text-xs font-bold uppercase tracking-wider text-sage-muted">
               3. Selecione a Planilha de Taxas (.xlsx)
             </label>
             <div
@@ -292,7 +292,7 @@
               @drop.prevent="onDropComiss"
               :class="[
                 'mt-2 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-7 text-center transition',
-                isDraggingComiss ? 'border-[#9fe870] bg-[#eef8e6]' : 'border-[#d0d7cd] bg-white hover:border-[#9fe870]'
+                isDraggingComiss ? 'border-brand bg-success-bg' : 'border-sage-border-dark bg-white hover:border-brand'
               ]"
             >
               <input
@@ -304,17 +304,17 @@
               />
 
               <div v-if="store.uploadModal.comissFile" class="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 text-center sm:text-left w-full max-w-full">
-                <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#eef1ec] text-[#0e0f0c]">
-                  <FileSpreadsheet class="h-6 w-6 text-[#2ead4b]" />
+                <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-sage-pill text-brand-dark">
+                  <FileSpreadsheet class="h-6 w-6 text-success" />
                 </div>
                 <div class="min-w-0 flex-1">
-                  <p class="break-all text-sm font-extrabold text-[#0e0f0c]">{{ store.uploadModal.comissFile.name }}</p>
-                  <p class="mt-0.5 text-xs text-[#646862]">{{ formatFileSize(store.uploadModal.comissFile.size) }} • XLSX</p>
+                  <p class="break-all text-sm font-extrabold text-brand-dark">{{ store.uploadModal.comissFile.name }}</p>
+                  <p class="mt-0.5 text-xs text-sage-muted">{{ formatFileSize(store.uploadModal.comissFile.size) }} • XLSX</p>
                 </div>
                 <button
                   type="button"
                   @click="store.setComissFile(null)"
-                  class="focus-ring rounded-lg p-2 text-[#646862] hover:bg-[#fce8e8] hover:text-[#d03238]"
+                  class="focus-ring rounded-lg p-2 text-sage-muted hover:bg-danger-bg hover:text-danger"
                   title="Remover arquivo"
                 >
                   <Trash2 class="h-4 w-4" />
@@ -322,27 +322,27 @@
               </div>
 
               <div v-else class="cursor-pointer" @click="triggerComissInput">
-                <UploadCloud class="mx-auto h-10 w-10 text-[#646862]" />
-                <p class="mt-2 text-sm font-extrabold text-[#0e0f0c]">
+                <UploadCloud class="mx-auto h-10 w-10 text-sage-muted" />
+                <p class="mt-2 text-sm font-extrabold text-brand-dark">
                   Arraste seu arquivo XLSX aqui ou <span class="underline underline-offset-4">procure no computador</span>
                 </p>
-                <p class="mt-1 text-xs text-[#868685]">Formatos suportados: .xlsx, .xls</p>
+                <p class="mt-1 text-xs text-sage-muted">Formatos suportados: .xlsx, .xls</p>
               </div>
             </div>
           </div>
         </template>
 
         <!-- MENSAGEM DE ERRO DO FORMULÁRIO (SE HOUVER) -->
-        <div v-if="store.uploadModal.errorMessage" class="rounded-xl border border-[#d03238] bg-[#fce8e8] p-3.5 text-xs font-semibold text-[#a7000d]">
+        <div v-if="store.uploadModal.errorMessage" class="rounded-xl border border-danger bg-danger-bg p-3.5 text-xs font-semibold text-danger-dark">
           {{ store.uploadModal.errorMessage }}
         </div>
 
         <!-- SELETOR DE MODO / SIMULAÇÃO (FACILITADOR PARA BANCA / TESTES DE DEV) -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl bg-[#f1f4ef] px-4 py-2.5 text-xs text-[#646862]">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl bg-sage-light px-4 py-2.5 text-xs text-sage-muted">
           <span class="font-medium shrink-0">Simulação / Conexão Backend:</span>
           <select
             v-model="store.uploadModal.cenarioTeste"
-            class="w-full sm:w-auto rounded-lg border border-[#d7dcd5] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#0e0f0c] outline-none"
+            class="w-full sm:w-auto rounded-lg border border-sage-border-dark bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-dark outline-none"
           >
             <option value="real">Conexão Real com Spring Boot (8080)</option>
             <template v-if="store.uploadModal.modo === 'CICLO'">
@@ -364,7 +364,7 @@
           <button
             type="button"
             @click="store.closeUploadModal"
-            class="focus-ring w-full sm:w-auto rounded-full border border-[#d7dcd5] bg-white px-5 py-3 text-sm font-semibold text-[#0e0f0c] transition hover:bg-[#f1f4ef]"
+            class="focus-ring w-full sm:w-auto rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-semibold text-brand-dark transition hover:bg-sage-light"
           >
             Cancelar
           </button>
@@ -373,7 +373,7 @@
             type="button"
             :disabled="store.uploadModal.isLoading || !store.podeEnviar"
             @click="store.enviarDados"
-            class="focus-ring flex w-full sm:w-auto items-center justify-center gap-2 rounded-full bg-[#9fe870] px-7 py-3 text-sm font-bold text-[#0e0f0c] transition hover:bg-[#8fe25f] disabled:cursor-not-allowed disabled:opacity-50"
+            class="focus-ring flex w-full sm:w-auto items-center justify-center gap-2 rounded-full bg-brand px-7 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span v-if="store.uploadModal.isLoading" class="flex items-center gap-2">
               <RefreshCw class="h-4 w-4 animate-spin" />
