@@ -23,10 +23,10 @@
   - Validação mandatória de vigência: campo 'data_fim' obrigatório para evitar regras com vigência indeterminada.
   - Criação de regras via NLP: tradução de texto livre (ex: "pagar 5% no ecommerce em dezembro") em JSON estruturado.
   - Carga em lote (XLSX) [Implementado no Frontend]:
-    - Upload multipart/form-data para as bases de RH, VENDAS e COMISS.
-    - Contratos específicos: Competência (MM/AAAA) para RH e Vendas; Vigência com data de término obrigatória para Comissões.
-    - Relatório de validação com apontamentos estruturados por Linha, Campo, Motivo e Severidade (IMPEDITIVO vs AVISO).
-    - Regra estrita de integridade: em caso de erro impeditivo ou bloqueio (duplicidade/sobreposição), mensagem mandatória *"Planilha com pendências: corrija e envie novamente"* com bloqueio total (sem importação parcial ou forçada).
+    - Upload multipart/form-data com suporte a **Fechamento de Ciclo Mensal Conjunto** (envio obrigatório e atômico de RH + Vendas) e **Taxas de Comissão** (vigência com data de término obrigatória).
+    - Validação cruzada (cross-check) relacional: consistência entre vendedores da base de Vendas e colaboradores ativos na base de RH da competência.
+    - Relatório de validação com apontamentos estruturados por Origem (RH, Vendas, Cruzamento), Linha, Campo, Motivo e Severidade (IMPEDITIVO vs AVISO).
+    - Regra estrita de integridade atômica: em caso de erro impeditivo, bloqueio relacional ou sobreposição, mensagem mandatória *"Planilha com pendências: corrija e envie novamente"* com bloqueio total (sem importação parcial ou forçada de meio ciclo).
     - Carga com avisos não impeditivos permitindo conclusão e reenvio após correções externas.
   - Logs imutáveis para cálculos de comissão.
 - Sprint 2:

@@ -13,14 +13,19 @@
           <AlertCircle class="h-6 w-6" />
         </div>
         <div class="flex-1">
-          <!-- Frase mandatória exigida pelo escopo aprovado -->
+          <!-- Frase mandatória estrita do projeto -->
           <h3 class="text-lg font-extrabold tracking-[-0.03em] text-[#a7000d]">
             Planilha com pendências: corrija e envie novamente
           </h3>
           <p class="mt-1 text-sm leading-6 text-[#454745]">
-            A carga foi <strong>integralmente rejeitada</strong> devido a apontamentos impeditivos ou violação de regras de integridade (como duplicidade ou sobreposição). Nenhuma linha foi gravada no banco de dados.
+            <template v-if="report.isCiclo">
+              O ciclo da competência <strong>{{ report.competencia }}</strong> foi <strong>integralmente rejeitado</strong> devido a inconsistências impeditivas em RH, Vendas ou violação de integridade relacional entre as bases. Nenhuma linha foi gravada no banco de dados.
+            </template>
+            <template v-else>
+              A carga foi <strong>integralmente rejeitada</strong> devido a apontamentos impeditivos ou violação de regras de integridade (como duplicidade ou sobreposição). Nenhuma linha foi gravada no banco de dados.
+            </template>
           </p>
-          <div class="mt-3 flex items-center gap-2 text-xs font-semibold text-[#a72027]">
+          <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-[#a72027]">
             <span>Status da API: REJEITADO</span>
             <span>•</span>
             <span>Importação parcial ou forçada não permitida</span>
@@ -44,7 +49,7 @@
             Planilha com avisos não impeditivos
           </h3>
           <p class="mt-1 text-sm leading-6 text-[#646862]">
-            Foram identificadas inconsistências leves que não impedem a importação. Você pode concluir a carga agora ou reenviar uma versão corrigida.
+            Foram identificadas inconsistências leves que não impedem a importação. Você pode concluir e fechar o ciclo agora ou reenviar uma versão corrigida.
           </p>
         </div>
       </div>
@@ -62,17 +67,60 @@
         </div>
         <div class="flex-1">
           <h3 class="text-lg font-extrabold tracking-[-0.03em] text-[#054d28]">
-            Carga validada e efetivada com sucesso
+            {{ report.isCiclo ? 'Ciclo validado e fechado com sucesso' : 'Carga validada e efetivada com sucesso' }}
           </h3>
           <p class="mt-1 text-sm leading-6 text-[#054d28]">
-            Todos os registros do arquivo foram validados pelo Spring Boot e integrados à base da competência.
+            <template v-if="report.isCiclo">
+              As bases de <strong>RH e Vendas</strong> foram devidamente cruzadas e validadas. A competência <strong>{{ report.competencia }}</strong> está pronta para apuração e simulação de comissões.
+            </template>
+            <template v-else>
+              Todos os registros foram validados pelo Spring Boot e integrados à base de dados.
+            </template>
           </p>
         </div>
       </div>
     </div>
 
     <!-- RESUMO NUMÉRICO DA VALIDAÇÃO -->
-    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div v-if="report.isCiclo" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div class="rounded-xl border border-[#e4e8e2] bg-white p-4">
+        <p class="text-xs font-semibold uppercase tracking-wider text-[#646862]">Base de RH</p>
+        <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-[#0e0f0c]">
+          {{ report.rh?.linhasValidas || 0 }} <span class="text-xs font-normal text-[#646862]">/ {{ report.rh?.totalLinhas || 0 }}</span>
+        </p>
+        <p class="mt-0.5 text-[11px] font-semibold text-[#2ead4b]">Colaboradores válidos</p>
+      </div>
+
+      <div class="rounded-xl border border-[#e4e8e2] bg-white p-4">
+        <p class="text-xs font-semibold uppercase tracking-wider text-[#646862]">Base de Vendas</p>
+        <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-[#0e0f0c]">
+          {{ report.vendas?.linhasValidas || 0 }} <span class="text-xs font-normal text-[#646862]">/ {{ report.vendas?.totalLinhas || 0 }}</span>
+        </p>
+        <p class="mt-0.5 text-[11px] font-semibold text-[#2ead4b]">Vendas válidas</p>
+      </div>
+
+      <div
+        class="rounded-xl border p-4"
+        :class="totalImpeditivos > 0 ? 'border-[#d03238] bg-[#fce8e8]/50' : 'border-[#e4e8e2] bg-white'"
+      >
+        <p class="text-xs font-semibold uppercase tracking-wider text-[#646862]">Impeditivos</p>
+        <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em]" :class="totalImpeditivos > 0 ? 'text-[#d03238]' : 'text-[#0e0f0c]'">
+          {{ totalImpeditivos }}
+        </p>
+        <p class="mt-0.5 text-[11px] font-semibold text-[#646862]">Bloqueios no ciclo</p>
+      </div>
+
+      <div class="rounded-xl border border-[#e4e8e2] bg-white p-4">
+        <p class="text-xs font-semibold uppercase tracking-wider text-[#646862]">Avisos</p>
+        <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em]" :class="totalAvisos > 0 ? 'text-[#b86700]' : 'text-[#0e0f0c]'">
+          {{ totalAvisos }}
+        </p>
+        <p class="mt-0.5 text-[11px] font-semibold text-[#646862]">Alertas leves</p>
+      </div>
+    </div>
+
+    <!-- RESUMO PADRÃO (BASE AVULSA / COMISS) -->
+    <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <div class="rounded-xl border border-[#e4e8e2] bg-white p-4">
         <p class="text-xs font-semibold uppercase tracking-wider text-[#646862]">Total de linhas</p>
         <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-[#0e0f0c]">{{ report.totalLinhas }}</p>
@@ -109,11 +157,16 @@
             Relatório de inconsistências detalhado
           </h4>
           <p class="text-xs text-[#646862]">
-            Arquivo: {{ report.nomeArquivo }} • Base: {{ report.tipoBase }}
+            <template v-if="report.isCiclo">
+              Ciclo Mensal: RH & Vendas • Competência {{ report.competencia }}
+            </template>
+            <template v-else>
+              Arquivo: {{ report.nomeArquivo }} • Base: {{ report.tipoBase }}
+            </template>
           </p>
         </div>
 
-        <!-- Filtro Rápido -->
+        <!-- Filtros Rápidos -->
         <div class="flex items-center gap-1 rounded-full bg-[#eef1ec] p-1 text-xs font-semibold overflow-x-auto max-w-full">
           <button
             type="button"
@@ -145,15 +198,27 @@
           >
             Avisos ({{ totalAvisos }})
           </button>
+          <button
+            v-if="totalCruzamento > 0"
+            type="button"
+            @click="filtroAtual = 'CRUZAMENTO'"
+            :class="[
+              'whitespace-nowrap rounded-full px-3 py-1.5 transition',
+              filtroAtual === 'CRUZAMENTO' ? 'bg-[#0e0f0c] text-white shadow-sm' : 'text-[#646862] hover:text-[#0e0f0c]'
+            ]"
+          >
+            Cruzamento ({{ totalCruzamento }})
+          </button>
         </div>
       </div>
 
       <!-- Tabela -->
       <div class="mt-4 overflow-x-auto">
-        <table class="w-full min-w-[560px] text-left text-sm" v-if="inconsistenciasFiltradas.length > 0">
+        <table class="w-full min-w-[620px] text-left text-sm" v-if="inconsistenciasFiltradas.length > 0">
           <thead class="bg-[#eef1ec] text-[10px] uppercase tracking-[0.12em] text-[#646862]">
             <tr>
-              <th class="rounded-l-lg px-4 py-3 font-semibold">Linha</th>
+              <th v-if="report.isCiclo" class="rounded-l-lg px-4 py-3 font-semibold">Origem</th>
+              <th :class="[!report.isCiclo ? 'rounded-l-lg' : '', 'px-4 py-3 font-semibold']">Linha</th>
               <th class="px-4 py-3 font-semibold">Campo / Coluna</th>
               <th class="px-4 py-3 font-semibold">Motivo do apontamento</th>
               <th class="rounded-r-lg px-4 py-3 font-semibold text-right">Severidade</th>
@@ -165,6 +230,28 @@
               :key="idx"
               :class="item.severidade === 'IMPEDITIVO' ? 'bg-[#fffbfb]' : ''"
             >
+              <!-- Coluna Origem para Ciclos -->
+              <td v-if="report.isCiclo" class="px-4 py-3">
+                <span
+                  v-if="item.base === 'CRUZAMENTO'"
+                  class="inline-flex items-center rounded-md bg-[#0e0f0c] px-2 py-0.5 text-[11px] font-bold text-white"
+                >
+                  RH ↔ Vendas
+                </span>
+                <span
+                  v-else-if="item.base === 'RH'"
+                  class="inline-flex items-center rounded-md bg-[#eef1ec] px-2 py-0.5 text-[11px] font-bold text-[#0e0f0c]"
+                >
+                  RH
+                </span>
+                <span
+                  v-else
+                  class="inline-flex items-center rounded-md bg-[#eef8e6] px-2 py-0.5 text-[11px] font-bold text-[#1e6e2f]"
+                >
+                  Vendas
+                </span>
+              </td>
+
               <td class="px-4 py-3 font-mono text-xs font-bold text-[#0e0f0c]">
                 Linha {{ item.linha }}
               </td>
@@ -202,7 +289,7 @@
           class="focus-ring flex w-full items-center justify-center gap-2 rounded-full bg-[#0e0f0c] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#252824] sm:w-auto"
         >
           <RefreshCw class="h-4 w-4" />
-          <span>Substituir e enviar nova planilha</span>
+          <span>{{ report.isCiclo ? 'Substituir planilhas e reenviar ciclo' : 'Substituir e reenviar planilha' }}</span>
         </button>
       </template>
 
@@ -221,7 +308,7 @@
           class="focus-ring flex w-full items-center justify-center gap-2 rounded-full bg-[#9fe870] px-6 py-3 text-sm font-bold text-[#0e0f0c] transition hover:bg-[#8fe25f] sm:w-auto"
         >
           <CheckCircle2 class="h-4 w-4" />
-          <span>Concluir importação</span>
+          <span>{{ report.isCiclo ? 'Concluir e fechar ciclo' : 'Concluir importação' }}</span>
         </button>
       </template>
     </div>
@@ -264,12 +351,19 @@ const totalAvisos = computed(() => {
   return listaInconsistencias.value.filter((i) => i.severidade === 'AVISO').length
 })
 
+const totalCruzamento = computed(() => {
+  return listaInconsistencias.value.filter((i) => i.base === 'CRUZAMENTO').length
+})
+
 const inconsistenciasFiltradas = computed(() => {
   if (filtroAtual.value === 'IMPEDITIVO') {
     return listaInconsistencias.value.filter((i) => i.severidade === 'IMPEDITIVO')
   }
   if (filtroAtual.value === 'AVISO') {
     return listaInconsistencias.value.filter((i) => i.severidade === 'AVISO')
+  }
+  if (filtroAtual.value === 'CRUZAMENTO') {
+    return listaInconsistencias.value.filter((i) => i.base === 'CRUZAMENTO')
   }
   return listaInconsistencias.value
 })
