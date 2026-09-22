@@ -11,8 +11,9 @@ defineProps({
 })
 
 const toneClasses = {
-  neutral: 'bg-[#eef1ec] text-[#646862]',
-  success: 'bg-[#e3f6d8] text-[#47872b]',
-  warning: 'bg-[#fff0bb] text-[#8c6e1e]'
+  neutral: 'bg-sage-pill text-sage-muted',
+  success: 'bg-success-surface text-success-text',
+  warning: 'bg-warning-light text-warning-dark',
+  danger: 'bg-danger-bg text-danger'
 }
 </script>
