@@ -7,10 +7,18 @@
         <RouterView />
       </main>
     </div>
+
+    <!-- Modal Global de Upload e Diagnóstico -->
+    <UploadBaseModal />
+
+    <!-- Notificações Flutuantes (Toasts) -->
+    <ToastContainer />
   </div>
 </template>
 
 <script setup>
 import SidebarNav from './SidebarNav.vue'
 import Topbar from './Topbar.vue'
+import UploadBaseModal from '@/components/data/UploadBaseModal.vue'
+import ToastContainer from '@/components/common/ToastContainer.vue'
 </script>

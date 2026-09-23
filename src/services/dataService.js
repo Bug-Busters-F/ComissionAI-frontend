@@ -283,105 +283,302 @@ function gerarMockRelatorio(tipoBase, nomeArquivo, cenario = 'cenario_impeditivo
   }
 }
 
+/**
+ * Converte identificadores de base do front para o enum ImportType esperado pelo Spring Boot:
+ * HR, SALES, COMISSIONS
+ */
+export function mapTipoBaseToImportType(tipo) {
+  if (!tipo) return 'HR'
+  const t = String(tipo).toUpperCase().trim()
+  if (t === 'RH' || t === 'HR') return 'HR'
+  if (t === 'VENDAS' || t === 'SALES') return 'SALES'
+  if (t === 'COMISS' || t === 'COMISSIONS' || t === 'TAXAS_BASE') return 'COMISSIONS'
+  return t
+}
+
 export const dataService = {
   /**
-   * Envia o ciclo conjunto fechado (RH + Vendas) para a competência indicada
+   * Envia o ciclo conjunto de forma sequencial (RH primeiro, depois Vendas)
+   * emitindo progresso a cada etapa
    */
-  async uploadCiclo({ rhFile, vendasFile, competencia, simulacao = 'real' }) {
+  async uploadCicloSequencial({
+    rhFile,
+    vendasFile,
+    competencia,
+    simulacao = 'real',
+    onProgress = null,
+    signal = null
+  }) {
     if (simulacao && simulacao !== 'real') {
-      await new Promise((r) => setTimeout(r, 700))
+      onProgress?.({
+        stage: 'RH',
+        progress: 25,
+        message: 'Validando estrutura da base de RH...'
+      })
+      await new Promise((r) => setTimeout(r, 600))
+
+      onProgress?.({
+        stage: 'VENDAS',
+        progress: 65,
+        message: 'Base de RH validada. Processando base de Vendas...'
+      })
+      await new Promise((r) => setTimeout(r, 600))
+
+      onProgress?.({
+        stage: 'CRUZAMENTO',
+        progress: 95,
+        message: 'Cruzando integridade relacional entre RH e Vendas...'
+      })
+      await new Promise((r) => setTimeout(r, 400))
+
       return gerarMockRelatorioCiclo(rhFile?.name, vendasFile?.name, competencia, simulacao)
     }
 
-    const formData = new FormData()
-    formData.append('arquivoRh', rhFile)
-    formData.append('rhFile', rhFile)
-    formData.append('arquivoVendas', vendasFile)
-    formData.append('vendasFile', vendasFile)
-    formData.append('competencia', competencia)
+    // ==========================================
+    // FLUXO REAL SEQUENCIAL VIA BACKEND (8080)
+    // ==========================================
 
+    // 1. Etapa 1: Envio da base de RH
+    onProgress?.({
+      stage: 'RH',
+      progress: 15,
+      message: 'Enviando e processando base de RH (1/2)...'
+    })
+
+    const formRh = new FormData()
+    formRh.append('file', rhFile)
+
+    let respRh
     try {
-      const response = await api.post('/importacoes/ciclo', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const httpRespRh = await api.post('/imports/upload', formRh, {
+        params: { importType: 'HR' },
+        headers: { 'Content-Type': 'multipart/form-data' },
+        signal
       })
-      return response.data
+      respRh = httpRespRh.data
     } catch (err) {
-      if (err.response?.status === 404) {
-        try {
-          const fallbackResp = await api.post('/imports/ciclo', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          })
-          return fallbackResp.data
-        } catch (subErr) {
-          if (subErr.response?.data?.inconsistencias || subErr.response?.data?.status) {
-            return subErr.response.data
+      console.error('Falha no upload da base de RH:', err)
+      const motivo =
+        err.response?.data?.message ||
+        (err.response?.status ? `Erro ${err.response.status} ao processar RH` : 'Servidor Spring Boot inatingível')
+      
+      const relatorioErro = {
+        isCiclo: true,
+        competencia,
+        nomeArquivo: `${rhFile.name} & ${vendasFile.name}`,
+        tipoBase: 'CICLO_MENSAL',
+        status: 'REJEITADO',
+        totalLinhas: 0,
+        linhasValidas: 0,
+        rejeicaoIntegral: true,
+        rh: {
+          nomeArquivo: rhFile.name,
+          totalLinhas: 0,
+          linhasValidas: 0,
+          status: 'REJEITADO'
+        },
+        vendas: {
+          nomeArquivo: vendasFile.name,
+          totalLinhas: 0,
+          linhasValidas: 0,
+          status: 'NAO_ENVIADO'
+        },
+        inconsistencias: [
+          {
+            base: 'RH',
+            linha: 1,
+            campo: 'arquivo',
+            motivo: `Falha crítica no processamento da base de RH: ${motivo}. A base de Vendas não foi processada para preservar a integridade.`,
+            severidade: 'IMPEDITIVO'
           }
-          throw subErr
-        }
+        ],
+        processadoEm: new Date().toISOString()
       }
-
-      if (err.response?.data?.inconsistencias || err.response?.data?.status) {
-        return err.response.data
-      }
-
-      if (!err.response) {
-        console.warn('Backend Spring Boot indisponível na porta 8080. Ativando diagnóstico de simulação com erro de integridade cruzada (RH x Vendas).')
-        return gerarMockRelatorioCiclo(rhFile?.name, vendasFile?.name, competencia, 'cenario_cruzamento')
-      }
-
-      throw err
+      return relatorioErro
     }
+
+    // 2. Etapa 2: Envio da base de Vendas (RH já persistido no banco)
+    const rhLinhas = respRh.totalLinhas ?? 0
+    onProgress?.({
+      stage: 'VENDAS',
+      progress: 55,
+      message: `RH processado (${rhLinhas} registros). Enviando base de Vendas (2/2)...`
+    })
+
+    const formVendas = new FormData()
+    formVendas.append('file', vendasFile)
+
+    let respVendas
+    try {
+      const httpRespVendas = await api.post('/imports/upload', formVendas, {
+        params: { importType: 'SALES' },
+        headers: { 'Content-Type': 'multipart/form-data' },
+        signal
+      })
+      respVendas = httpRespVendas.data
+    } catch (err) {
+      console.error('Falha no upload da base de Vendas:', err)
+      const motivo =
+        err.response?.data?.message ||
+        (err.response?.status ? `Erro ${err.response.status} ao processar Vendas` : 'Erro no processamento de vendas')
+
+      const relatorioErro = {
+        isCiclo: true,
+        competencia,
+        nomeArquivo: `${rhFile.name} & ${vendasFile.name}`,
+        tipoBase: 'CICLO_MENSAL',
+        status: 'REJEITADO',
+        totalLinhas: rhLinhas,
+        linhasValidas: rhLinhas,
+        rejeicaoIntegral: true,
+        rh: {
+          nomeArquivo: rhFile.name,
+          totalLinhas: rhLinhas,
+          linhasValidas: rhLinhas,
+          status: 'SUCESSO'
+        },
+        vendas: {
+          nomeArquivo: vendasFile.name,
+          totalLinhas: 0,
+          linhasValidas: 0,
+          status: 'REJEITADO'
+        },
+        inconsistencias: [
+          {
+            base: 'VENDAS',
+            linha: 1,
+            campo: 'arquivo',
+            motivo: `A base de RH foi gravada com sucesso (${rhLinhas} registros), porém a base de Vendas falhou: ${motivo}`,
+            severidade: 'IMPEDITIVO'
+          }
+        ],
+        processadoEm: new Date().toISOString()
+      }
+      return relatorioErro
+    }
+
+    // 3. Etapa 3: Consolidação dos resultados com sucesso
+    const vendasLinhas = respVendas.totalLinhas ?? 0
+    const totalGeral = rhLinhas + vendasLinhas
+
+    onProgress?.({
+      stage: 'CONCLUIDO',
+      progress: 100,
+      message: `Ciclo concluído com sucesso! (RH: ${rhLinhas} | Vendas: ${vendasLinhas})`
+    })
+
+    return {
+      isCiclo: true,
+      competencia,
+      nomeArquivo: `${respRh.nomeArquivo || rhFile.name} & ${respVendas.nomeArquivo || vendasFile.name}`,
+      tipoBase: 'CICLO_MENSAL',
+      status: 'SUCESSO',
+      totalLinhas: totalGeral,
+      linhasValidas: totalGeral,
+      rejeicaoIntegral: false,
+      rh: {
+        nomeArquivo: respRh.nomeArquivo || rhFile.name,
+        totalLinhas: rhLinhas,
+        linhasValidas: rhLinhas,
+        status: 'SUCESSO'
+      },
+      vendas: {
+        nomeArquivo: respVendas.nomeArquivo || vendasFile.name,
+        totalLinhas: vendasLinhas,
+        linhasValidas: vendasLinhas,
+        status: 'SUCESSO'
+      },
+      inconsistencias: [],
+      processadoEm: new Date().toISOString()
+    }
+  },
+
+  /**
+   * Alias de compatibilidade para upload do ciclo
+   */
+  async uploadCiclo(params) {
+    return this.uploadCicloSequencial(params)
   },
 
   /**
    * Envia uma planilha avulsa para validação e carga (ex: COMISS com vigência)
    */
-  async uploadBase({ tipoBase, file, competencia, dataInicio, dataFim, simulacao = 'real' }) {
+  async uploadBase({
+    tipoBase,
+    file,
+    competencia,
+    dataInicio,
+    dataFim,
+    simulacao = 'real',
+    onProgress = null,
+    signal = null
+  }) {
     if (simulacao && simulacao !== 'real') {
-      await new Promise((r) => setTimeout(r, 700))
+      onProgress?.({ stage: 'ENVIO', progress: 50, message: 'Validando planilha...' })
+      await new Promise((r) => setTimeout(r, 600))
       return gerarMockRelatorio(tipoBase, file?.name, simulacao)
     }
 
+    const importType = mapTipoBaseToImportType(tipoBase)
     const formData = new FormData()
-    formData.append('arquivo', file)
     formData.append('file', file)
-    formData.append('tipoBase', tipoBase)
-    if (competencia) formData.append('competencia', competencia)
-    if (dataInicio) formData.append('dataInicio', dataInicio)
-    if (dataFim) formData.append('dataFim', dataFim)
+
+    onProgress?.({
+      stage: 'ENVIO',
+      progress: 40,
+      message: `Enviando planilha ${file.name} (${importType})...`
+    })
 
     try {
-      const response = await api.post('/importacoes/upload', formData, {
-        params: { tipoBase },
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const response = await api.post('/imports/upload', formData, {
+        params: { importType },
+        headers: { 'Content-Type': 'multipart/form-data' },
+        signal
       })
-      return response.data
+
+      const data = response.data
+      const total = data.totalLinhas ?? 0
+
+      onProgress?.({
+        stage: 'CONCLUIDO',
+        progress: 100,
+        message: `Base processada com sucesso! (${total} linhas)`
+      })
+
+      return {
+        nomeArquivo: data.nomeArquivo || file.name,
+        tipoBase: data.tipoBase || importType,
+        status: 'SUCESSO',
+        totalLinhas: total,
+        linhasValidas: total,
+        rejeicaoIntegral: false,
+        inconsistencias: [],
+        processadoEm: new Date().toISOString()
+      }
     } catch (err) {
-      if (err.response?.status === 404) {
-        try {
-          const fallbackResp = await api.post('/imports/upload', formData, {
-            params: { tipoBase },
-            headers: { 'Content-Type': 'multipart/form-data' }
-          })
-          return fallbackResp.data
-        } catch (subErr) {
-          if (subErr.response?.data?.inconsistencias || subErr.response?.data?.status) {
-            return subErr.response.data
+      console.error(`Falha no upload de base avulsa (${importType}):`, err)
+      const motivo =
+        err.response?.data?.message ||
+        (err.response?.status ? `Erro ${err.response.status} ao processar arquivo` : 'Servidor Spring Boot inatingível')
+
+      return {
+        nomeArquivo: file.name,
+        tipoBase: importType,
+        status: 'REJEITADO',
+        totalLinhas: 0,
+        linhasValidas: 0,
+        rejeicaoIntegral: true,
+        inconsistencias: [
+          {
+            base: importType,
+            linha: 1,
+            campo: 'arquivo',
+            motivo: `Falha ao processar arquivo: ${motivo}`,
+            severidade: 'IMPEDITIVO'
           }
-          throw subErr
-        }
+        ],
+        processadoEm: new Date().toISOString()
       }
-
-      if (err.response?.data?.inconsistencias || err.response?.data?.status) {
-        return err.response.data
-      }
-
-      if (!err.response) {
-        console.warn('Backend Spring Boot indisponível na porta 8080. Ativando relatório de demonstração com erro impeditivo.')
-        return gerarMockRelatorio(tipoBase, file?.name, 'cenario_impeditivo')
-      }
-
-      throw err
     }
   }
 }

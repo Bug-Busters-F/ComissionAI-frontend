@@ -2,7 +2,7 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1',
-  timeout: 30000
+  timeout: 300000 // 5 minutos para cargas pesadas de planilhas
 })
 
 api.interceptors.response.use(

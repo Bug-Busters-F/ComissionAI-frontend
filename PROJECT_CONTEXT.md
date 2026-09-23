@@ -47,7 +47,7 @@ src/
 ├── assets/                  # Arquivos estáticos e estilos globais (Tailwind CSS, ícones, imagens)
 ├── components/              # Componentes Vue reutilizáveis organizados por domínio
 │   ├── audit/               # Componentes de auditoria, rastreabilidade e logs imutáveis de comissões
-│   ├── common/              # Componentes de UI genéricos e utilitários (botões, inputs, modais, badges)
+│   ├── common/              # Componentes de UI genéricos e utilitários (PageHeader, StatusBadge, ToastContainer.vue)
 │   ├── data/                # Ingestão de dados (UploadBaseModal.vue, ValidationReport.vue)
 │   ├── layout/              # Cascas de layout compartilhadas (AppShell, SidebarNav, Topbar)
 │   ├── rules/               # Componentes de gestão de regras (formulário de CRUD e input de regras via NLP)
@@ -55,7 +55,7 @@ src/
 ├── layouts/                 # Estruturas de layout complementares
 ├── router/                  # Definição e configuração de rotas via Vue Router (index.js)
 ├── services/                # Camada de integração HTTP com Axios centralizando chamadas ao Spring Boot (api.js, dataService.js)
-├── stores/                  # Gerenciamento de estado global com Pinia (dataStore.js, regras, simulações)
+├── stores/                  # Gerenciamento de estado global com Pinia (dataStore.js, notificationStore.js, regras, simulações)
 ├── views/                   # Telas/páginas principais conectadas às rotas (HomeView, DataView, CampaignsView)
 ├── App.vue                  # Componente raiz da aplicação
 └── main.js                  # Ponto de entrada da aplicação (instanciação do Vue, Pinia e plugins)
@@ -66,11 +66,22 @@ src/
 - **Serviços HTTP**: Camada em `src/services/` encapsulando Axios e centralizando endpoints do Spring Boot.
 - **Proxy Reverso no Vite**: Configurado no `vite.config.js` (`/api` -> `http://localhost:8080`), eliminando barreiras de CORS no ambiente local.
 - **Gerenciamento de Estado**: Pinia stores (`dataStore.js`, regras e simulações) gerenciando o ciclo de vida reativo dos uploads, competências, regras e diagnósticos de integridade.
-- **Fechamento Atômico de Ciclo**: Ingestão conjunta e obrigatória das bases de RH e Vendas para cada competência mensal, impedindo estados parciais e validando integridade cruzada relacional (vendedor x matrícula).
+- **Fechamento Atômico de Ciclo & Orquestração Sequencial**:
+  - Ingestão conjunta das bases de RH e Vendas para cada competência mensal.
+  - Orquestração sequencial no frontend: primeiro a base de RH é enviada (`importType=HR`) para garantir que todos os colaboradores e filiais sejam persistidos no banco relacional; em seguida, a base de Vendas (`importType=SALES`) é processada, garantindo integridade referencial nas transações.
+  - Suporte a importação de taxas comissionadas avulsas (`importType=COMISSIONS`) com validação de vigência obrigatória.
+- **Processamento Assíncrono em Segundo Plano & UX Desacoplada**:
+  - **Desacoplamento do Modal**: O ciclo de vida da requisição HTTP é gerenciado pela Pinia store (`dataStore.activeJob`), permitindo que o usuário minimize ou feche o modal e continue navegando livremente pela aplicação (SPA) sem interromper a carga.
+  - **Feedback Visual Multicanal**:
+    - **Topbar**: Widget animado no topo com badge de status, etapa atual e percentual de progresso em tempo real, permitindo reabrir o modal a qualquer momento.
+    - **Cards Reativos no DataView**: Exibição dinâmica de barra de progresso no card da respectiva competência mensal.
+    - **Sistema Global de Notificações (Toasts)**: Componente `ToastContainer` e `notificationStore` emitindo alertas contextuais de início, sucesso e erro com botões de ação direta ("Ver Relatório" / "Ver Detalhes").
+  - **Resiliência e Timeout**: Timeout de requisição estendido no Axios (5 minutos) para garantir a ingestão completa de planilhas pesadas (ex: 8.000+ linhas de RH e 5.000+ linhas de Vendas).
 - **Design System & Arquitetura de Cores**:
   - Tokens de cores centralizados como **Variáveis CSS Dinâmicas** (`:root` em `src/assets/main.css`), consumidas semanticamente no `tailwind.config.js` (`brand`, `sage`, `success`, `warning`, `danger`).
   - **Zero Cores Hardcoded**: Eliminação total de valores hexadecimais soltos nos componentes Vue, garantindo manutenibilidade em ponto único.
   - **HMR Instantâneo**: Atualização em tempo real de estilos e cores pelo Vite sem necessidade de reinício do servidor de desenvolvimento.
   - **Pronto para Modo Noturno**: Suporte a Dark Mode com chaveamento de variáveis via classe `.dark` no `main.css`, sem necessidade de alterar templates Vue.
 - **Aderência Estrita à Identidade Wise**: Paleta Sage para fundos e superfícies, acento verde CTA, cards arredondados (`rounded-2xl`) e feedback visual de alta legibilidade.
+
 

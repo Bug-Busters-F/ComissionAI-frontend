@@ -58,7 +58,133 @@
         />
       </div>
 
-      <!-- CORPO 2: FORMULÁRIO DE SELEÇÃO E ENVIO -->
+      <!-- CORPO 2: PROCESSAMENTO ASSÍNCRONO EM SEGUNDO PLANO -->
+      <div v-else-if="store.uploadModal.isLoading" class="mt-6 space-y-6 py-2">
+        <div class="rounded-2xl border border-warning-border bg-warning-bg/40 p-6 text-center">
+          <div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white border border-warning-border shadow-sm">
+            <RefreshCw class="h-7 w-7 animate-spin text-warning-dark" />
+          </div>
+          <span class="mt-4 inline-block rounded-md bg-warning-light px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-warning-dark">
+            Processamento Assíncrono • Servidor Ativo
+          </span>
+          <h3 class="mt-2 text-xl font-extrabold text-brand-dark">
+            Validando integridade no backend...
+          </h3>
+          <p class="mx-auto mt-1 max-w-md text-xs text-sage-muted">
+            {{ store.activeJob.message || 'Processando registros e validando integridade estrutural...' }}
+          </p>
+
+          <!-- Barra de Progresso com Porcentagem -->
+          <div class="mx-auto mt-5 max-w-md">
+            <div class="flex items-center justify-between text-xs font-bold text-brand-dark">
+              <span>Progresso geral</span>
+              <span>{{ store.activeJob.progress }}%</span>
+            </div>
+            <div class="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-sage-border">
+              <div
+                class="h-full bg-brand transition-all duration-500 ease-out"
+                :style="{ width: `${store.activeJob.progress}%` }"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Checklist de etapas do ciclo -->
+        <div v-if="store.uploadModal.modo === 'CICLO'" class="rounded-2xl border border-sage-border-light bg-sage-light/50 p-5 space-y-3">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-sage-muted">
+            Etapas da Ingestão Sequencial
+          </h4>
+
+          <!-- Etapa 1: RH -->
+          <div class="flex items-center justify-between rounded-xl bg-white p-3.5 border border-sage-border-light">
+            <div class="flex items-center gap-3">
+              <div class="grid h-8 w-8 place-items-center rounded-lg bg-sage-light">
+                <Users class="h-4 w-4 text-brand-dark" />
+              </div>
+              <div>
+                <p class="text-xs font-bold text-brand-dark">1. Base de RH (Colaboradores e Matrículas)</p>
+                <p class="text-[11px] text-sage-muted">
+                  {{ store.activeJob.rhFileName || 'Planilha de RH' }}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <span
+                v-if="store.activeJob.stage === 'VENDAS' || store.activeJob.stage === 'CONCLUIDO'"
+                class="inline-flex items-center gap-1 text-xs font-bold text-success"
+              >
+                <CheckCircle2 class="h-4 w-4" /> Gravada com sucesso
+              </span>
+              <span
+                v-else-if="store.activeJob.stage === 'RH'"
+                class="inline-flex items-center gap-1.5 text-xs font-bold text-warning-dark"
+              >
+                <RefreshCw class="h-3.5 w-3.5 animate-spin" /> Em validação...
+              </span>
+              <span v-else class="text-xs font-semibold text-sage-muted">
+                Aguardando início...
+              </span>
+            </div>
+          </div>
+
+          <!-- Etapa 2: Vendas -->
+          <div class="flex items-center justify-between rounded-xl bg-white p-3.5 border border-sage-border-light">
+            <div class="flex items-center gap-3">
+              <div class="grid h-8 w-8 place-items-center rounded-lg bg-sage-light">
+                <TrendingUp class="h-4 w-4 text-brand-dark" />
+              </div>
+              <div>
+                <p class="text-xs font-bold text-brand-dark">2. Base de Vendas (Transações e Vendedores)</p>
+                <p class="text-[11px] text-sage-muted">
+                  {{ store.activeJob.vendasFileName || 'Planilha de Vendas' }}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <span
+                v-if="store.activeJob.stage === 'CONCLUIDO'"
+                class="inline-flex items-center gap-1 text-xs font-bold text-success"
+              >
+                <CheckCircle2 class="h-4 w-4" /> Concluída
+              </span>
+              <span
+                v-else-if="store.activeJob.stage === 'VENDAS'"
+                class="inline-flex items-center gap-1.5 text-xs font-bold text-warning-dark"
+              >
+                <RefreshCw class="h-3.5 w-3.5 animate-spin" /> Validando vendas...
+              </span>
+              <span v-else class="text-xs font-semibold text-sage-muted">
+                Aguardando gravação do RH
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Banner Explicativo de UX: Pode navegar livremente -->
+        <div class="flex items-start gap-3 rounded-xl border border-sage-border bg-white p-4">
+          <Info class="h-5 w-5 shrink-0 text-brand-dark mt-0.5" />
+          <div class="text-xs text-sage-muted leading-relaxed">
+            <strong class="text-brand-dark">Você não precisa esperar aqui:</strong>
+            O processamento continua normalmente em segundo plano no servidor Spring Boot. Você pode fechar esta tela ou navegar pelo sistema. Emitiremos uma notificação assim que tudo estiver pronto!
+          </div>
+        </div>
+
+        <!-- Botão Minimizar / Continuar navegando -->
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button
+            type="button"
+            @click="store.minimizarModal"
+            class="focus-ring flex items-center justify-center gap-2 rounded-full bg-brand-dark px-6 py-3 text-xs font-bold text-white transition hover:bg-brand-dark-hover"
+          >
+            <Minimize2 class="h-4 w-4" />
+            <span>Continuar navegando em segundo plano</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- CORPO 3: FORMULÁRIO DE SELEÇÃO E ENVIO -->
       <div v-else class="mt-6 space-y-6">
         <!-- SELEÇÃO DA MODALIDADE (CICLO VS COMISSÕES) -->
         <div>
@@ -404,7 +530,9 @@ import {
   Percent,
   Users,
   TrendingUp,
-  CheckCircle2
+  CheckCircle2,
+  Minimize2,
+  Info
 } from 'lucide-vue-next'
 import { useDataStore } from '@/stores/dataStore'
 import ValidationReport from './ValidationReport.vue'

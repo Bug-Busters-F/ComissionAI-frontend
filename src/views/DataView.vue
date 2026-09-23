@@ -29,7 +29,7 @@
       </div>
       <h2 class="mt-2 text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Fechamento do ciclo mensal</h2>
       <p class="mt-2 max-w-3xl text-sm leading-6 text-sage-muted">
-        Para a correta apuração e simulação das regras de negócio, as bases de <strong>RH e Vendas devem ser enviadas conjuntamente</strong> para cada competência mensal. A validação cruzada garante que todos os vendedores registrados nas vendas existam no quadro de colaboradores ativos.
+        Para a correta apuração e simulação das regras de negócio, as bases de <strong>RH e Vendas devem ser enviadas conjuntamente</strong> para cada competência mensal. A validação sequencial garante que todos os colaboradores existam no quadro ativo antes de registrar as transações.
       </p>
     </section>
 
@@ -37,8 +37,14 @@
       <article
         v-for="period in store.competencias"
         :key="period.name"
-        class="flex flex-col justify-between rounded-2xl bg-white p-6 shadow-sm border border-sage-border-light"
+        class="flex flex-col justify-between rounded-2xl bg-white p-6 shadow-sm border border-sage-border-light relative overflow-hidden"
       >
+        <!-- Borda superior animada quando em processamento de background -->
+        <div
+          v-if="store.activeJob.isActive && store.activeJob.competenciaNome === period.name"
+          class="absolute top-0 left-0 right-0 h-1 bg-brand animate-pulse"
+        />
+
         <div>
           <div class="flex items-start justify-between gap-4">
             <div>
@@ -46,6 +52,29 @@
               <h2 class="mt-1 text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">{{ period.name }}</h2>
             </div>
             <StatusBadge :label="period.status" :tone="period.tone" />
+          </div>
+
+          <!-- Card de progresso ativo se esta competência estiver processando -->
+          <div
+            v-if="store.activeJob.isActive && store.activeJob.competenciaNome === period.name"
+            class="mt-4 rounded-xl border border-warning-border bg-warning-bg/50 p-3"
+          >
+            <div class="flex items-center justify-between text-xs font-bold text-brand-dark">
+              <span class="flex items-center gap-1.5">
+                <RefreshCw class="h-3.5 w-3.5 animate-spin text-warning-dark" />
+                Processando no servidor
+              </span>
+              <span>{{ store.activeJob.progress }}%</span>
+            </div>
+            <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-sage-border">
+              <div
+                class="h-full bg-brand transition-all duration-300"
+                :style="{ width: `${store.activeJob.progress}%` }"
+              />
+            </div>
+            <p class="mt-1.5 text-[11px] text-sage-muted truncate">
+              {{ store.activeJob.message }}
+            </p>
           </div>
 
           <div class="mt-6 space-y-3 text-sm text-sage-muted">
@@ -75,8 +104,14 @@
             @click="store.openCicloModal(period.name)"
             class="focus-ring flex items-center justify-between rounded-xl bg-sage-light px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-sage-border transition"
           >
-            <span>{{ period.cicloFechado ? 'Reenviar ciclo (RH + Vendas)' : 'Fechar ciclo (RH + Vendas)' }}</span>
-            <span>→</span>
+            <template v-if="store.activeJob.isActive && store.activeJob.competenciaNome === period.name">
+              <span>Acompanhar processamento</span>
+              <span>⏳</span>
+            </template>
+            <template v-else>
+              <span>{{ period.cicloFechado ? 'Reenviar ciclo (RH + Vendas)' : 'Fechar ciclo (RH + Vendas)' }}</span>
+              <span>→</span>
+            </template>
           </button>
 
           <button
@@ -89,16 +124,13 @@
         </div>
       </article>
     </section>
-
-    <!-- Modal de Upload e Relatório de Validação -->
-    <UploadBaseModal />
   </div>
 </template>
 
 <script setup>
+import { RefreshCw } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
-import UploadBaseModal from '@/components/data/UploadBaseModal.vue'
 import { useDataStore } from '@/stores/dataStore'
 
 const store = useDataStore()

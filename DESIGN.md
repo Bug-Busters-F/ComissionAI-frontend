@@ -607,3 +607,19 @@ Dark mode is natively supported by overriding the CSS variables under `.dark` in
 - **Atomic Validation Banner**: If impeditivo errors or relational cross-check failures occur, the strict mandatory alert is displayed:
   > *"Planilha com pendências: corrija e envie novamente"*
 
+### 5. Asynchronous Background Processing & Non-blocking Feedback Patterns
+- **Topbar Progress Pill (`Topbar.vue`)**:
+  - Live animated widget placed at the top-right header:
+    - **In progress**: Amber warning pill (`border-warning-border bg-warning-bg`) with spinner icon, active stage, and percentage (`0% - 100%`).
+    - **Success**: Emerald success pill (`border-success/30 bg-success-bg text-success`) with checkmark, direct modal reopen link, and dismiss button.
+    - **Error**: Rose error pill (`border-danger/30 bg-danger-bg text-danger`) with warning icon and direct link to diagnosis.
+- **Modal In-Progress Step Checklist (`UploadBaseModal.vue`)**:
+  - Step-by-step visual tracker inside the modal separating Stage 1 (RH) and Stage 2 (Vendas), with dynamic status (`Aguardando`, `Em validação...`, `Concluída`).
+  - Button **"Continuar navegando em segundo plano"** (`bg-brand-dark hover:bg-brand-dark-hover`) allowing the user to unmount the modal without aborting the background promise.
+- **Reactive Competency Card Progress (`DataView.vue`)**:
+  - When a background ingestion is active for a specific month, the card renders a top pulsating accent line (`bg-brand animate-pulse`) and an inline progress bar with real-time percentage and status copy.
+- **Global Toast Notification Surface (`ToastContainer.vue`, `notificationStore.js`)**:
+  - Floating alerts (`fixed bottom-5 right-5 z-[9999]`) with smooth enter/leave transitions, adhering to the semantic token palette (`success`, `warning`, `danger`, `info`).
+  - Actionable CTAs: Allows direct reopening of the modal (`actionLabel: "Ver Relatório"` / `"Ver Diagnóstico"`) from anywhere in the application.
+
+
