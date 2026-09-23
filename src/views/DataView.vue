@@ -12,7 +12,7 @@
           </button>
           <button
             type="button"
-            @click="store.openCicloModal('Dezembro')"
+            @click="store.openCicloModal(null)"
             class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover"
           >
             + Enviar ciclo (RH + Vendas)
@@ -36,27 +36,30 @@
     <section class="grid gap-5 lg:grid-cols-3" aria-label="Competências disponíveis">
       <article
         v-for="period in store.competencias"
-        :key="period.name"
+        :key="period.competenciaCodigo || period.name"
         class="flex flex-col justify-between rounded-2xl bg-white p-6 shadow-sm border border-sage-border-light relative overflow-hidden"
       >
         <!-- Borda superior animada quando em processamento de background -->
         <div
-          v-if="store.activeJob.isActive && store.activeJob.competenciaNome === period.name"
+          v-if="store.activeJob.isActive && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)"
           class="absolute top-0 left-0 right-0 h-1 bg-brand animate-pulse"
         />
 
         <div>
           <div class="flex items-start justify-between gap-4">
             <div>
-              <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-sage-muted">Competência 2025</p>
+              <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-sage-muted">
+                Competência {{ period.competenciaCodigo ? period.competenciaCodigo.split('/')[1] : '2025' }}
+              </p>
               <h2 class="mt-1 text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">{{ period.name }}</h2>
+              <span class="text-xs font-semibold text-sage-muted">({{ period.competenciaCodigo }})</span>
             </div>
             <StatusBadge :label="period.status" :tone="period.tone" />
           </div>
 
           <!-- Card de progresso ativo se esta competência estiver processando -->
           <div
-            v-if="store.activeJob.isActive && store.activeJob.competenciaNome === period.name"
+            v-if="store.activeJob.isActive && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)"
             class="mt-4 rounded-xl border border-warning-border bg-warning-bg/50 p-3"
           >
             <div class="flex items-center justify-between text-xs font-bold text-brand-dark">
@@ -101,10 +104,10 @@
         <div class="mt-7 pt-4 border-t border-sage-border-light flex flex-col gap-2">
           <button
             type="button"
-            @click="store.openCicloModal(period.name)"
+            @click="store.openCicloModal(period.competenciaCodigo)"
             class="focus-ring flex items-center justify-between rounded-xl bg-sage-light px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-sage-border transition"
           >
-            <template v-if="store.activeJob.isActive && store.activeJob.competenciaNome === period.name">
+            <template v-if="store.activeJob.isActive && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)">
               <span>Acompanhar processamento</span>
               <span>⏳</span>
             </template>

@@ -244,10 +244,17 @@
                 id="competenciaInput"
                 type="text"
                 v-model="store.uploadModal.competencia"
-                placeholder="Ex: 12/2025"
+                @input="store.onCompetenciaChange($event.target.value)"
+                placeholder="Ex: 08/2025"
                 class="focus-ring w-full sm:max-w-xs rounded-xl border border-sage-border bg-white px-4 py-2.5 text-sm font-semibold text-brand-dark outline-none"
               />
-              <span class="text-xs text-sage-muted">Formato MM/AAAA. Utilizado para cruzamento relacional e integridade.</span>
+              <span
+                v-if="store.nomeCompetenciaFormatada && store.nomeCompetenciaFormatada !== 'Competência'"
+                class="rounded-lg bg-white border border-sage-border-dark px-3 py-1.5 text-xs font-bold text-brand-dark shadow-sm shrink-0"
+              >
+                Mês detectado: {{ store.nomeCompetenciaFormatada }}
+              </span>
+              <span class="text-xs text-sage-muted">Formato MM/AAAA. Gera ou atualiza o card desta competência.</span>
             </div>
           </div>
 

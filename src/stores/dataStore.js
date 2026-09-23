@@ -2,6 +2,35 @@ import { defineStore } from 'pinia'
 import { dataService, TIPOS_BASE } from '@/services/dataService'
 import { useNotificationStore } from '@/stores/notificationStore'
 
+export const MESES_NOMES = {
+  '01': 'Janeiro',
+  '02': 'Fevereiro',
+  '03': 'Março',
+  '04': 'Abril',
+  '05': 'Maio',
+  '06': 'Junho',
+  '07': 'Julho',
+  '08': 'Agosto',
+  '09': 'Setembro',
+  '10': 'Outubro',
+  '11': 'Novembro',
+  '12': 'Dezembro'
+}
+
+/**
+ * Converte um código como "08/2025" ou "8/2025" no nome correspondente do mês ("Agosto")
+ */
+export function formatarNomeCompetencia(codigo) {
+  if (!codigo) return 'Competência'
+  const parts = String(codigo).trim().split('/')
+  if (parts.length === 2) {
+    const mes = parts[0].padStart(2, '0')
+    const nomeMes = MESES_NOMES[mes]
+    if (nomeMes) return nomeMes
+  }
+  return codigo
+}
+
 export const useDataStore = defineStore('data', {
   state: () => ({
     // Lista de competências cadastradas no sistema
@@ -87,6 +116,10 @@ export const useDataStore = defineStore('data', {
   getters: {
     tipoAtualConfig: (state) => TIPOS_BASE[state.uploadModal.tipoBase] || TIPOS_BASE.CICLO,
 
+    nomeCompetenciaFormatada: (state) => {
+      return formatarNomeCompetencia(state.uploadModal.competencia)
+    },
+
     podeEnviar: (state) => {
       if (state.uploadModal.modo === 'CICLO') {
         return !!(state.uploadModal.rhFile && state.uploadModal.vendasFile && state.uploadModal.competencia)
@@ -118,21 +151,80 @@ export const useDataStore = defineStore('data', {
   },
 
   actions: {
-    openCicloModal(nomeCompetencia = 'Dezembro') {
-      const codigoMap = {
-        Dezembro: '12/2025',
-        Novembro: '11/2025',
-        Outubro: '10/2025'
+    /**
+     * Localiza a competência pelo código (ex: '08/2025') ou cria um novo card no grid
+     * caso o usuário esteja fechando um ciclo de uma competência ainda não listada
+     */
+    obterOuCriarCompetencia(codigo) {
+      if (!codigo) return null
+      const codTrim = String(codigo).trim()
+
+      // 1. Procura primeiro pelo código exato (ex: '08/2025')
+      let comp = this.competencias.find((c) => c.competenciaCodigo === codTrim)
+      if (comp) return comp
+
+      // 2. Se não existir, extrai o nome do mês e cria uma nova competência
+      const nomeMes = formatarNomeCompetencia(codTrim)
+
+      comp = {
+        name: nomeMes,
+        competenciaCodigo: codTrim,
+        status: 'Ciclo com pendências',
+        tone: 'warning',
+        cicloFechado: false,
+        bases: [
+          { tipo: 'RH', label: 'RH', value: 'Pendente' },
+          { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
+          { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
+        ]
+      }
+
+      // 3. Adiciona no início da lista para visualização imediata
+      this.competencias.unshift(comp)
+      return comp
+    },
+
+    onCompetenciaChange(valor) {
+      this.uploadModal.competencia = valor
+      if (valor && valor.includes('/')) {
+        this.uploadModal.competenciaNome = formatarNomeCompetencia(valor)
+      }
+    },
+
+    openCicloModal(param = null) {
+      let compCodigo = '12/2025'
+      let compNome = 'Dezembro'
+
+      if (param) {
+        if (param.includes('/')) {
+          compCodigo = param
+          compNome = formatarNomeCompetencia(param)
+        } else {
+          const codigoMap = {
+            Dezembro: '12/2025',
+            Novembro: '11/2025',
+            Outubro: '10/2025',
+            Setembro: '09/2025',
+            Agosto: '08/2025',
+            Julho: '07/2025'
+          }
+          compNome = param
+          compCodigo = codigoMap[param] || '12/2025'
+        }
+      } else {
+        // Se chamado sem parâmetro (botão superior "+ Enviar ciclo"), sugere agosto ou mês livre
+        compCodigo = '08/2025'
+        compNome = 'Agosto'
       }
 
       this.uploadModal.isOpen = true
       this.uploadModal.modo = 'CICLO'
       this.uploadModal.tipoBase = 'CICLO'
-      this.uploadModal.competenciaNome = nomeCompetencia
-      this.uploadModal.competencia = codigoMap[nomeCompetencia] || '12/2025'
+      this.uploadModal.competenciaNome = compNome
+      this.uploadModal.competencia = compCodigo
 
-      // Se houver um job ativo para esta competência, exibe o progresso em tempo real
-      if (this.activeJob.isActive && this.activeJob.competenciaNome === nomeCompetencia) {
+      // Se houver um job ativo para esta competência específica, exibe o progresso em tempo real
+      if (this.activeJob.isActive && this.activeJob.competencia === compCodigo) {
         this.uploadModal.isLoading = this.activeJob.status === 'PROCESSING'
         this.uploadModal.report = this.activeJob.report
         this.uploadModal.errorMessage = this.activeJob.error
@@ -148,11 +240,24 @@ export const useDataStore = defineStore('data', {
       this.uploadModal.cenarioTeste = 'real'
     },
 
-    openComissModal(nomeCompetencia = 'Dezembro') {
+    openComissModal(param = null) {
+      let compCodigo = '12/2025'
+      let compNome = 'Dezembro'
+
+      if (param) {
+        if (param.includes('/')) {
+          compCodigo = param
+          compNome = formatarNomeCompetencia(param)
+        } else {
+          compNome = param
+        }
+      }
+
       this.uploadModal.isOpen = true
       this.uploadModal.modo = 'COMISS'
       this.uploadModal.tipoBase = 'COMISS'
-      this.uploadModal.competenciaNome = nomeCompetencia
+      this.uploadModal.competenciaNome = compNome
+      this.uploadModal.competencia = compCodigo
       this.uploadModal.dataInicio = '2025-12-01'
       this.uploadModal.dataFim = '2025-12-31'
 
@@ -172,11 +277,11 @@ export const useDataStore = defineStore('data', {
       this.uploadModal.cenarioTeste = 'real'
     },
 
-    openUploadModal(tipo = 'CICLO', nomeCompetencia = 'Dezembro') {
+    openUploadModal(tipo = 'CICLO', param = null) {
       if (tipo === 'COMISS') {
-        this.openComissModal(nomeCompetencia)
+        this.openComissModal(param)
       } else {
-        this.openCicloModal(nomeCompetencia)
+        this.openCicloModal(param)
       }
     },
 
@@ -291,12 +396,14 @@ export const useDataStore = defineStore('data', {
         }
 
         if (!this.uploadModal.competencia) {
-          this.uploadModal.errorMessage = 'Informe a competência no formato MM/AAAA (ex: 12/2025).'
+          this.uploadModal.errorMessage = 'Informe a competência no formato MM/AAAA (ex: 08/2025).'
           return
         }
 
-        const compCodigo = this.uploadModal.competencia
-        const compNome = this.uploadModal.competenciaNome
+        const compCodigo = this.uploadModal.competencia.trim()
+        const compNome = formatarNomeCompetencia(compCodigo)
+        this.uploadModal.competenciaNome = compNome
+
         const rhFile = this.uploadModal.rhFile
         const vendasFile = this.uploadModal.vendasFile
         const cenario = this.uploadModal.cenarioTeste
@@ -311,7 +418,7 @@ export const useDataStore = defineStore('data', {
           competenciaNome: compNome,
           stage: 'INICIO',
           progress: 5,
-          message: 'Iniciando validação sequencial do ciclo...',
+          message: `Iniciando validação sequencial do ciclo ${compCodigo}...`,
           status: 'PROCESSING',
           report: null,
           error: null,
@@ -321,10 +428,8 @@ export const useDataStore = defineStore('data', {
           startTime: Date.now()
         }
 
-        // Atualiza temporariamente o status da competência no grid para feedback visual imediato
-        const comp = this.competencias.find(
-          (c) => c.name === compNome || c.competenciaCodigo === compCodigo
-        )
+        // Obtém a competência existente ou CRIA UM NOVO CARD no grid
+        const comp = this.obterOuCriarCompetencia(compCodigo)
         if (comp) {
           comp.status = 'Processando bases...'
           comp.tone = 'warning'
@@ -363,16 +468,17 @@ export const useDataStore = defineStore('data', {
             this.activeJob.progress = 100
             this.activeJob.message = 'Ciclo mensal validado e fechado com sucesso!'
 
-            // Atualiza a competência com os dados reais
-            if (comp) {
-              const rhBase = comp.bases.find((b) => b.tipo === 'RH')
-              const vendasBase = comp.bases.find((b) => b.tipo === 'VENDAS')
-              if (rhBase) rhBase.value = `${response.rh?.totalLinhas || 0} registros`
-              if (vendasBase) vendasBase.value = `${response.vendas?.totalLinhas || 0} registros`
+            // Atualiza a competência específica (criada ou existente) com os dados reais
+            const targetComp = this.obterOuCriarCompetencia(compCodigo)
+            if (targetComp) {
+              const rhBase = targetComp.bases.find((b) => b.tipo === 'RH')
+              const vendasBase = targetComp.bases.find((b) => b.tipo === 'VENDAS')
+              if (rhBase) rhBase.value = `${response.rh?.totalLinhas || response.rh?.linhasValidas || 0} registros`
+              if (vendasBase) vendasBase.value = `${response.vendas?.totalLinhas || response.vendas?.linhasValidas || 0} registros`
 
-              comp.cicloFechado = true
-              comp.status = 'Ciclo Fechado'
-              comp.tone = 'success'
+              targetComp.cicloFechado = true
+              targetComp.status = 'Ciclo Fechado'
+              targetComp.tone = 'success'
             }
 
             notifStore.success(
@@ -389,9 +495,10 @@ export const useDataStore = defineStore('data', {
             this.activeJob.progress = 100
             this.activeJob.message = 'Inconsistências encontradas nas bases enviadas.'
 
-            if (comp) {
-              comp.status = 'Ciclo com pendências'
-              comp.tone = 'danger'
+            const targetComp = this.obterOuCriarCompetencia(compCodigo)
+            if (targetComp) {
+              targetComp.status = 'Ciclo com pendências'
+              targetComp.tone = 'danger'
             }
 
             notifStore.error(
@@ -412,9 +519,10 @@ export const useDataStore = defineStore('data', {
           this.activeJob.error = msg
           this.activeJob.message = 'Erro durante o processamento do ciclo.'
 
-          if (comp) {
-            comp.status = 'Ciclo com pendências'
-            comp.tone = 'danger'
+          const targetComp = this.obterOuCriarCompetencia(compCodigo)
+          if (targetComp) {
+            targetComp.status = 'Ciclo com pendências'
+            targetComp.tone = 'danger'
           }
 
           notifStore.error(
@@ -554,17 +662,16 @@ export const useDataStore = defineStore('data', {
       const rep = this.uploadModal.report
       if (!rep) return
 
-      const comp = this.competencias.find(
-        (c) => c.name === this.uploadModal.competenciaNome || c.competenciaCodigo === this.uploadModal.competencia
-      )
+      const compCodigo = this.uploadModal.competencia?.trim()
+      const comp = this.obterOuCriarCompetencia(compCodigo)
 
       if (comp) {
         if (this.uploadModal.modo === 'CICLO') {
           const rhBase = comp.bases.find((b) => b.tipo === 'RH')
           const vendasBase = comp.bases.find((b) => b.tipo === 'VENDAS')
 
-          if (rhBase) rhBase.value = `${rep.rh?.linhasValidas || rep.rh?.totalLinhas || 120} registros`
-          if (vendasBase) vendasBase.value = `${rep.vendas?.linhasValidas || rep.vendas?.totalLinhas || 184} registros`
+          if (rhBase) rhBase.value = `${rep.rh?.linhasValidas || rep.rh?.totalLinhas || 0} registros`
+          if (vendasBase) vendasBase.value = `${rep.vendas?.linhasValidas || rep.vendas?.totalLinhas || 0} registros`
 
           comp.cicloFechado = true
           comp.status = 'Ciclo Fechado'
