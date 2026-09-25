@@ -580,5 +580,221 @@ export const dataService = {
         processadoEm: new Date().toISOString()
       }
     }
+  },
+
+  // ==========================================
+  // CONSULTA DE DADOS EFETIVADOS (S1-B18)
+  // ==========================================
+
+  /**
+   * Obtém o resumo consolidado de contagens por competência diretamente do banco
+   */
+  async fetchResumoCompetencias() {
+    try {
+      const response = await api.get('/vendas/resumo-competencias')
+      return response.data
+    } catch (err) {
+      console.warn('Endpoint /vendas/resumo-competencias falhou ou indisponível:', err)
+      return null
+    }
+  },
+
+  /**
+   * Consulta a base efetivada de Matrículas (RH) com paginação do Spring Boot
+   */
+  async fetchMatriculas({ page = 0, size = 20 }) {
+    try {
+      const response = await api.get('/matriculas', {
+        params: { page, size }
+      })
+      return response.data
+    } catch (err) {
+      console.error('Falha ao consultar matrículas:', err)
+      throw err
+    }
+  },
+
+  /**
+   * Exclui uma matrícula efetivada pelo ID (UUID)
+   * Trata 409 caso existam vendas vinculadas
+   */
+  async deleteMatricula(id) {
+    try {
+      await api.delete(`/matriculas/${id}`)
+      return true
+    } catch (err) {
+      console.error(`Falha ao excluir matrícula ${id}:`, err)
+      const motivo =
+        err.response?.data?.message ||
+        (err.response?.status === 409
+          ? 'Não é possível excluir a matrícula: existem vendas vinculadas a ela.'
+          : 'Erro ao excluir matrícula no servidor.')
+      throw new Error(motivo)
+    }
+  },
+
+  /**
+   * Exclui todas as matrículas cadastradas (se não houver vendas vinculadas)
+   */
+  async deleteTodasMatriculas() {
+    try {
+      const response = await api.delete('/matriculas/todas')
+      return response.data
+    } catch (err) {
+      console.error('Falha ao excluir todas as matrículas:', err)
+      const motivo =
+        err.response?.data?.message ||
+        (err.response?.status === 409
+          ? 'Não é possível excluir todas as matrículas: existem vendas vinculadas no banco. Exclua as vendas primeiro.'
+          : 'Erro ao excluir matrículas no servidor.')
+      throw new Error(motivo)
+    }
+  },
+
+  /**
+   * Consulta a base efetivada de Vendas com paginação e filtro opcional por competência (MM/AAAA)
+   */
+  async fetchVendas({ page = 0, size = 20, competencia = null }) {
+    try {
+      const params = { page, size }
+      if (competencia && competencia !== 'TODAS') {
+        params.competencia = competencia.trim()
+      }
+      const response = await api.get('/vendas', { params })
+      return response.data
+    } catch (err) {
+      console.error('Falha ao consultar vendas:', err)
+      throw err
+    }
+  },
+
+  /**
+   * Exclui uma venda efetivada pelo ID (UUID)
+   */
+  async deleteVenda(id) {
+    try {
+      await api.delete(`/vendas/${id}`)
+      return true
+    } catch (err) {
+      console.error(`Falha ao excluir venda ${id}:`, err)
+      const motivo =
+        err.response?.data?.message || 'Erro ao excluir venda no servidor.'
+      throw new Error(motivo)
+    }
+  },
+
+  /**
+   * Exclui todas as vendas pertencentes a uma competência específica (ex: '09/2025')
+   */
+  async deleteVendasPorCompetencia(competenciaCodigo) {
+    if (!competenciaCodigo) throw new Error('Código de competência obrigatório.')
+    const parts = String(competenciaCodigo).trim().split('/')
+    if (parts.length !== 2) {
+      throw new Error('Formato de competência inválido. Esperado MM/AAAA (ex: 09/2025).')
+    }
+    const mes = parseInt(parts[0], 10)
+    const ano = parseInt(parts[1], 10)
+
+    try {
+      const response = await api.delete(`/vendas/competencia/${mes}/${ano}`)
+      return response.data
+    } catch (err) {
+      console.error(`Falha ao excluir vendas da competência ${competenciaCodigo}:`, err)
+      const motivo = err.response?.data?.message || 'Erro ao excluir vendas da competência no servidor.'
+      throw new Error(motivo)
+    }
+  },
+
+  /**
+   * Exclui todas as vendas registradas no banco de dados
+   */
+  async deleteTodasVendas() {
+    try {
+      const response = await api.delete('/vendas/todas')
+      return response.data
+    } catch (err) {
+      console.error('Falha ao excluir todas as vendas:', err)
+      const motivo = err.response?.data?.message || 'Erro ao excluir vendas no servidor.'
+      throw new Error(motivo)
+    }
+  },
+
+  /**
+   * Consulta as taxas de comissão ativas (COMISS) com suporte ao backend real
+   */
+  async fetchComissoes({ page = 0, size = 20 } = {}) {
+    try {
+      const response = await api.get('/comissoes', {
+        params: { page, size }
+      })
+      const data = response.data
+      const content = (data.content || []).map((it) => ({
+        id: it.id,
+        cargo: it.position?.description || 'Cargo Geral',
+        codCargo: it.position?.code || 0,
+        marca: it.brand?.description || 'Marca Geral',
+        codMarca: it.brand?.code || 0,
+        percentual: it.percentage != null ? Number(it.percentage) : 0.0,
+        vigenciaInicio: it.referenceMonth || '2025-01-01',
+        vigenciaFim: it.referenceMonth || '2025-12-31'
+      }))
+
+      return {
+        ...data,
+        content
+      }
+    } catch (err) {
+      console.warn('Backend /comissoes indisponível, utilizando fallback estruturado:', err)
+      const mockComissoes = [
+        { id: 'comiss-1', cargo: 'VENDEDOR BALCAO', codCargo: 200, marca: 'PRETO', codMarca: 10, percentual: 0.03, vigenciaInicio: '2025-12-01', vigenciaFim: '2025-12-31' },
+        { id: 'comiss-2', cargo: 'GERENTE QUIOSQUE', codCargo: 150, marca: 'PRETO', codMarca: 10, percentual: 0.01, vigenciaInicio: '2025-12-01', vigenciaFim: '2025-12-31' },
+        { id: 'comiss-3', cargo: 'VENDEDOR BALCAO', codCargo: 200, marca: 'VERMELHO', codMarca: 40, percentual: 0.02, vigenciaInicio: '2025-12-01', vigenciaFim: '2025-12-31' },
+        { id: 'comiss-4', cargo: 'GERENTE LOJA', codCargo: 100, marca: 'BRANCO', codMarca: 20, percentual: 0.015, vigenciaInicio: '2025-12-01', vigenciaFim: '2025-12-31' },
+        { id: 'comiss-5', cargo: 'SUPERVISOR REGIONAL', codCargo: 50, marca: 'AZUL', codMarca: 30, percentual: 0.025, vigenciaInicio: '2025-12-01', vigenciaFim: '2025-12-31' }
+      ]
+
+      const start = page * size
+      const content = mockComissoes.slice(start, start + size)
+
+      return {
+        content,
+        totalElements: mockComissoes.length,
+        totalPages: Math.ceil(mockComissoes.length / size),
+        size,
+        number: page,
+        first: page === 0,
+        last: start + size >= mockComissoes.length,
+        empty: content.length === 0
+      }
+    }
+  },
+
+  /**
+   * Exclui uma taxa de comissão pelo ID
+   */
+  async deleteComissao(id) {
+    try {
+      await api.delete(`/comissoes/${id}`)
+      return true
+    } catch (err) {
+      console.error(`Falha ao excluir comissão ${id}:`, err)
+      const motivo = err.response?.data?.message || 'Erro ao excluir taxa de comissão.'
+      throw new Error(motivo)
+    }
+  },
+
+  /**
+   * Exclui todas as taxas de comissão
+   */
+  async deleteTodasComissoes() {
+    try {
+      const response = await api.delete('/comissoes/todas')
+      return response.data
+    } catch (err) {
+      console.error('Falha ao excluir todas as comissões:', err)
+      const motivo = err.response?.data?.message || 'Erro ao excluir comissões no servidor.'
+      throw new Error(motivo)
+    }
   }
 }
+

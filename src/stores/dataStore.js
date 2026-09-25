@@ -44,31 +44,67 @@ export const useDataStore = defineStore('data', {
         bases: [
           { tipo: 'RH', label: 'RH', value: 'Pendente' },
           { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
-          { tipo: 'COMISS', label: 'Comissão', value: '1 taxa ativa' }
+          { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
         ]
       },
       {
         name: 'Novembro',
         competenciaCodigo: '11/2025',
-        status: 'Ciclo Fechado',
-        tone: 'success',
-        cicloFechado: true,
+        status: 'Ciclo com pendências',
+        tone: 'warning',
+        cicloFechado: false,
         bases: [
-          { tipo: 'RH', label: 'RH', value: '120 registros' },
-          { tipo: 'VENDAS', label: 'Vendas', value: '184 registros' },
-          { tipo: 'COMISS', label: 'Comissão', value: '1 taxa ativa' }
+          { tipo: 'RH', label: 'RH', value: 'Pendente' },
+          { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
+          { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
         ]
       },
       {
         name: 'Outubro',
         competenciaCodigo: '10/2025',
-        status: 'Ciclo Fechado',
-        tone: 'success',
-        cicloFechado: true,
+        status: 'Ciclo com pendências',
+        tone: 'warning',
+        cicloFechado: false,
         bases: [
-          { tipo: 'RH', label: 'RH', value: '115 registros' },
-          { tipo: 'VENDAS', label: 'Vendas', value: '172 registros' },
-          { tipo: 'COMISS', label: 'Comissão', value: '1 taxa ativa' }
+          { tipo: 'RH', label: 'RH', value: 'Pendente' },
+          { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
+          { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
+        ]
+      },
+      {
+        name: 'Setembro',
+        competenciaCodigo: '09/2025',
+        status: 'Ciclo com pendências',
+        tone: 'warning',
+        cicloFechado: false,
+        bases: [
+          { tipo: 'RH', label: 'RH', value: 'Pendente' },
+          { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
+          { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
+        ]
+      },
+      {
+        name: 'Agosto',
+        competenciaCodigo: '08/2025',
+        status: 'Ciclo com pendências',
+        tone: 'warning',
+        cicloFechado: false,
+        bases: [
+          { tipo: 'RH', label: 'RH', value: 'Pendente' },
+          { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
+          { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
+        ]
+      },
+      {
+        name: 'Julho',
+        competenciaCodigo: '07/2025',
+        status: 'Ciclo com pendências',
+        tone: 'warning',
+        cicloFechado: false,
+        bases: [
+          { tipo: 'RH', label: 'RH', value: 'Pendente' },
+          { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
+          { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
         ]
       }
     ],
@@ -110,6 +146,162 @@ export const useDataStore = defineStore('data', {
       vendasFileName: '',
       comissFileName: '',
       startTime: null
+    },
+
+    // Aba ativa no DataView: 'EFETIVADOS' | 'ENVIOS'
+    tabAtiva: 'EFETIVADOS',
+
+    // Histórico de Envios e seus relatórios de validação
+    enviosHistorico: [
+      {
+        id: 'env-1',
+        tipoBase: 'CICLO_MENSAL',
+        competencia: '12/2025',
+        competenciaNome: 'Dezembro',
+        nomeArquivo: 'BASE_RH_2025.xlsx & BASE_VENDAS_2025.xlsx',
+        criadoEm: '2026-09-22T21:40:00.000Z',
+        totalLinhas: 304,
+        linhasValidas: 296,
+        status: 'REJEITADO',
+        rejeicaoIntegral: true,
+        report: {
+          isCiclo: true,
+          competencia: '12/2025',
+          nomeArquivo: 'BASE_RH_2025.xlsx & BASE_VENDAS_2025.xlsx',
+          tipoBase: 'CICLO_MENSAL',
+          status: 'REJEITADO',
+          totalLinhas: 304,
+          linhasValidas: 296,
+          rejeicaoIntegral: true,
+          rh: {
+            nomeArquivo: 'BASE_RH_2025.xlsx',
+            totalLinhas: 120,
+            linhasValidas: 120,
+            status: 'SUCESSO'
+          },
+          vendas: {
+            nomeArquivo: 'BASE_VENDAS_2025.xlsx',
+            totalLinhas: 184,
+            linhasValidas: 176,
+            status: 'REJEITADO'
+          },
+          inconsistencias: [
+            {
+              base: 'CRUZAMENTO',
+              linha: 14,
+              campo: 'matricula_vendedor',
+              motivo: 'Matrícula "VEND-9921" apontada na base de Vendas não foi localizada no cadastro de RH da competência 12/2025 (integridade relacional violada).',
+              severidade: 'IMPEDITIVO'
+            },
+            {
+              base: 'CRUZAMENTO',
+              linha: 29,
+              campo: 'cod_filial',
+              motivo: 'Vendedor "VEND-8812" consta com filial "SÃO PAULO" em Vendas, mas no RH ativo da competência está lotado em "CAMPINAS".',
+              severidade: 'IMPEDITIVO'
+            },
+            {
+              base: 'VENDAS',
+              linha: 45,
+              campo: 'canal',
+              motivo: 'Canal de venda não preenchido; atribuído canal padrão LOJA_FISICA.',
+              severidade: 'AVISO'
+            }
+          ],
+          processadoEm: '2026-09-22T21:40:00.000Z'
+        }
+      },
+      {
+        id: 'env-2',
+        tipoBase: 'CICLO_MENSAL',
+        competencia: '11/2025',
+        competenciaNome: 'Novembro',
+        nomeArquivo: 'BASE_RH_NOV2025.xlsx & BASE_VENDAS_NOV2025.xlsx',
+        criadoEm: '2026-09-15T14:20:00.000Z',
+        totalLinhas: 304,
+        linhasValidas: 304,
+        status: 'SUCESSO',
+        rejeicaoIntegral: false,
+        report: {
+          isCiclo: true,
+          competencia: '11/2025',
+          nomeArquivo: 'BASE_RH_NOV2025.xlsx & BASE_VENDAS_NOV2025.xlsx',
+          tipoBase: 'CICLO_MENSAL',
+          status: 'SUCESSO',
+          totalLinhas: 304,
+          linhasValidas: 304,
+          rejeicaoIntegral: false,
+          rh: {
+            nomeArquivo: 'BASE_RH_NOV2025.xlsx',
+            totalLinhas: 120,
+            linhasValidas: 120,
+            status: 'SUCESSO'
+          },
+          vendas: {
+            nomeArquivo: 'BASE_VENDAS_NOV2025.xlsx',
+            totalLinhas: 184,
+            linhasValidas: 184,
+            status: 'SUCESSO'
+          },
+          inconsistencias: [],
+          processadoEm: '2026-09-15T14:20:00.000Z'
+        }
+      },
+      {
+        id: 'env-3',
+        tipoBase: 'TAXAS_BASE',
+        competencia: '12/2025',
+        competenciaNome: 'Dezembro',
+        nomeArquivo: 'TAXAS_COMISSAO_2025.xlsx',
+        criadoEm: '2026-09-20T10:00:00.000Z',
+        totalLinhas: 5,
+        linhasValidas: 5,
+        status: 'SUCESSO',
+        rejeicaoIntegral: false,
+        report: {
+          isCiclo: false,
+          competencia: '12/2025',
+          nomeArquivo: 'TAXAS_COMISSAO_2025.xlsx',
+          tipoBase: 'TAXAS_BASE',
+          status: 'SUCESSO',
+          totalLinhas: 5,
+          linhasValidas: 5,
+          rejeicaoIntegral: false,
+          inconsistencias: [],
+          processadoEm: '2026-09-20T10:00:00.000Z'
+        }
+      }
+    ],
+
+    // Estado da Consulta de Dados Efetivados (S1-B18)
+    dadosEfetivados: {
+      tipoBaseAtiva: 'RH', // 'RH' | 'VENDAS' | 'COMISS'
+      competenciaFiltro: 'TODAS',
+      termoBusca: '',
+      page: 0,
+      size: 20,
+      totalElements: 0,
+      totalPages: 0,
+      loading: false,
+      itens: [],
+      error: null
+    },
+
+    // Modal de confirmação de exclusão
+    modalExclusao: {
+      isOpen: false,
+      tipo: 'REGISTRO', // 'REGISTRO' | 'BASE_COMPETENCIA' | 'ENVIO'
+      titulo: '',
+      mensagem: '',
+      detalhes: '',
+      item: null,
+      loading: false
+    },
+
+    // Modal para exibição de relatório de validação de envio anterior
+    modalRelatorioEnvio: {
+      isOpen: false,
+      envio: null
     }
   }),
 
@@ -463,6 +655,19 @@ export const useDataStore = defineStore('data', {
           this.uploadModal.report = response
           this.activeJob.report = response
 
+          // Registra no histórico de envios
+          this.adicionarAoHistoricoEnvios({
+            tipoBase: 'CICLO_MENSAL',
+            competencia: compCodigo,
+            competenciaNome: compNome,
+            nomeArquivo: `${rhFile.name} & ${vendasFile.name}`,
+            totalLinhas: response.totalLinhas || (response.rh?.totalLinhas || 0) + (response.vendas?.totalLinhas || 0),
+            linhasValidas: response.linhasValidas || (response.rh?.linhasValidas || 0) + (response.vendas?.linhasValidas || 0),
+            status: response.status,
+            rejeicaoIntegral: response.rejeicaoIntegral === true,
+            report: response
+          })
+
           if (response.status === 'SUCESSO') {
             this.activeJob.status = 'SUCCESS'
             this.activeJob.progress = 100
@@ -607,6 +812,19 @@ export const useDataStore = defineStore('data', {
           this.uploadModal.report = response
           this.activeJob.report = response
 
+          // Registra no histórico de envios
+          this.adicionarAoHistoricoEnvios({
+            tipoBase: 'TAXAS_BASE',
+            competencia: this.uploadModal.competencia || '12/2025',
+            competenciaNome: this.uploadModal.competenciaNome || 'Dezembro',
+            nomeArquivo: comissFile.name,
+            totalLinhas: response.totalLinhas || 1,
+            linhasValidas: response.linhasValidas || 1,
+            status: response.status,
+            rejeicaoIntegral: response.rejeicaoIntegral === true,
+            report: response
+          })
+
           if (response.status === 'SUCESSO') {
             this.activeJob.status = 'SUCCESS'
             this.activeJob.progress = 100
@@ -684,6 +902,364 @@ export const useDataStore = defineStore('data', {
 
       this.limparJobConcluido()
       this.closeUploadModal()
+      this.carregarDadosEfetivados()
+    },
+
+    // ==========================================
+    // AÇÕES DE CONSULTA E EXCLUSÃO (S1-B18)
+    // ==========================================
+
+    adicionarAoHistoricoEnvios(envioData) {
+      const novo = {
+        id: 'env-' + Date.now(),
+        criadoEm: new Date().toISOString(),
+        ...envioData
+      }
+      this.enviosHistorico.unshift(novo)
+    },
+
+    setTabAtiva(tab) {
+      this.tabAtiva = tab
+      if (tab === 'EFETIVADOS' && this.dadosEfetivados.itens.length === 0) {
+        this.carregarDadosEfetivados()
+      }
+    },
+
+    mudarTipoBaseEfetivados(tipo) {
+      this.dadosEfetivados.tipoBaseAtiva = tipo
+      this.dadosEfetivados.page = 0
+      this.carregarDadosEfetivados()
+    },
+
+    mudarPaginaEfetivados(newPage) {
+      if (newPage < 0 || newPage >= this.dadosEfetivados.totalPages) return
+      this.dadosEfetivados.page = newPage
+      this.carregarDadosEfetivados()
+    },
+
+    mudarTamanhoPaginaEfetivados(newSize) {
+      this.dadosEfetivados.size = Number(newSize)
+      this.dadosEfetivados.page = 0
+      this.carregarDadosEfetivados()
+    },
+
+    setTermoBusca(termo) {
+      this.dadosEfetivados.termoBusca = termo
+      this.dadosEfetivados.page = 0
+      this.carregarDadosEfetivados()
+    },
+
+    setCompetenciaFiltro(comp) {
+      this.dadosEfetivados.competenciaFiltro = comp
+      this.dadosEfetivados.page = 0
+      this.carregarDadosEfetivados()
+    },
+
+    /**
+     * Sincroniza em tempo real as competências e contadores com o banco PostgreSQL.
+     * Garante que após F5 ou exclusão, os cards reflitam com precisão o estado real do banco.
+     */
+    async sincronizarCompetenciasComBanco() {
+      try {
+        const resumo = await dataService.fetchResumoCompetencias()
+        if (!resumo) return
+
+        const totalRh = resumo.totalMatriculas || 0
+        const totalComiss = resumo.totalComissoes || 0
+        const vendasMap = resumo.vendasPorCompetencia || {}
+
+        this.competencias.forEach((comp) => {
+          const cod = comp.competenciaCodigo?.trim()
+          const vendasQtd = cod && vendasMap[cod] != null ? Number(vendasMap[cod]) : 0
+
+          const rhBase = comp.bases.find((b) => b.tipo === 'RH')
+          const vendasBase = comp.bases.find((b) => b.tipo === 'VENDAS')
+          const comissBase = comp.bases.find((b) => b.tipo === 'COMISS')
+
+          // VENDAS
+          if (vendasBase) {
+            vendasBase.value = vendasQtd > 0 ? `${vendasQtd.toLocaleString('pt-BR')} registros` : 'Pendente'
+          }
+
+          // RH (Quadro ativo)
+          if (rhBase) {
+            rhBase.value = totalRh > 0 ? `${totalRh.toLocaleString('pt-BR')} registros` : 'Pendente'
+          }
+
+          // COMISS (Taxas ativas)
+          if (comissBase) {
+            comissBase.value = totalComiss > 0 ? `${totalComiss} taxas` : 'Pendente'
+          }
+
+          // Status do Ciclo: Fechado se houver vendas daquela competência no banco
+          if (vendasQtd > 0) {
+            comp.status = 'Ciclo Fechado'
+            comp.tone = 'success'
+            comp.cicloFechado = true
+          } else {
+            comp.status = 'Ciclo com pendências'
+            comp.tone = 'warning'
+            comp.cicloFechado = false
+          }
+        })
+      } catch (err) {
+        console.error('Falha ao sincronizar competências com o banco:', err)
+      }
+    },
+
+    async carregarDadosEfetivados() {
+      // Sincroniza os contadores das competências em paralelo
+      this.sincronizarCompetenciasComBanco()
+
+      this.dadosEfetivados.loading = true
+      this.dadosEfetivados.error = null
+      const tipo = this.dadosEfetivados.tipoBaseAtiva
+      const page = this.dadosEfetivados.page
+      const size = this.dadosEfetivados.size
+      const competencia = this.dadosEfetivados.competenciaFiltro
+
+      try {
+        if (tipo === 'RH') {
+          const data = await dataService.fetchMatriculas({ page, size })
+          let content = data.content || []
+          
+          if (this.dadosEfetivados.termoBusca) {
+            const termo = this.dadosEfetivados.termoBusca.toLowerCase().trim()
+            content = content.filter(it => 
+              (it.registration && it.registration.toLowerCase().includes(termo)) ||
+              (it.position?.description && it.position.description.toLowerCase().includes(termo)) ||
+              (it.store?.description && it.store.description.toLowerCase().includes(termo))
+            )
+          }
+
+          this.dadosEfetivados.itens = content
+          this.dadosEfetivados.totalElements = data.totalElements ?? content.length
+          this.dadosEfetivados.totalPages = data.totalPages ?? Math.ceil(this.dadosEfetivados.totalElements / size)
+        } else if (tipo === 'VENDAS') {
+          const data = await dataService.fetchVendas({ page, size, competencia })
+          let content = data.content || []
+
+          if (this.dadosEfetivados.termoBusca) {
+            const termo = this.dadosEfetivados.termoBusca.toLowerCase().trim()
+            content = content.filter(it =>
+              (it.registration?.registration && it.registration.registration.toLowerCase().includes(termo)) ||
+              (it.brand?.description && it.brand.description.toLowerCase().includes(termo)) ||
+              (it.store?.description && it.store.description.toLowerCase().includes(termo)) ||
+              (it.saleChannel && it.saleChannel.toLowerCase().includes(termo))
+            )
+          }
+
+          this.dadosEfetivados.itens = content
+          this.dadosEfetivados.totalElements = data.totalElements ?? content.length
+          this.dadosEfetivados.totalPages = data.totalPages ?? Math.ceil(this.dadosEfetivados.totalElements / size)
+        } else {
+          // COMISS
+          const data = await dataService.fetchComissoes({ page, size })
+          let content = data.content || []
+
+          if (this.dadosEfetivados.termoBusca) {
+            const termo = this.dadosEfetivados.termoBusca.toLowerCase().trim()
+            content = content.filter(it =>
+              (it.cargo && it.cargo.toLowerCase().includes(termo)) ||
+              (it.marca && it.marca.toLowerCase().includes(termo))
+            )
+          }
+
+          this.dadosEfetivados.itens = content
+          this.dadosEfetivados.totalElements = data.totalElements ?? content.length
+          this.dadosEfetivados.totalPages = data.totalPages ?? Math.ceil(this.dadosEfetivados.totalElements / size)
+        }
+      } catch (err) {
+        console.error('Falha ao carregar dados efetivados:', err)
+        this.dadosEfetivados.error = err.message || 'Erro ao carregar dados do servidor Spring Boot.'
+        this.dadosEfetivados.itens = []
+        this.dadosEfetivados.totalElements = 0
+        this.dadosEfetivados.totalPages = 0
+      } finally {
+        this.dadosEfetivados.loading = false
+      }
+    },
+
+    abrirModalExclusaoRegistro(tipo, item) {
+      let desc = ''
+      if (tipo === 'VENDAS') {
+        const val = item.value != null ? Number(item.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00'
+        desc = `Venda ID: ${item.id ? item.id.substring(0, 8) + '...' : ''} | Matrícula: ${item.registration?.registration || '-'} | Valor: ${val}`
+      } else if (tipo === 'RH') {
+        desc = `Matrícula: ${item.registration || item.id} | Cargo: ${item.position?.description || '-'} | Loja: ${item.store?.description || '-'}`
+      } else {
+        desc = `Taxa: ${item.cargo} | Marca: ${item.marca} | ${(item.percentual * 100).toFixed(2)}%`
+      }
+
+      this.modalExclusao = {
+        isOpen: true,
+        tipo: 'REGISTRO',
+        titulo: `Excluir Registro de ${tipo}`,
+        mensagem: 'Deseja realmente excluir este registro permanentemente do banco de dados?',
+        detalhes: desc,
+        item: { ...item, tipo },
+        loading: false
+      }
+    },
+
+    abrirModalExclusaoBase(competenciaCodigo) {
+      const comp = this.competencias.find(c => c.competenciaCodigo === competenciaCodigo)
+      const nome = comp?.name || competenciaCodigo
+      this.modalExclusao = {
+        isOpen: true,
+        tipo: 'BASE_COMPETENCIA',
+        titulo: `Excluir Base Lançada (${nome} - ${competenciaCodigo})`,
+        mensagem: `Deseja realmente excluir os registros da competência ${competenciaCodigo}? Todas as vendas correspondentes serão excluídas permanentemente do banco de dados relacional e o ciclo voltará ao status Pendente.`,
+        detalhes: `Competência ${competenciaCodigo} (${nome})`,
+        item: { competenciaCodigo, nome },
+        loading: false
+      }
+    },
+
+    abrirModalExclusaoTodasVendas() {
+      this.modalExclusao = {
+        isOpen: true,
+        tipo: 'TODAS_VENDAS',
+        titulo: 'Excluir Todas as Vendas',
+        mensagem: 'Deseja realmente remover TODAS as vendas de todas as competências do banco de dados? Esta ação liberará as matrículas para exclusão e reiniciará os ciclos.',
+        detalhes: 'Limpeza global de tb_sales no PostgreSQL',
+        item: null,
+        loading: false
+      }
+    },
+
+    abrirModalExclusaoTodasMatriculas() {
+      this.modalExclusao = {
+        isOpen: true,
+        tipo: 'TODAS_MATRICULAS',
+        titulo: 'Excluir Todas as Matrículas (RH)',
+        mensagem: 'Deseja remover todas as matrículas do banco de dados? Para concluir esta ação, certifique-se de que não existem vendas vinculadas.',
+        detalhes: 'Limpeza global de tb_registration no PostgreSQL',
+        item: null,
+        loading: false
+      }
+    },
+
+    abrirModalExclusaoEnvio(envio) {
+      this.modalExclusao = {
+        isOpen: true,
+        tipo: 'ENVIO',
+        titulo: 'Excluir Envio do Histórico',
+        mensagem: 'Deseja remover este registro de envio do histórico da aplicação?',
+        detalhes: `Arquivo: ${envio.nomeArquivo} (${envio.competencia || 'Sem competência'})`,
+        item: envio,
+        loading: false
+      }
+    },
+
+    fecharModalExclusao() {
+      this.modalExclusao.isOpen = false
+      this.modalExclusao.item = null
+      this.modalExclusao.loading = false
+    },
+
+    async confirmarExclusao() {
+      const notifStore = useNotificationStore()
+      this.modalExclusao.loading = true
+
+      try {
+        if (this.modalExclusao.tipo === 'REGISTRO') {
+          const tipo = this.modalExclusao.item?.tipo || this.dadosEfetivados.tipoBaseAtiva
+          const id = this.modalExclusao.item?.id
+          if (!id) throw new Error('ID do registro não informado.')
+
+          if (tipo === 'VENDAS') {
+            await dataService.deleteVenda(id)
+            notifStore.success('Venda Excluída', 'O registro de venda foi removido com sucesso do banco de dados.')
+          } else if (tipo === 'RH') {
+            await dataService.deleteMatricula(id)
+            notifStore.success('Matrícula Excluída', 'A matrícula foi removida com sucesso.')
+          } else {
+            await dataService.deleteComissao(id)
+            notifStore.success('Taxa Excluída', 'A taxa de comissão foi removida com sucesso.')
+          }
+
+          this.fecharModalExclusao()
+          await this.carregarDadosEfetivados()
+        } else if (this.modalExclusao.tipo === 'BASE_COMPETENCIA') {
+          const compCodigo = this.modalExclusao.item?.competenciaCodigo
+          const res = await dataService.deleteVendasPorCompetencia(compCodigo)
+
+          const comp = this.competencias.find(c => c.competenciaCodigo === compCodigo)
+          if (comp) {
+            comp.status = 'Ciclo com pendências'
+            comp.tone = 'warning'
+            comp.cicloFechado = false
+            const vb = comp.bases.find(b => b.tipo === 'VENDAS')
+            if (vb) vb.value = 'Pendente'
+          }
+
+          this.enviosHistorico = this.enviosHistorico.filter(e => e.competencia !== compCodigo)
+          const totalExc = res?.totalExcluido ?? 0
+          notifStore.success(
+            'Base Excluída do Banco',
+            `A base de vendas da competência ${compCodigo} foi excluída com sucesso (${totalExc} registros removidos de tb_sales).`
+          )
+          this.fecharModalExclusao()
+          await this.carregarDadosEfetivados()
+        } else if (this.modalExclusao.tipo === 'TODAS_VENDAS') {
+          const res = await dataService.deleteTodasVendas()
+          this.competencias.forEach(comp => {
+            comp.status = 'Ciclo com pendências'
+            comp.tone = 'warning'
+            comp.cicloFechado = false
+            const vb = comp.bases.find(b => b.tipo === 'VENDAS')
+            if (vb) vb.value = 'Pendente'
+          })
+
+          const totalExc = res?.totalExcluido ?? 0
+          notifStore.success(
+            'Vendas Limpas',
+            `Todas as vendas (${totalExc} registros) foram excluídas com sucesso do banco de dados.`
+          )
+          this.fecharModalExclusao()
+          await this.carregarDadosEfetivados()
+        } else if (this.modalExclusao.tipo === 'TODAS_MATRICULAS') {
+          const res = await dataService.deleteTodasMatriculas()
+          this.competencias.forEach(comp => {
+            const rh = comp.bases.find(b => b.tipo === 'RH')
+            if (rh) rh.value = 'Pendente'
+          })
+
+          const totalExc = res?.totalExcluido ?? 0
+          notifStore.success(
+            'Matrículas Limpas',
+            `Todas as matrículas (${totalExc} registros) foram excluídas com sucesso do banco de dados.`
+          )
+          this.fecharModalExclusao()
+          await this.carregarDadosEfetivados()
+        } else if (this.modalExclusao.tipo === 'ENVIO') {
+          const id = this.modalExclusao.item?.id
+          this.enviosHistorico = this.enviosHistorico.filter(e => e.id !== id)
+          notifStore.success('Envio Excluído', 'O registro de envio foi removido do histórico com sucesso.')
+          this.fecharModalExclusao()
+        }
+      } catch (err) {
+        console.error('Falha na exclusão:', err)
+        const msg = err.message || 'Falha ao processar exclusão.'
+        notifStore.error('Erro na Exclusão', msg)
+      } finally {
+        this.modalExclusao.loading = false
+      }
+    },
+
+    abrirRelatorioEnvio(envio) {
+      this.modalRelatorioEnvio = {
+        isOpen: true,
+        envio
+      }
+    },
+
+    fecharRelatorioEnvio() {
+      this.modalRelatorioEnvio = {
+        isOpen: false,
+        envio: null
+      }
     }
   }
 })
