@@ -3,8 +3,11 @@
     <div class="flex min-h-11 items-center justify-between gap-4">
       <p class="text-xs font-medium text-sage-muted">Workspace / {{ currentLabel }}</p>
 
-      <!-- WIDGET DE PROCESSAMENTO EM SEGUNDO PLANO -->
-      <div v-if="store.activeJob.isActive" class="flex items-center gap-2">
+      <div class="flex items-center gap-3">
+        <span v-if="isCampaignDemoEnabled" class="rounded-full border border-sage-border-dark bg-white px-3.5 py-1.5 text-xs font-semibold text-sage-subtle">Ambiente demonstrativo</span>
+
+        <!-- WIDGET DE PROCESSAMENTO EM SEGUNDO PLANO -->
+        <div v-if="store.activeJob.isActive" class="flex items-center gap-2">
         <!-- Em processamento -->
         <button
           v-if="store.activeJob.status === 'PROCESSING'"
@@ -68,6 +71,7 @@
             <X class="h-3.5 w-3.5" />
           </button>
         </div>
+        </div>
       </div>
     </div>
 
@@ -92,6 +96,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { RefreshCw, CheckCircle2, AlertOctagon, X } from 'lucide-vue-next'
 import { useDataStore } from '@/stores/dataStore'
+import { isCampaignDemoEnabled } from '@/services/campaignDemo'
 
 const route = useRoute()
 const store = useDataStore()

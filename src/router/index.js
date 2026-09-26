@@ -1,7 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 import DataView from '@/views/DataView.vue'
-import CampaignsView from '@/views/CampaignsView.vue'
+import CampaignsView from '@/views/CampaignsPrototypeView.vue'
+import CampaignDetailsView from '@/views/CampaignDetailsPrototypeView.vue'
+import CampaignFlowView from '@/views/CampaignFlowView.vue'
+import CampaignApurationView from '@/views/CampaignApurationView.vue'
 
 const routes = [
   {
@@ -24,6 +27,30 @@ const routes = [
     path: '/campanhas',
     name: 'campanhas',
     component: CampaignsView,
+    meta: { section: 'campanhas', label: 'Campanhas' }
+  },
+  {
+    path: '/campanhas/nova',
+    name: 'campanha-nova',
+    component: CampaignFlowView,
+    meta: { section: 'campanhas', label: 'Campanhas' }
+  },
+  {
+    path: '/campanhas/:id/editar',
+    name: 'campanha-editar',
+    component: CampaignFlowView,
+    meta: { section: 'campanhas', label: 'Campanhas' }
+  },
+  {
+    path: '/campanhas/:id',
+    name: 'campanha-detalhes',
+    component: CampaignDetailsView,
+    meta: { section: 'campanhas', label: 'Campanhas' }
+  },
+  {
+    path: '/campanhas/:id/apurar',
+    name: 'campanha-apurar',
+    component: CampaignApurationView,
     meta: { section: 'campanhas', label: 'Campanhas' }
   },
   {
