@@ -92,7 +92,7 @@ export function campaignResponseToForm(response) {
 export function campaignFormToPayload(form, options = {}) {
   const payload = {
     titulo: String(form.titulo ?? '').trim(),
-    textoOriginal: String(form.textoOriginal ?? '').trim(),
+    textoOriginal: String(form.textoOriginal ?? ''),
     canal: emptyToNull(form.canal),
     codMarca: integerOrNull(form.codMarca),
     descrMarca: emptyToNull(form.descrMarca),
@@ -134,9 +134,13 @@ export function formatPeriodArrow(start, end) {
 }
 
 export const CAMPAIGN_CHANNEL_OPTIONS = [
-  { value: '', label: 'Todos' },
+  { value: '', label: 'Sem restrição de canal' },
   { value: 'LOJA_FISICA', label: 'Loja física' },
-  { value: 'ECOMMERCE', label: 'E-commerce' }
+  { value: 'ECOMMERCE', label: 'E-commerce' },
+  { value: 'BALCAO', label: 'Balcão' },
+  { value: 'QUIOSQUE', label: 'Quiosque' },
+  { value: 'APP', label: 'App' },
+  { value: 'PADRAO', label: 'Padrão' }
 ]
 
 export function formatCampaignChannel(value) {

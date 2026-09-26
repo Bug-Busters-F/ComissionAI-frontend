@@ -1,8 +1,5 @@
 <template>
-  <div class="space-y-6" :class="isDemo ? 'campaign-demo-mode' : ''">
-    <div v-if="isDemo" class="flex items-center justify-between rounded-full border border-sage-border bg-white px-4 py-2 text-xs font-bold text-sage-muted" role="status">
-      <span>Ambiente demonstrativo</span><span class="rounded-full bg-sage-pill px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-sage-subtle">Nenhum dado real será alterado</span>
-    </div>
+  <div class="space-y-6">
 
     <header>
       <button type="button" class="focus-ring rounded font-semibold text-brand-dark" @click="handleBack">← Voltar às campanhas</button>
@@ -22,10 +19,10 @@
         <div class="mt-5 flex flex-wrap gap-3"><button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-white" @click="reload">Tentar novamente</button><RouterLink to="/campanhas" class="focus-ring rounded-full border border-danger/30 px-5 py-3 text-sm font-bold text-danger-dark">Voltar para campanhas</RouterLink></div>
       </section>
       <template v-else>
-        <CampaignProposalStep v-if="activeStep === 'proposta'" :form="form" :errors="state.fieldErrors" :demo="state.demo" @update="updateField" @update-demo="updateDemoField" />
-        <CampaignInterpretationStep v-else-if="activeStep === 'interpretacao'" :form="form" :errors="state.fieldErrors" :interpretation="state.interpretation" :stale="interpretationIsStale()" @update="updateField" @apply-example="applyExampleInterpretation" />
-        <CampaignSimulationStep v-else-if="activeStep === 'simulacao'" :campaign-title="campaignTitle" :demo="state.demo" @update-demo="updateDemoField" @edit-manually="goToStep('interpretacao')" @continue-review="goToStep('revisao')" />
-        <CampaignReviewStep v-else :form="form" :is-demo="isDemo" :persisted-state="state.persistedState" :campaign-id="state.campaignId" :demo="state.demo" @memory="isMemoryOpen = true" @edit-simulation="goToStep('simulacao')" />
+        <CampaignProposalStep v-if="activeStep === 'proposta'" :form="form" :errors="state.fieldErrors" :demo="state.demo" :interpretation="state.interpretation" @update="updateField" @update-demo="updateDemoField" @cancel-interpretation="cancelInterpretation" />
+        <CampaignInterpretationStep v-else-if="activeStep === 'interpretacao'" :form="form" :errors="state.fieldErrors" :interpretation="state.interpretation" :stale="interpretationIsStale()" @update="updateField" @cancel-interpretation="cancelInterpretation" />
+        <CampaignSimulationStep v-else-if="activeStep === 'simulacao'" :demo="state.demo" @update-demo="updateDemoField" />
+        <CampaignReviewStep v-else :form="form" :persisted-state="state.persistedState" :campaign-id="state.campaignId" :demo="state.demo" />
       </template>
     </main>
 
@@ -35,8 +32,7 @@
       <button v-if="activeStep !== 'proposta'" type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark" @click="goToStep(CAMPAIGN_STEPS[currentStepIndex - 1].key)">← Voltar</button>
       <span v-else></span>
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <button v-if="activeStep === 'interpretacao'" type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark" @click="applyExampleInterpretation">Aplicar interpretação demonstrativa</button>
-        <button v-if="activeStep === 'proposta'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover" @click="goToStep('interpretacao')">Interpretar proposta →</button>
+        <button v-if="activeStep === 'proposta'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="state.interpretation.isProcessing" @click="interpretProposal">{{ state.interpretation.isProcessing ? 'Interpretando…' : 'Interpretar proposta →' }}</button>
         <button v-else-if="activeStep === 'interpretacao'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover" @click="goToStep('simulacao')">Ir para simulação →</button>
         <button v-else-if="activeStep === 'simulacao'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover" @click="goToStep('revisao')">Ir para revisão →</button>
         <template v-else>
@@ -49,14 +45,11 @@
   </div>
 
   <CampaignDiscardDialog :open="state.discardDialogOpen" :is-new="!isPersisted" @continue="cancelDiscard" @discard="confirmDiscard" />
-  <CampaignMemoryDialog :open="isMemoryOpen" @close="isMemoryOpen = false" />
 </template>
 
 <script setup>
-import { ref } from 'vue'
 import CampaignDiscardDialog from '@/components/common/CampaignDiscardDialog.vue'
 import CampaignInterpretationStep from '@/components/common/CampaignInterpretationStep.vue'
-import CampaignMemoryDialog from '@/components/common/CampaignMemoryDialog.vue'
 import CampaignProposalStep from '@/components/common/CampaignProposalStep.vue'
 import CampaignReviewStep from '@/components/common/CampaignReviewStep.vue'
 import CampaignSimulationStep from '@/components/common/CampaignSimulationStep.vue'
@@ -70,25 +63,23 @@ const {
   state,
   activeStep,
   loadError,
-  isDemo,
   isPersisted,
   canApprove,
   campaignTitle,
   currentStepIndex,
   goToStep,
+  interpretProposal,
+  cancelInterpretation,
   saveDraft,
   approveCampaign,
   updateField,
   updateDemoField,
-  applyExampleInterpretation,
   interpretationIsStale,
   requestLeave,
   confirmDiscard,
   cancelDiscard,
   reload
 } = useCampaignFlow()
-
-const isMemoryOpen = ref(false)
 
 function handleBack() {
   requestLeave('/campanhas')

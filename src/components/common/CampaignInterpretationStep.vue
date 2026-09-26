@@ -5,21 +5,26 @@
         <h2 id="interpretation-heading" class="text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">Confira a interpretação</h2>
         <p class="mt-2 text-sm text-sage-muted">Revise os parâmetros da única regra vinculada antes de continuar.</p>
       </div>
-      <span class="rounded-full bg-success-surface px-3 py-1.5 text-xs font-bold text-success-text">{{ sourceLabel }}</span>
+      <span class="rounded-full px-3 py-1.5 text-xs font-bold" :class="interpretation.isProcessing ? 'bg-sage-light text-brand-dark' : interpretation.status === 'error' ? 'bg-danger-bg text-danger-dark' : 'bg-success-surface text-success-text'">{{ sourceLabel }}</span>
     </div>
 
     <div class="mt-6 rounded-2xl bg-sage-light px-4 py-3 text-sm leading-6 text-sage-subtle">
-      {{ stale ? 'O texto da proposta mudou desde a última interpretação. Reaplique a demonstração ou revise os campos manualmente.' : sourceMessage }}
+      {{ interpretation.isProcessing ? 'Interpretando proposta… aguarde o retorno do Spring.' : stale ? 'O texto ou o contexto mudou desde a última interpretação. Interprete novamente para atualizar as sugestões.' : sourceMessage }}
     </div>
+
+    <div v-if="interpretation.isProcessing" class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-white px-4 py-3 text-sm text-brand-dark" role="status" aria-live="polite">
+      <span>Interpretando proposta…</span>
+      <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-3 py-2 text-xs font-bold" @click="$emit('cancel-interpretation')">Cancelar</button>
+    </div>
+    <div v-if="interpretation.error" class="mt-4 rounded-2xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm leading-6 text-danger-dark" role="alert">{{ interpretation.error }}</div>
 
     <div v-if="interpretation.pending?.length" class="mt-4 rounded-2xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-text" role="status">
       <p class="font-bold">Pendências para revisão</p>
       <ul class="mt-2 list-disc space-y-1 pl-5"><li v-for="pending in interpretation.pending" :key="pending">{{ pending }}</li></ul>
     </div>
-    <p v-if="interpretation.confidence !== null && interpretation.confidence !== undefined" class="mt-3 text-xs text-sage-muted">Confiança técnica recebida: {{ interpretation.confidence }}</p>
+    <p v-if="interpretation.confidence !== null && interpretation.confidence !== undefined && interpretation.confidence !== 0" class="mt-3 text-xs text-sage-muted">Confiança técnica recebida: {{ formatConfidence(interpretation.confidence) }}</p>
 
     <dl class="mt-6 grid gap-x-8 sm:grid-cols-2">
-      <div class="flex items-center justify-between border-b border-sage-border-light py-3 text-sm"><dt class="text-sage-muted">Público</dt><dd class="font-bold text-brand-dark">{{ audience }}</dd></div>
       <div class="flex items-center justify-between border-b border-sage-border-light py-3 text-sm"><dt class="text-sage-muted">Vigência</dt><dd class="font-bold text-brand-dark">{{ period }}</dd></div>
     </dl>
 
@@ -30,6 +35,13 @@
       </div>
 
       <div class="grid gap-5 p-4 sm:grid-cols-2">
+        <div>
+          <label for="campaign-channel" class="campaign-label">Canal da regra</label>
+          <select id="campaign-channel" :value="form.canal" class="campaign-control" @change="$emit('update', 'canal', $event.target.value)">
+            <option v-for="option in channelOptions" :key="option.value || 'none'" :value="option.value">{{ option.value ? option.label : 'Sem restrição de canal' }}</option>
+          </select>
+          <p class="campaign-help">A seleção manual será usada como contexto somente em uma nova interpretação.</p>
+        </div>
         <div>
           <label for="campaign-rate" class="campaign-label">Taxa de comissão (%) <span class="text-danger">*</span></label>
           <input id="campaign-rate" :value="form.taxaPercentual" type="text" inputmode="decimal" class="campaign-control" :class="errors.taxaPercentual ? 'campaign-control-error' : ''" :aria-invalid="Boolean(errors.taxaPercentual)" :aria-describedby="errors.taxaPercentual ? 'campaign-rate-error' : 'campaign-rate-help'" placeholder="Ex.: 5 ou 0,75" @input="$emit('update', 'taxaPercentual', $event.target.value)" />
@@ -75,29 +87,12 @@
       </div>
     </div>
 
-    <div class="mt-5 rounded-2xl border border-sage-border-light p-4">
-      <div class="flex items-center justify-between gap-4">
-        <div><p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">02 · Bônus condicionado</p><h3 class="mt-1 text-base font-extrabold text-brand-dark">Bloco futuro demonstrativo</h3></div>
-        <span class="text-sm font-bold text-sage-muted">Não persistido</span>
-      </div>
-      <p class="mt-3 text-sm leading-6 text-sage-muted">Os campos de bônus e faixa aparecem como referência visual, mas não fazem parte do contrato desta entrega.</p>
-    </div>
-
-    <details class="mt-5 rounded-2xl border border-sage-border-light">
-      <summary class="focus-ring cursor-pointer list-none px-4 py-4 text-sm font-bold text-brand-dark">Histórico de versões da regra <span class="ml-2 text-xs font-normal text-sage-muted">Demonstração</span></summary>
-      <div class="overflow-x-auto border-t border-sage-border-light p-4">
-        <table class="w-full min-w-[620px] text-left text-sm">
-          <thead class="bg-sage-pill text-[10px] uppercase tracking-[0.12em] text-sage-muted"><tr><th class="rounded-l-xl px-3 py-3">Versão</th><th class="px-3 py-3">Canal / taxa</th><th class="px-3 py-3">Validade</th><th class="rounded-r-xl px-3 py-3">Origem</th></tr></thead>
-          <tbody><tr class="border-b border-sage-border-light"><td class="px-3 py-4 font-bold">v1 <span class="block text-xs font-normal text-sage-muted">Exemplo inicial</span></td><td class="px-3 py-4">{{ audience }}<span class="block text-xs text-sage-muted">{{ form.taxaPercentual || '—' }}%</span></td><td class="px-3 py-4">{{ period }}</td><td class="px-3 py-4 text-sage-muted">Demonstração</td></tr></tbody>
-        </table>
-      </div>
-    </details>
   </section>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { formatPeriodArrow } from '@/services/campaignMappers'
+import { CAMPAIGN_CHANNEL_OPTIONS, formatPeriodArrow } from '@/services/campaignMappers'
 
 const props = defineProps({
   form: { type: Object, required: true },
@@ -106,11 +101,15 @@ const props = defineProps({
   stale: { type: Boolean, default: false }
 })
 
-defineEmits(['update', 'apply-example'])
-const sourceLabel = computed(() => ({ real: 'Interpretação recebida', exemplo: 'Exemplo demonstrativo', manual: 'Preenchimento manual' }[props.interpretation.source] || 'Preenchimento manual'))
-const sourceMessage = computed(() => ({ real: 'A interpretação recebida está pronta para revisão manual.', exemplo: 'Esta é uma interpretação demonstrativa editável. A extração automática será integrada posteriormente.', manual: 'Preencha ou revise os campos manualmente. A extração automática será integrada posteriormente.' }[props.interpretation.source] || 'Preencha ou revise os campos manualmente. A extração automática será integrada posteriormente.'))
-const audience = computed(() => props.form.descriCargo || 'Público não informado')
+defineEmits(['update', 'cancel-interpretation'])
+const channelOptions = CAMPAIGN_CHANNEL_OPTIONS
+const sourceLabel = computed(() => ({ real: 'Interpretação recebida', demo: 'Interpretação demonstrativa', exemplo: 'Exemplo demonstrativo', manual: 'Preenchimento manual' }[props.interpretation.source] || (props.interpretation.status === 'error' ? 'Falha na interpretação' : 'Preenchimento manual')))
+const sourceMessage = computed(() => ({ real: 'A interpretação recebida está pronta para revisão manual.', demo: 'Esta é uma interpretação demonstrativa editável.', exemplo: 'Esta é uma interpretação demonstrativa editável.', manual: 'Preencha os campos manualmente ou solicite uma interpretação do texto original.' }[props.interpretation.source] || 'Preencha os campos manualmente ou solicite uma interpretação do texto original.'))
 const period = computed(() => formatPeriodArrow(props.form.dataInicio, props.form.dataFim))
+
+function formatConfidence(value) {
+  return `${new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 1 }).format(value)}`
+}
 </script>
 
 <style scoped>

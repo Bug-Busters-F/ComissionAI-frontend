@@ -19,25 +19,11 @@
           <p v-if="errors.textoOriginal" id="campaign-original-text-error" class="campaign-error">{{ errors.textoOriginal }}</p>
         </div>
 
-        <div class="grid gap-5 sm:grid-cols-2">
-          <div>
-            <label for="campaign-start" class="campaign-label">Início da vigência</label>
-            <input id="campaign-start" :value="form.dataInicio" type="date" class="campaign-control" :class="errorClass('dataInicio')" :aria-invalid="Boolean(errors.dataInicio)" @input="update('dataInicio', $event.target.value)" />
-            <p v-if="errors.dataInicio" class="campaign-error">{{ errors.dataInicio }}</p>
-          </div>
-          <div>
-            <label for="campaign-end" class="campaign-label">Término da vigência</label>
-            <input id="campaign-end" :value="form.dataFim" type="date" class="campaign-control" :class="errorClass('dataFim')" :aria-invalid="Boolean(errors.dataFim)" @input="update('dataFim', $event.target.value)" />
-            <p v-if="errors.dataFim" class="campaign-error">{{ errors.dataFim }}</p>
-          </div>
-        </div>
-
-        <p class="rounded-2xl bg-sage-light px-4 py-3 text-sm leading-6 text-sage-subtle">Se as datas não forem informadas, a vigência será definida automaticamente no salvamento.</p>
       </div>
     </section>
 
     <aside class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="proposal-sidebar-heading">
-      <h2 id="proposal-sidebar-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Uma campanha, uma regra</h2>
+      <h2 id="proposal-sidebar-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Somente uma regra vinculada por campanha</h2>
       <div class="mt-6 space-y-5">
         <div class="flex gap-3">
           <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-sage-pill font-bold text-brand-dark" aria-hidden="true">%</span>
@@ -45,14 +31,18 @@
         </div>
         <div class="flex gap-3">
           <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-sage-pill font-bold text-brand-dark" aria-hidden="true">1</span>
-          <div><p class="text-sm font-bold text-brand-dark">Uma regra vinculada</p><p class="mt-1 text-xs leading-5 text-sage-muted">Os demais blocos ficam disponíveis como demonstração visual.</p></div>
+          <div><p class="text-sm font-bold text-brand-dark">Regra única</p><p class="mt-1 text-xs leading-5 text-sage-muted">A taxa revisada será vinculada a esta campanha.</p></div>
         </div>
       </div>
 
       <label for="campaign-budget" class="campaign-label mt-8">Orçamento mensal de comissões (R$)</label>
       <input id="campaign-budget" :value="demo.budget" type="number" min="0" step="100" class="campaign-control" @input="$emit('update-demo', 'budget', $event.target.value)" />
-      <p class="mt-2 text-xs leading-5 text-sage-muted">Campo de apresentação. Não é enviado ao cadastro da campanha.</p>
-      <div class="mt-6 rounded-2xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-text">Interpretação demonstrativa: a extração automática da regra será integrada posteriormente.</div>
+      <div v-if="interpretation.isProcessing" class="mt-6 rounded-2xl border border-brand/30 bg-sage-light px-4 py-3 text-sm leading-6 text-brand-dark" role="status" aria-live="polite">
+        <p class="font-bold">Interpretando proposta…</p>
+        <p class="mt-1 text-sage-subtle">O texto será enviado ao Spring. Nenhuma campanha será salva nesta etapa.</p>
+        <button type="button" class="focus-ring mt-3 rounded-full border border-sage-border-dark px-3 py-2 text-xs font-bold text-brand-dark" @click="$emit('cancel-interpretation')">Cancelar interpretação</button>
+      </div>
+      <div v-else-if="interpretation.error" class="mt-6 rounded-2xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm leading-6 text-danger-dark" role="alert">{{ interpretation.error }}</div>
     </aside>
   </div>
 </template>
@@ -61,10 +51,11 @@
 const props = defineProps({
   form: { type: Object, required: true },
   errors: { type: Object, default: () => ({}) },
-  demo: { type: Object, required: true }
+  demo: { type: Object, required: true },
+  interpretation: { type: Object, required: true }
 })
 
-const emit = defineEmits(['update', 'update-demo'])
+const emit = defineEmits(['update', 'update-demo', 'cancel-interpretation'])
 
 function update(field, value) {
   emit('update', field, value)

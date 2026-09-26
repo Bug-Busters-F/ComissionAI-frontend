@@ -10,21 +10,16 @@
     </header>
 
     <template v-if="campaign && !loadError">
-      <div v-if="isDemo" class="rounded-[22px] border border-success/20 bg-success-bg p-5"><p class="font-bold text-success-dark">Registro demonstrativo</p><p class="mt-1 text-sm leading-6 text-success-dark/80">Este exemplo serve apenas para explorar o fluxo e não representa uma campanha persistida.</p></div>
+      <div v-if="isDemo" class="rounded-[22px] border border-success/20 bg-success-bg p-5"><p class="font-bold text-success-dark">Campanha pronta para consulta</p><p class="mt-1 text-sm leading-6 text-success-dark/80">Confira os dados da proposta e da regra vinculada.</p></div>
       <div v-else class="rounded-[22px] border border-success/20 bg-success-bg p-5"><p class="font-bold text-success-dark">Campanha salva como {{ formatCampaignState(campaign.estado).toLocaleLowerCase() }}</p><p class="mt-1 text-sm leading-6 text-success-dark/80">Texto original, vigência e regra abaixo são os dados persistidos.</p></div>
 
-      <CampaignSummary :title="'Revisão consolidada'" :subtitle="isDemo ? 'Proposta demonstrativa' : 'Dados persistidos da proposta e da regra vinculada.'" :badge="isDemo ? 'Demonstração' : formatCampaignState(campaign.estado)" :summary-items="summaryItems" :original-text="campaign.textoOriginal" />
+      <CampaignSummary :title="'Revisão consolidada'" :subtitle="isDemo ? 'Proposta e regra vinculada.' : 'Dados persistidos da proposta e da regra vinculada.'" :badge="formatCampaignState(campaign.estado)" :summary-items="summaryItems" :original-text="campaign.textoOriginal" />
 
-      <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="rule-details-heading"><div class="flex flex-wrap items-start justify-between gap-4"><div><h2 id="rule-details-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Parâmetros da regra</h2><p class="mt-1 text-sm text-sage-muted">Uma regra vinculada à campanha.</p></div><StatusBadge v-if="campaign.regra" :label="campaign.regra.status || 'Rascunho'" :tone="campaignStateTone(campaign.regra.status)" /></div><dl class="mt-6 grid gap-x-8 sm:grid-cols-2"><div v-for="item in ruleItems" :key="item.label" class="flex items-center justify-between gap-4 border-b border-sage-border-light py-3 text-sm"><dt class="text-sage-muted">{{ item.label }}</dt><dd class="text-right font-bold text-brand-dark">{{ item.value || 'Não informado' }}</dd></div></dl></section>
-
-      <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="demo-section-heading"><div class="flex flex-wrap items-center justify-between gap-3"><div><h2 id="demo-section-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Apuração e memória</h2><p class="mt-1 text-sm text-sage-muted">Acessos visuais do protótipo, sem cálculo ou alteração de dados reais.</p></div><span class="rounded-full bg-warning-light px-3 py-1.5 text-xs font-bold text-warning-dark">Demonstração</span></div><div class="mt-5 flex flex-wrap gap-3"><RouterLink :to="`/campanhas/${campaign.id}/apurar`" class="focus-ring rounded-full bg-sage-pill px-5 py-3 text-sm font-bold text-brand-dark">Abrir apuração</RouterLink><button type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark" @click="isMemoryOpen = true">Abrir memória</button></div></section>
-
-      <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="history-heading"><div class="flex items-center justify-between gap-4"><div><h2 id="history-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Histórico e decisões</h2><p class="mt-1 text-sm text-sage-muted">Histórico de versões demonstrativo nesta entrega.</p></div><span class="rounded-full bg-warning-light px-3 py-1.5 text-xs font-bold text-warning-dark">Demonstração</span></div><div class="mt-5 overflow-x-auto"><table class="w-full min-w-[620px] text-left text-sm"><thead class="bg-sage-pill text-[10px] uppercase tracking-[0.12em] text-sage-muted"><tr><th class="rounded-l-xl px-3 py-3">Versão</th><th class="px-3 py-3">Canal / taxa</th><th class="px-3 py-3">Validade</th><th class="rounded-r-xl px-3 py-3">Origem</th></tr></thead><tbody><tr><td class="px-3 py-4 font-bold">v1<span class="block text-xs font-normal text-sage-muted">Versão atual</span></td><td class="px-3 py-4">{{ formatCampaignChannel(campaign.regra?.canal) }} · {{ formatRate(campaign.regra?.taxa) }}</td><td class="px-3 py-4">{{ formatPeriodArrow(campaign.dataInicio, campaign.dataFim) }}</td><td class="px-3 py-4 text-sage-muted">Somente visual</td></tr></tbody></table></div></section>
+      <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="history-heading"><div class="flex items-center justify-between gap-4"><div><h2 id="history-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Histórico e decisões</h2><p class="mt-1 text-sm text-sage-muted">Acompanhe as versões e decisões da campanha.</p></div></div><div class="mt-5 overflow-x-auto"><table class="w-full min-w-[620px] text-left text-sm"><thead class="bg-sage-pill text-[10px] uppercase tracking-[0.12em] text-sage-muted"><tr><th class="rounded-l-xl px-3 py-3">Versão</th><th class="px-3 py-3">Canal / taxa</th><th class="px-3 py-3">Validade</th><th class="rounded-r-xl px-3 py-3">Origem</th></tr></thead><tbody><tr><td class="px-3 py-4 font-bold">v1<span class="block text-xs font-normal text-sage-muted">Versão atual</span></td><td class="px-3 py-4">{{ formatCampaignChannel(campaign.regra?.canal) }} · {{ formatRate(campaign.regra?.taxa) }}</td><td class="px-3 py-4">{{ formatPeriodArrow(campaign.dataInicio, campaign.dataFim) }}</td><td class="px-3 py-4 text-sage-muted">Registro atual</td></tr></tbody></table></div></section>
 
     </template>
 
     <CampaignDeleteDialog :open="isDeleteOpen" :campaign-title="campaign?.titulo" :is-removing="isRemoving" :error-message="deleteError" @cancel="closeDelete" @confirm="removeCampaign" />
-    <CampaignMemoryDialog :open="isMemoryOpen" @close="isMemoryOpen = false" />
   </div>
 </template>
 
@@ -32,7 +27,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CampaignDeleteDialog from '@/components/common/CampaignDeleteDialog.vue'
-import CampaignMemoryDialog from '@/components/common/CampaignMemoryDialog.vue'
 import CampaignSummary from '@/components/common/CampaignSummary.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { campaignDemo, isCampaignDemoEnabled } from '@/services/campaignDemo'
@@ -49,32 +43,17 @@ const loadError = ref('')
 const isDeleteOpen = ref(false)
 const isRemoving = ref(false)
 const deleteError = ref('')
-const isMemoryOpen = ref(false)
 const isDemo = isCampaignDemoEnabled
 
 const summaryItems = computed(() => {
   const rule = campaign.value?.regra || {}
   return [
-    { label: 'Público / canal', value: `${rule.descrMarca || 'Marca não informada'} · ${rule.descriCargo || 'Cargo não informado'} · ${formatCampaignChannel(rule.canal)}` },
+    { label: 'Canal', value: formatCampaignChannel(rule.canal) },
     { label: 'Vigência', value: formatPeriodArrow(campaign.value?.dataInicio, campaign.value?.dataFim) },
     { label: 'Regra percentual', value: formatRate(rule.taxa) },
     { label: 'Canal da regra', value: formatCampaignChannel(rule.canal) },
     { label: 'Matrícula', value: rule.matricula || 'Todos' },
     { label: 'Código da loja', value: rule.codLoja ?? 'Todos' }
-  ]
-})
-
-const ruleItems = computed(() => {
-  const rule = campaign.value?.regra || {}
-  return [
-    { label: 'Taxa', value: formatRate(rule.taxa) },
-    { label: 'Canal', value: formatCampaignChannel(rule.canal) },
-    { label: 'Marca', value: rule.descrMarca },
-    { label: 'Código da marca', value: rule.codMarca },
-    { label: 'Loja', value: rule.codLoja },
-    { label: 'Cargo', value: rule.descriCargo },
-    { label: 'Matrícula', value: rule.matricula },
-    { label: 'Vigência da regra', value: formatPeriodArrow(rule.dataInicio, rule.dataFim) }
   ]
 })
 
@@ -110,7 +89,7 @@ async function removeCampaign() {
   try {
     if (isDemo) campaignDemo.remove(campaign.value.id)
     else await campaignService.remove(campaign.value.id)
-    notifications.success('Campanha removida', isDemo ? 'Apenas o exemplo demonstrativo foi retirado.' : 'A campanha foi removida da listagem.')
+    notifications.success('Campanha removida', 'A campanha foi removida da listagem.')
     await router.push('/campanhas')
   } catch (error) {
     deleteError.value = normalizeCampaignError(error).message

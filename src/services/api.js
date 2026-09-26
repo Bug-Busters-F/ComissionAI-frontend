@@ -9,7 +9,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     // Tratamento unificado de erros de rede / conexão
-    if (!error.response) {
+    if (!error.response && error.code !== 'ERR_CANCELED') {
       console.warn('Servidor Spring Boot offline ou inatingível. Verifique se o backend está em execução na porta 8080.')
     }
     return Promise.reject(error)

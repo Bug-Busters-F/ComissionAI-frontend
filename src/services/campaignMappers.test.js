@@ -53,6 +53,12 @@ describe('campaignMappers', () => {
     expect(payload.budget).toBeUndefined()
   })
 
+  it('preserves the original proposal text in the persistence payload', () => {
+    const payload = campaignFormToPayload({ titulo: 'Campanha', textoOriginal: '  texto original\n', taxaPercentual: '5' })
+
+    expect(payload.textoOriginal).toBe('  texto original\n')
+  })
+
   it('maps the nested rule response into the shared form', () => {
     expect(campaignResponseToForm({
       titulo: 'Campanha persistida',

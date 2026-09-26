@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyInterpretationToForm } from './campaignInterpretation'
+import { applyInterpretationToForm, normalizeInterpretationResult } from './campaignInterpretation'
 
 const form = {
   titulo: 'Campanha',
@@ -13,7 +13,7 @@ const form = {
 
 describe('campaignInterpretation', () => {
   it('applies only recognized values and preserves original text', () => {
-    const result = applyInterpretationToForm(form, {
+    const result = applyInterpretationToForm({ ...form, taxaPercentual: '' }, {
       canal: 'ECOMMERCE',
       dataInicio: '2026-12-01',
       taxa: 0.075,
@@ -37,6 +37,48 @@ describe('campaignInterpretation', () => {
     expect(result.form.canal).toBe('')
     expect(result.form.codCargo).toBe(200)
     expect(result.changedFields).toEqual([])
+  })
+
+  it('clears an old suggestion when the new interpretation explicitly returns null', () => {
+    const result = applyInterpretationToForm({ ...form, taxaPercentual: '5' }, {
+      taxa: null,
+      pendencias: ['Percentual não identificado.']
+    }, { suggestedFields: ['taxaPercentual'] })
+
+    expect(result.form.taxaPercentual).toBe('')
+    expect(result.suggestedFields).toContain('taxaPercentual')
+  })
+
+  it('preserves manually cleared fields while replacing other suggestions', () => {
+    const result = applyInterpretationToForm({ ...form, taxaPercentual: '', canal: 'ECOMMERCE' }, {
+      canal: 'APP',
+      taxa: 0.03
+    }, {
+      manualFields: ['taxaPercentual'],
+      suggestedFields: ['canal', 'taxaPercentual']
+    })
+
+    expect(result.form.canal).toBe('APP')
+    expect(result.form.taxaPercentual).toBe('')
+    expect(result.preservedFields).toContain('taxaPercentual')
+  })
+
+  it('does not infer matrícula and deduplicates pending messages', () => {
+    const normalized = normalizeInterpretationResult({
+      matricula: '123',
+      confianca: null,
+      pendencias: ['Cargo ambíguo', 'Cargo ambíguo']
+    })
+
+    expect(normalized.valid).toBe(true)
+    expect(normalized.fields.matricula).toBeUndefined()
+    expect(normalized.pending).toEqual(['Cargo ambíguo'])
+    expect(normalized.confidence).toBeNull()
+  })
+
+  it('rejects an empty or unrelated response before touching the form', () => {
+    expect(normalizeInterpretationResult({}).valid).toBe(false)
+    expect(normalizeInterpretationResult({ resultado: 'desconhecido' }).valid).toBe(false)
   })
 
   it('rejects a response tied to an older source text', () => {

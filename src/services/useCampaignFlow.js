@@ -1,9 +1,10 @@
 import { computed, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { useNotificationStore } from '@/stores/notificationStore'
-import { applyInterpretationToForm } from './campaignInterpretation'
+import { applyInterpretationToForm, normalizeInterpretationResult } from './campaignInterpretation'
 import { campaignDemo, isCampaignDemoEnabled } from './campaignDemo'
 import { campaignService, mapCampaignFieldErrors, normalizeCampaignError } from './campaignService'
+import { campaignInterpretationService, normalizeInterpretationError } from './campaignInterpretationService'
 import { campaignFormToPayload, campaignResponseToForm, createEmptyCampaignForm } from './campaignMappers'
 import { hasValidationErrors, validateCampaignForm } from './campaignValidation'
 
@@ -51,11 +52,22 @@ export function useCampaignFlow() {
     generalError: '',
     discardDialogOpen: false,
     interpretation: {
+      status: 'manual',
+      isProcessing: false,
+      requestId: 0,
+      requestRouteName: null,
+      requestRouteId: null,
       source: null,
       sourceText: null,
+      requestContext: {},
+      lastResponse: null,
+      manualFields: [],
       dirtyFields: [],
+      suggestedFields: [],
+      preservedFields: [],
       pending: [],
-      confidence: null
+      confidence: null,
+      error: ''
     },
     demo: {
       budget: '',
@@ -70,6 +82,9 @@ export function useCampaignFlow() {
   const loadedRouteKey = ref('')
   const allowNavigation = ref(false)
   const pendingNavigation = ref(null)
+  let interpretationSequence = 0
+  let activeInterpretationController = null
+  let componentActive = true
   const isDemo = computed(() => isCampaignDemoEnabled)
   const isEdit = computed(() => route.name === 'campanha-editar')
   const isPersisted = computed(() => Boolean(state.campaignId))
@@ -84,6 +99,8 @@ export function useCampaignFlow() {
   })
   onBeforeUnmount(() => {
     loadSequence.value += 1
+    invalidateInterpretationRequest({ silent: true })
+    componentActive = false
     window.removeEventListener('beforeunload', handleBeforeUnload)
   })
 
@@ -122,12 +139,14 @@ export function useCampaignFlow() {
       return
     }
 
+    invalidateInterpretationRequest({ silent: true })
     loadedRouteKey.value = routeKey
     const requestSequence = ++loadSequence.value
     const nextStep = normalizeCampaignStep(route.query.etapa)
     activeStep.value = nextStep
     state.fieldErrors = {}
     state.generalError = ''
+    state.interpretation.error = ''
     loadError.value = ''
     state.isLoading = true
 
@@ -203,11 +222,15 @@ export function useCampaignFlow() {
       return
     }
     form[field] = value
+    if (!state.interpretation.manualFields.includes(field)) {
+      state.interpretation.manualFields.push(field)
+    }
     if (!state.interpretation.dirtyFields.includes(field)) {
       state.interpretation.dirtyFields.push(field)
     }
     state.fieldErrors = { ...state.fieldErrors, [field]: undefined }
     state.generalError = ''
+    state.interpretation.error = ''
   }
 
   function updateDemoField(field, value) {
@@ -218,7 +241,20 @@ export function useCampaignFlow() {
 
   async function goToStep(step) {
     const normalized = normalizeCampaignStep(step)
-    if (normalized !== 'proposta' && (!form.titulo.trim() || !form.textoOriginal.trim())) {
+    if (state.interpretation.isProcessing && normalized !== 'proposta' && normalized !== 'interpretacao') {
+      state.interpretation.error = 'Aguarde a interpretação terminar antes de continuar.'
+      return false
+    }
+
+    if (normalized === 'interpretacao' && !form.textoOriginal.trim()) {
+      state.fieldErrors = { ...state.fieldErrors, textoOriginal: 'Informe o texto da proposta para abrir a interpretação.' }
+      await router.push({ query: { ...route.query, etapa: 'proposta' } })
+      await nextTick()
+      document.querySelector('#campaign-original-text')?.focus()
+      return false
+    }
+
+    if ((normalized === 'simulacao' || normalized === 'revisao') && (!form.titulo.trim() || !form.textoOriginal.trim())) {
       state.fieldErrors = validateCampaignForm(form)
       await router.push({ query: { ...route.query, etapa: 'proposta' } })
       await nextTick()
@@ -235,8 +271,122 @@ export function useCampaignFlow() {
     }
 
     state.generalError = ''
+    state.interpretation.error = ''
     await router.push({ query: { ...route.query, etapa: normalized } })
     return true
+  }
+
+  async function interpretProposal() {
+    if (state.interpretation.isProcessing) return false
+
+    const originalText = String(form.textoOriginal ?? '')
+    if (!originalText.trim()) {
+      state.fieldErrors = { ...state.fieldErrors, textoOriginal: 'Informe o texto da proposta para interpretar.' }
+      await router.push({ query: { ...route.query, etapa: 'proposta' } })
+      await nextTick()
+      document.querySelector('#campaign-original-text')?.focus()
+      return false
+    }
+
+    state.generalError = ''
+    state.interpretation.error = ''
+    invalidateInterpretationRequest({ silent: true })
+    const requestId = ++interpretationSequence
+    const controller = new AbortController()
+    activeInterpretationController = controller
+    const context = buildInterpretationContext({ onlyExplicit: true })
+    const manualFields = [...state.interpretation.manualFields]
+    const previousSuggestions = [...state.interpretation.suggestedFields]
+
+    state.interpretation = {
+      ...state.interpretation,
+      status: 'processing',
+      isProcessing: true,
+      requestId,
+      requestRouteName: route.name,
+      requestRouteId: route.params.id || null,
+      sourceText: state.interpretation.sourceText,
+      requestContext: context,
+      error: ''
+    }
+    state.fieldErrors = { ...state.fieldErrors, textoOriginal: undefined }
+
+    try {
+      const result = isDemo.value
+        ? createDemoInterpretationResult(form)
+        : await campaignInterpretationService.interpret({ texto: originalText, contexto: context }, { signal: controller.signal })
+
+      if (!isCurrentInterpretationRequest(requestId, originalText, context)) {
+        markStaleInterpretation(requestId, originalText)
+        return false
+      }
+
+      const normalized = normalizeInterpretationResult(result)
+      if (!normalized.valid) {
+        throw createInterpretationFlowError(normalized.message)
+      }
+
+      const applied = applyInterpretationToForm(form, normalized, {
+        sourceText: originalText,
+        currentSourceText: form.textoOriginal,
+        manualFields,
+        suggestedFields: previousSuggestions
+      })
+
+      if (!applied.applied) {
+        if (applied.reason === 'stale-source') {
+          markStaleInterpretation(requestId, originalText)
+          return false
+        }
+        throw createInterpretationFlowError(applied.message || 'Não foi possível aplicar a resposta da interpretação.')
+      }
+
+      Object.assign(form, applied.form)
+      state.interpretation = {
+        ...state.interpretation,
+        status: normalized.pending.length ? 'pending' : 'interpreted',
+        isProcessing: false,
+        source: isDemo.value ? 'demo' : 'real',
+        sourceText: originalText,
+        requestContext: context,
+        lastResponse: result,
+        manualFields,
+        dirtyFields: manualFields,
+        suggestedFields: applied.suggestedFields,
+        preservedFields: applied.preservedFields,
+        pending: normalized.pending,
+        confidence: normalized.confidence,
+        error: ''
+      }
+      await router.push({ query: { ...route.query, etapa: 'interpretacao' } })
+      notifications.success(isDemo.value ? 'Interpretação demonstrativa aplicada' : 'Proposta interpretada', isDemo.value ? 'Revise os campos fictícios antes de continuar.' : 'Revise os campos sugeridos antes de salvar a campanha.')
+      return true
+    } catch (error) {
+      if (!isCurrentInterpretationRequest(requestId, originalText, context)) {
+        return false
+      }
+      const normalizedError = normalizeInterpretationError(error)
+      if (normalizedError.kind === 'canceled') {
+        state.interpretation.isProcessing = false
+        state.interpretation.status = state.interpretation.sourceText ? 'stale' : 'manual'
+        return false
+      }
+      state.interpretation.isProcessing = false
+      state.interpretation.status = 'error'
+      state.interpretation.error = normalizedError.message
+      return false
+    } finally {
+      if (activeInterpretationController === controller) {
+        activeInterpretationController = null
+      }
+    }
+  }
+
+  function cancelInterpretation() {
+    if (!state.interpretation.isProcessing) return
+    invalidateInterpretationRequest({ silent: true })
+    state.interpretation.isProcessing = false
+    state.interpretation.status = state.interpretation.sourceText ? 'stale' : 'manual'
   }
 
   async function saveDraft({ returnToCampaigns = true } = {}) {
@@ -245,6 +395,7 @@ export function useCampaignFlow() {
 
     state.isSaving = true
     state.generalError = ''
+    state.interpretation.error = ''
     try {
       const currentState = state.campaignId && state.persistedState && state.persistedState !== 'DRAFT'
         ? state.persistedState
@@ -352,39 +503,59 @@ export function useCampaignFlow() {
     }
   }
 
-  function applyExampleInterpretation() {
-    const result = {
-      canal: null,
-      codMarca: form.codMarca || 10,
-      descrMarca: form.descrMarca || 'Aurora',
-      descriCargo: form.descriCargo || 'Vendedores',
-      taxa: 0.03,
-      dataInicio: form.dataInicio || null,
-      dataFim: form.dataFim || null,
-      pendencias: []
-    }
-    const sourceText = form.textoOriginal
-    const applied = applyInterpretationToForm(form, result, {
-      sourceText,
-      currentSourceText: form.textoOriginal,
-      dirtyFields: state.interpretation.dirtyFields
-    })
+  function interpretationIsStale() {
+    if (!state.interpretation.sourceText) return false
+    if (state.interpretation.sourceText !== form.textoOriginal) return true
 
-    if (!applied.applied) {
-      state.generalError = 'O exemplo não foi aplicado porque o texto da proposta mudou.'
-      return
-    }
-
-    Object.assign(form, applied.form)
-    state.interpretation.source = 'exemplo'
-    state.interpretation.sourceText = sourceText
-    state.interpretation.pending = result.pendencias || []
-    state.interpretation.confidence = null
-    notifications.info('Interpretação demonstrativa aplicada', 'Revise os campos antes de chegar à revisão final.')
+    const currentContext = buildInterpretationContext({ onlyExplicit: true })
+    return ['ano_referencia', 'canal_padrao'].some((key) =>
+      state.interpretation.manualFields.some((field) => (key === 'ano_referencia' ? ['dataInicio', 'dataFim'].includes(field) : field === 'canal')) &&
+      currentContext[key] !== state.interpretation.requestContext[key]
+    )
   }
 
-  function interpretationIsStale() {
-    return Boolean(state.interpretation.sourceText && state.interpretation.sourceText !== form.textoOriginal)
+  function buildInterpretationContext({ onlyExplicit = false } = {}) {
+    const context = {}
+    const referenceDate = validDate(form.dataInicio) ? form.dataInicio : validDate(form.dataFim) ? form.dataFim : null
+    const datesAreExplicit = state.interpretation.manualFields.includes('dataInicio') || state.interpretation.manualFields.includes('dataFim')
+    if (referenceDate && (!onlyExplicit || datesAreExplicit)) {
+      context.ano_referencia = Number(referenceDate.slice(0, 4))
+    }
+
+    if (state.interpretation.manualFields.includes('canal') && form.canal && form.canal !== 'TODOS') {
+      context.canal_padrao = form.canal
+    }
+
+    return context
+  }
+
+  function isCurrentInterpretationRequest(requestId, originalText, context) {
+    return componentActive &&
+      requestId === interpretationSequence &&
+      state.interpretation.requestId === requestId &&
+      route.name === state.interpretation.requestRouteName &&
+      (route.params.id || null) === state.interpretation.requestRouteId &&
+      String(form.textoOriginal ?? '') === originalText &&
+      JSON.stringify(buildInterpretationContext({ onlyExplicit: true })) === JSON.stringify(context)
+  }
+
+  function markStaleInterpretation(requestId, originalText) {
+    if (state.interpretation.requestId !== requestId) return
+    state.interpretation.isProcessing = false
+    state.interpretation.status = state.interpretation.sourceText ? 'stale' : 'manual'
+    state.interpretation.error = state.interpretation.sourceText
+      ? 'A resposta foi ignorada porque o texto ou o contexto mudou. Interprete novamente para atualizar as sugestões.'
+      : `A resposta foi ignorada porque o texto mudou após a solicitação (${originalText.length} caracteres).`
+  }
+
+  function invalidateInterpretationRequest({ silent = false } = {}) {
+    interpretationSequence += 1
+    activeInterpretationController?.abort()
+    activeInterpretationController = null
+    if (!silent && state.interpretation.isProcessing) {
+      state.interpretation.isProcessing = false
+      state.interpretation.status = state.interpretation.sourceText ? 'stale' : 'manual'
+    }
   }
 
   function requestLeave(target) {
@@ -409,6 +580,7 @@ export function useCampaignFlow() {
     const target = pendingNavigation.value || '/campanhas'
     state.discardDialogOpen = false
     pendingNavigation.value = null
+    invalidateInterpretationRequest({ silent: true })
     resetForm()
     await navigateWithPermission(target)
   }
@@ -455,11 +627,12 @@ export function useCampaignFlow() {
     campaignTitle,
     currentStepIndex,
     goToStep,
+    interpretProposal,
+    cancelInterpretation,
     saveDraft,
     approveCampaign,
     updateField,
     updateDemoField,
-    applyExampleInterpretation,
     interpretationIsStale,
     requestLeave,
     confirmDiscard,
@@ -480,16 +653,54 @@ function createDemoState() {
 
 function createInterpretationState() {
   return {
+    status: 'manual',
+    isProcessing: false,
+    requestId: 0,
+    requestRouteName: null,
+    requestRouteId: null,
     source: null,
     sourceText: null,
+    requestContext: {},
+    lastResponse: null,
+    manualFields: [],
     dirtyFields: [],
+    suggestedFields: [],
+    preservedFields: [],
     pending: [],
-    confidence: null
+    confidence: null,
+    error: ''
+  }
+}
+
+function validDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return false
+  const [year, month, day] = String(value).split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+}
+
+function createDemoInterpretationResult(form) {
+  return {
+    canal: form.canal || null,
+    codMarca: form.codMarca || 10,
+    descrMarca: form.descrMarca || 'Aurora',
+    descriCargo: form.descriCargo || 'Vendedores',
+    taxa: form.taxaPercentual ? Number(String(form.taxaPercentual).replace(',', '.')) / 100 : 0.03,
+    dataInicio: form.dataInicio || null,
+    dataFim: form.dataFim || null,
+    confianca: null,
+    pendencias: []
   }
 }
 
 function createCampaignFlowError(message) {
   const error = new Error(message)
   error.code = 'CAMPAIGN_FLOW'
+  return error
+}
+
+function createInterpretationFlowError(message) {
+  const error = new Error(message)
+  error.code = 'INTERPRETATION_FLOW'
   return error
 }

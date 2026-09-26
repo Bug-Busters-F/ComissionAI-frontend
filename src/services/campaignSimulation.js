@@ -4,7 +4,7 @@ export const CAMPAIGN_SIMULATION_PREMISES = [
   { label: 'Canal considerado', value: 'Loja física' },
   { label: 'Referência histórica', value: 'Novembro de 2025' },
   { label: 'Quadro de vendedores', value: '5 funcionários · 2 lojas' },
-  { label: 'Taxa vigente fictícia', value: '2,5%' },
+  { label: 'Taxa vigente', value: '2,5%' },
   { label: 'Ocorrências', value: 'Sem afastamentos no período' },
   { label: 'Abrangência do orçamento', value: 'R$ 7.500,00 mensais' }
 ]
@@ -26,7 +26,7 @@ const FIXTURES = {
     ]
   },
   adjusted: {
-    label: 'Sugestão demonstrativa aplicada',
+    label: 'Sugestão aplicada',
     scenarios: [
       { key: '80', percentage: '80%', classification: 'Abaixo', sales: 184000, withoutProposal: 3680, withProposal: 5010, impact: 1330, budget: 7500 },
       { key: '100', percentage: '100%', classification: 'Referência', sales: 230000, withoutProposal: 4600, withProposal: 6400, impact: 1800, budget: 7500 },
