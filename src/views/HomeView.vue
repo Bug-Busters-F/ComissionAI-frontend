@@ -3,7 +3,7 @@
     <PageHeader title="Visão geral" description="Acompanhe os dados e o ciclo das suas campanhas.">
       <template #action>
         <RouterLink
-          to="/campanhas"
+          to="/campanhas/nova"
           class="focus-ring inline-flex items-center rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover"
         >
           + Nova campanha
@@ -30,7 +30,10 @@
           <RouterLink to="/campanhas" class="focus-ring text-sm font-semibold underline underline-offset-4 text-brand-dark">Ver todas →</RouterLink>
         </div>
         <div class="mt-6 overflow-x-auto">
-          <table class="w-full min-w-[520px] text-left text-sm">
+          <div v-if="campaignsLoading" class="rounded-xl bg-sage-light px-4 py-6 text-sm text-sage-muted" role="status">Carregando campanhas recentes…</div>
+          <p v-else-if="campaignsError" class="rounded-xl border border-danger/30 bg-danger-bg px-4 py-4 text-sm leading-6 text-danger-dark" role="alert">{{ campaignsError }}</p>
+          <p v-else-if="campaigns.length === 0" class="rounded-xl bg-sage-light px-4 py-6 text-sm text-sage-muted">Nenhuma campanha cadastrada ainda.</p>
+          <table v-else class="w-full min-w-[520px] text-left text-sm">
             <thead class="bg-sage-pill text-[10px] uppercase tracking-[0.12em] text-sage-muted">
               <tr>
                 <th class="rounded-l-xl px-4 py-3 font-semibold">Campanha</th>
@@ -39,15 +42,15 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-sage-border-light">
-              <tr v-for="campaign in campaigns" :key="campaign.name">
+              <tr v-for="campaign in campaigns" :key="campaign.id">
                 <td class="px-4 py-4">
-                  <p class="font-bold text-brand-dark">{{ campaign.name }}</p>
-                  <p class="mt-1 text-xs text-sage-muted">{{ campaign.period }}</p>
+                  <p class="font-bold text-brand-dark">{{ campaign.titulo }}</p>
+                  <p class="mt-1 text-xs text-sage-muted">{{ formatPeriod(campaign.dataInicio, campaign.dataFim) }}</p>
                 </td>
-                <td class="px-4 py-4"><StatusBadge :label="campaign.status" :tone="campaign.tone" /></td>
+                <td class="px-4 py-4"><StatusBadge :label="formatCampaignState(campaign.estado)" :tone="campaignStateTone(campaign.estado)" /></td>
                 <td class="px-4 py-4">
-                  <RouterLink to="/campanhas" class="focus-ring font-semibold underline underline-offset-4 text-brand-dark">
-                    {{ campaign.action }} →
+                  <RouterLink :to="`/campanhas/${campaign.id}`" class="focus-ring font-semibold underline underline-offset-4 text-brand-dark">
+                    Ver campanha →
                   </RouterLink>
                 </td>
               </tr>
@@ -82,8 +85,12 @@
 </template>
 
 <script setup>
+import { onMounted, ref } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import { campaignDemo, isCampaignDemoEnabled } from '@/services/campaignDemo'
+import { campaignService, normalizeCampaignError } from '@/services/campaignService'
+import { campaignStateTone, formatCampaignState, formatPeriod } from '@/services/campaignMappers'
 
 const metrics = [
   { label: 'Competências cadastradas', value: '3', detail: 'RH, Vendas e Comissão', highlight: true },
@@ -92,10 +99,9 @@ const metrics = [
   { label: 'Pendências nos dados', value: '3', detail: 'Revisão antes dos cálculos' }
 ]
 
-const campaigns = [
-  { name: 'Incentivo de novembro', period: '01/11/2025 → 30/11/2025', status: 'Finalizada', tone: 'success', action: 'Ver campanha' },
-  { name: 'Campanha de dezembro', period: '01/12/2025 → 31/12/2025', status: 'Rascunho', tone: 'warning', action: 'Continuar' }
-]
+const campaigns = ref([])
+const campaignsLoading = ref(true)
+const campaignsError = ref('')
 
 const process = [
   { number: 1, title: 'Prepare as bases mensais', detail: 'Importe RH, Vendas e Comissão.' },
@@ -103,4 +109,14 @@ const process = [
   { number: 3, title: 'Aprove a proposta', detail: 'Registre a decisão e a versão.' },
   { number: 4, title: 'Apure os resultados', detail: 'Compare a simulação com o realizado.' }
 ]
+
+onMounted(async () => {
+  try {
+    campaigns.value = (isCampaignDemoEnabled ? campaignDemo.list() : await campaignService.list()).slice(0, 3)
+  } catch (error) {
+    campaignsError.value = normalizeCampaignError(error).message
+  } finally {
+    campaignsLoading.value = false
+  }
+})
 </script>
