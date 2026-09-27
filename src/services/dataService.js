@@ -771,8 +771,17 @@ export const dataService = {
         content
       }
     } catch (err) {
-      console.error('Falha ao consultar taxas de comissão no backend:', err)
-      throw err
+      console.warn('Falha ao consultar taxas de comissão no backend:', err)
+      return {
+        content: [],
+        totalElements: 0,
+        totalPages: 0,
+        size,
+        number: page,
+        first: true,
+        last: true,
+        empty: true
+      }
     }
   },
 
