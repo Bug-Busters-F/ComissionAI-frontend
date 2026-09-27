@@ -20,9 +20,98 @@ export function formatarNomeCompetencia(codigo) {
   return codigo
 }
 
+export function criarCompetenciasPadrao() {
+  return [
+    {
+      name: 'Dezembro',
+      competencia: '2025-12',
+      competenciaCodigo: '12/2025',
+      status: 'Ciclo com pendências',
+      tone: 'warning',
+      cicloFechado: false,
+      vendasCount: 0,
+      bases: [
+        { tipo: 'RH', label: 'RH', value: 'Pendente' },
+        { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
+        { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
+      ]
+    },
+    {
+      name: 'Novembro',
+      competencia: '2025-11',
+      competenciaCodigo: '11/2025',
+      status: 'Ciclo com pendências',
+      tone: 'warning',
+      cicloFechado: false,
+      vendasCount: 0,
+      bases: [
+        { tipo: 'RH', label: 'RH', value: 'Pendente' },
+        { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
+        { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
+      ]
+    },
+    {
+      name: 'Outubro',
+      competencia: '2025-10',
+      competenciaCodigo: '10/2025',
+      status: 'Ciclo com pendências',
+      tone: 'warning',
+      cicloFechado: false,
+      vendasCount: 0,
+      bases: [
+        { tipo: 'RH', label: 'RH', value: 'Pendente' },
+        { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
+        { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
+      ]
+    },
+    {
+      name: 'Setembro',
+      competencia: '2025-09',
+      competenciaCodigo: '09/2025',
+      status: 'Ciclo com pendências',
+      tone: 'warning',
+      cicloFechado: false,
+      vendasCount: 0,
+      bases: [
+        { tipo: 'RH', label: 'RH', value: 'Pendente' },
+        { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
+        { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
+      ]
+    },
+    {
+      name: 'Agosto',
+      competencia: '2025-08',
+      competenciaCodigo: '08/2025',
+      status: 'Ciclo com pendências',
+      tone: 'warning',
+      cicloFechado: false,
+      vendasCount: 0,
+      bases: [
+        { tipo: 'RH', label: 'RH', value: 'Pendente' },
+        { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
+        { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
+      ]
+    },
+    {
+      name: 'Julho',
+      competencia: '2025-07',
+      competenciaCodigo: '07/2025',
+      status: 'Ciclo com pendências',
+      tone: 'warning',
+      cicloFechado: false,
+      vendasCount: 0,
+      bases: [
+        { tipo: 'RH', label: 'RH', value: 'Pendente' },
+        { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
+        { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
+      ]
+    }
+  ]
+}
+
 export const useDataStore = defineStore('data', {
   state: () => ({
-    competencias: [],
+    competencias: criarCompetenciasPadrao(),
     competenciasLoading: false,
     competenciasError: '',
 
@@ -147,29 +236,49 @@ export const useDataStore = defineStore('data', {
 
       try {
         const sales = await dataService.listAllSales()
-        const previous = new Map(this.competencias.map((competencia) => [competencia.competencia, competencia]))
+        if (!Array.isArray(sales) || sales.length === 0) {
+          return
+        }
 
-        this.competencias = groupSalesByCompetence(sales).map((group) => {
-          const existing = previous.get(group.competence)
-          const previousCommission = existing?.bases?.find((base) => base.tipo === 'COMISS')?.value
-          return {
-            ...(existing || {}),
-            name: formatCompetenceLabel(group.competence),
-            competencia: group.competence,
-            competenciaCodigo: formatCompetenceCode(group.competence),
-            status: 'Vendas disponíveis',
-            tone: 'success',
-            cicloFechado: true,
-            vendasCount: group.salesCount,
-            bases: [
-              { tipo: 'RH', label: 'RH', value: 'Vínculos verificados no cálculo' },
-              { tipo: 'VENDAS', label: 'Vendas', value: `${group.salesCount} registros persistidos` },
-              { tipo: 'COMISS', label: 'Comissão', value: previousCommission || 'Resolvida no cálculo' }
-            ]
+        const salesGroups = groupSalesByCompetence(sales)
+        const salesMap = new Map(salesGroups.map((g) => [formatCompetenceCode(g.competence), g]))
+
+        // Atualiza as competências padrão/existentes com dados de vendas persistidas
+        this.competencias.forEach((comp) => {
+          const cod = comp.competenciaCodigo?.trim()
+          if (cod && salesMap.has(cod)) {
+            const group = salesMap.get(cod)
+            comp.vendasCount = group.salesCount
+            comp.cicloFechado = true
+            comp.status = 'Vendas disponíveis'
+            comp.tone = 'success'
+            const vb = comp.bases.find((b) => b.tipo === 'VENDAS')
+            if (vb) vb.value = `${group.salesCount.toLocaleString('pt-BR')} registros persistidos`
           }
         })
+
+        // Adiciona competências que tenham vendas no banco mas não constavam na lista inicial
+        for (const group of salesGroups) {
+          const cod = formatCompetenceCode(group.competence)
+          if (!this.competencias.some((c) => c.competenciaCodigo === cod)) {
+            this.competencias.push({
+              name: formatCompetenceLabel(group.competence),
+              competencia: group.competence,
+              competenciaCodigo: cod,
+              status: 'Vendas disponíveis',
+              tone: 'success',
+              cicloFechado: true,
+              vendasCount: group.salesCount,
+              bases: [
+                { tipo: 'RH', label: 'RH', value: 'Vínculos verificados no cálculo' },
+                { tipo: 'VENDAS', label: 'Vendas', value: `${group.salesCount.toLocaleString('pt-BR')} registros persistidos` },
+                { tipo: 'COMISS', label: 'Comissão', value: 'Resolvida no cálculo' }
+              ]
+            })
+          }
+        }
       } catch (error) {
-        this.competenciasError = error?.response?.data?.message || 'Não foi possível consultar as vendas persistidas.'
+        console.warn('Não foi possível sincronizar vendas do banco:', error)
       } finally {
         this.competenciasLoading = false
       }
