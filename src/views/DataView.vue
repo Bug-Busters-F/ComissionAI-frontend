@@ -1,0 +1,241 @@
+<template>
+  <div class="space-y-7">
+    <PageHeader title="Base de dados" description="Organize e feche os ciclos mensais de dados de cada competência.">
+      <template #action>
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            @click="store.openComissModal('Dezembro')"
+            class="focus-ring rounded-full border border-sage-border-dark bg-white px-4 py-3 text-sm font-semibold text-brand-dark hover:bg-sage-light"
+          >
+            Tabelas de Comissão
+          </button>
+          <button
+            type="button"
+            @click="store.openCicloModal(null)"
+            class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover"
+          >
+            + Enviar ciclo (RH + Vendas)
+          </button>
+        </div>
+      </template>
+    </PageHeader>
+
+    <section class="rounded-2xl border border-warning-border bg-warning-bg p-6 sm:p-7">
+      <div class="flex items-center gap-2">
+        <span class="rounded bg-warning-light px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-warning-dark">
+          Integridade Relacional
+        </span>
+      </div>
+      <h2 class="mt-2 text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Fechamento do ciclo mensal</h2>
+      <p class="mt-2 max-w-3xl text-sm leading-6 text-sage-muted">
+        Para a correta apuração e simulação das regras de negócio, as bases de <strong>RH e Vendas devem ser enviadas conjuntamente</strong> para cada competência mensal. A validação sequencial garante que todos os colaboradores existam no quadro ativo antes de registrar as transações.
+      </p>
+    </section>
+
+    <section v-if="store.competenciasLoading" class="rounded-2xl bg-white px-6 py-12 text-center text-sm text-sage-muted" role="status">
+      Consultando as vendas persistidas para montar as competências…
+    </section>
+
+    <section v-else-if="store.competenciasError" class="rounded-2xl border border-danger/30 bg-danger-bg p-6" role="alert">
+      <h2 class="text-xl font-extrabold text-danger-dark">Não foi possível carregar as competências</h2>
+      <p class="mt-2 text-sm leading-6 text-danger-dark/80">{{ store.competenciasError }}</p>
+      <button type="button" class="focus-ring mt-5 rounded-full bg-danger px-5 py-3 text-sm font-bold text-white" @click="store.loadCompetenciasFromSales()">
+        Tentar novamente
+      </button>
+    </section>
+
+    <section v-else-if="!store.competencias.length" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
+      <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma competência disponível</h2>
+      <p class="mt-2 text-sm leading-6 text-sage-muted">Importe uma base de vendas válida para habilitar o cálculo por competência.</p>
+    </section>
+
+    <section v-else class="grid gap-5 lg:grid-cols-3" aria-label="Competências disponíveis">
+      <article
+        v-for="period in store.competencias"
+        :key="period.competenciaCodigo || period.name"
+        class="flex flex-col justify-between rounded-2xl bg-white p-6 shadow-sm border border-sage-border-light relative overflow-hidden"
+      >
+        <!-- Borda superior animada quando em processamento de background -->
+        <div
+          v-if="store.activeJob.isActive && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)"
+          class="absolute top-0 left-0 right-0 h-1 bg-brand animate-pulse"
+        />
+
+        <div>
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-sage-muted">
+                Competência {{ period.competenciaCodigo }}
+              </p>
+              <h2 class="mt-1 text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">{{ period.name }}</h2>
+              <span class="text-xs font-semibold text-sage-muted">({{ period.competenciaCodigo }})</span>
+            </div>
+            <StatusBadge :label="period.status" :tone="period.tone" />
+          </div>
+
+          <!-- Card de progresso ativo se esta competência estiver processando -->
+          <div
+            v-if="store.activeJob.isActive && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)"
+            class="mt-4 rounded-xl border border-warning-border bg-warning-bg/50 p-3"
+          >
+            <div class="flex items-center justify-between text-xs font-bold text-brand-dark">
+              <span class="flex items-center gap-1.5">
+                <RefreshCw class="h-3.5 w-3.5 animate-spin text-warning-dark" />
+                Processando dados...
+              </span>
+              <span>{{ store.activeJob.progress }}%</span>
+            </div>
+            <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-sage-border">
+              <div
+                class="h-full bg-brand transition-all duration-300"
+                :style="{ width: `${store.activeJob.progress}%` }"
+              />
+            </div>
+            <p class="mt-1.5 text-[11px] text-sage-muted truncate">
+              {{ store.activeJob.message }}
+            </p>
+          </div>
+
+          <div class="mt-6 space-y-3 text-sm text-sage-muted">
+            <div
+              v-for="base in period.bases"
+              :key="base.label"
+              class="flex items-center justify-between border-b border-sage-border-light pb-3"
+            >
+              <span class="font-semibold text-brand-dark">{{ base.label }}</span>
+              <span
+                :class="[
+                  'text-xs font-semibold',
+                  base.value === 'Pendente' || base.value === 'Não importado'
+                    ? 'text-warning'
+                    : 'text-success'
+                ]"
+              >
+                {{ base.value }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-7 pt-4 border-t border-sage-border-light flex flex-col gap-2">
+          <button
+            type="button"
+            @click="store.openCicloModal(period.competenciaCodigo)"
+            class="focus-ring flex items-center justify-between rounded-xl bg-sage-light px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-sage-border transition"
+          >
+            <template v-if="store.activeJob.isActive && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)">
+              <span>Acompanhar processamento</span>
+              <span>⏳</span>
+            </template>
+            <template v-else>
+              <span>{{ period.cicloFechado ? 'Reenviar ciclo (RH + Vendas)' : 'Fechar ciclo (RH + Vendas)' }}</span>
+              <span>→</span>
+            </template>
+          </button>
+
+          <RouterLink
+            v-if="period.vendasCount > 0"
+            :to="{ name: 'dados-calculo', params: { competencia: period.competencia } }"
+            class="focus-ring flex items-center justify-between rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-brand-hover"
+          >
+            <span>Calcular comissões</span>
+            <span>→</span>
+          </RouterLink>
+          <span v-else class="rounded-xl bg-sage-light px-4 py-2.5 text-xs font-semibold text-sage-muted text-center">
+            Cálculo indisponível sem vendas persistidas
+          </span>
+
+          <div class="flex items-center justify-between pt-1 text-[11px]">
+            <button
+              type="button"
+              @click="store.openComissModal(period.name)"
+              class="font-semibold text-sage-muted hover:text-brand-dark hover:underline"
+            >
+              Taxas de comissão
+            </button>
+
+            <button
+              v-if="period.cicloFechado || period.status !== 'Ciclo Pendente'"
+              type="button"
+              @click="store.abrirModalExclusaoBase(period.competenciaCodigo)"
+              class="text-sage-muted hover:text-danger hover:underline transition flex items-center gap-1 font-semibold"
+              title="Excluir base e reiniciar ciclo"
+            >
+              <Trash2 class="h-3 w-3" />
+              <span>Excluir base</span>
+            </button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- SEÇÃO DE CONSULTA INTEGRADA: DADOS EFETIVADOS & HISTÓRICO DE ENVIOS -->
+    <section class="rounded-2xl bg-white p-6 sm:p-7 shadow-sm border border-sage-border-light space-y-6">
+      <!-- Abas Principais de Navegação -->
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-sage-border-light pb-4">
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            @click="store.setTabAtiva('EFETIVADOS')"
+            :class="[
+              'focus-ring flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition',
+              store.tabAtiva === 'EFETIVADOS'
+                ? 'bg-brand text-brand-dark shadow-sm'
+                : 'bg-sage-light text-sage-muted hover:text-brand-dark'
+            ]"
+          >
+            <Database class="h-4 w-4" />
+            <span>Dados Efetivados</span>
+          </button>
+
+          <button
+            type="button"
+            @click="store.setTabAtiva('ENVIOS')"
+            :class="[
+              'focus-ring flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition',
+              store.tabAtiva === 'ENVIOS'
+                ? 'bg-brand text-brand-dark shadow-sm'
+                : 'bg-sage-light text-sage-muted hover:text-brand-dark'
+            ]"
+          >
+            <FileSpreadsheet class="h-4 w-4" />
+            <span>Histórico de Envios & Validação</span>
+            <span class="rounded-full bg-sage-pill px-2 py-0.5 text-[10px] font-bold text-brand-dark">
+              {{ store.enviosHistorico.length }}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Conteúdo da Aba Ativa -->
+      <EfetivadosTable v-if="store.tabAtiva === 'EFETIVADOS'" />
+      <EnviosList v-else />
+    </section>
+
+    <!-- Modais de Suporte -->
+    <ConfirmDeleteModal />
+    <EnvioReportModal />
+  </div>
+</template>
+
+<script setup>
+import { onMounted } from 'vue'
+import { RefreshCw, Trash2, Database, FileSpreadsheet } from 'lucide-vue-next'
+import PageHeader from '@/components/common/PageHeader.vue'
+import StatusBadge from '@/components/common/StatusBadge.vue'
+import EfetivadosTable from '@/components/data/EfetivadosTable.vue'
+import EnviosList from '@/components/data/EnviosList.vue'
+import ConfirmDeleteModal from '@/components/data/ConfirmDeleteModal.vue'
+import EnvioReportModal from '@/components/data/EnvioReportModal.vue'
+import { useDataStore } from '@/stores/dataStore'
+
+const store = useDataStore()
+
+onMounted(async () => {
+  await store.loadCompetenciasFromSales()
+  if (store.dadosEfetivados.itens.length === 0) {
+    await store.carregarDadosEfetivados()
+  }
+})
+</script>
