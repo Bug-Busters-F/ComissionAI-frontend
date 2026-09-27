@@ -82,7 +82,7 @@
             <div class="flex items-center justify-between text-xs font-bold text-brand-dark">
               <span class="flex items-center gap-1.5">
                 <RefreshCw class="h-3.5 w-3.5 animate-spin text-warning-dark" />
-                Processando no servidor
+                Processando dados...
               </span>
               <span>{{ store.activeJob.progress }}%</span>
             </div>
@@ -142,33 +142,100 @@
             <span>Calcular comissões</span>
             <span>→</span>
           </RouterLink>
-          <span v-else class="rounded-xl bg-sage-light px-4 py-2.5 text-xs font-semibold text-sage-muted">
+          <span v-else class="rounded-xl bg-sage-light px-4 py-2.5 text-xs font-semibold text-sage-muted text-center">
             Cálculo indisponível sem vendas persistidas
           </span>
 
-          <button
-            type="button"
-            @click="store.openComissModal(period.name)"
-            class="text-left text-[11px] font-semibold text-sage-muted hover:text-brand-dark hover:underline"
-          >
-            Gerenciar taxas de comissão
-          </button>
+          <div class="flex items-center justify-between pt-1 text-[11px]">
+            <button
+              type="button"
+              @click="store.openComissModal(period.name)"
+              class="font-semibold text-sage-muted hover:text-brand-dark hover:underline"
+            >
+              Taxas de comissão
+            </button>
+
+            <button
+              v-if="period.cicloFechado || period.status !== 'Ciclo Pendente'"
+              type="button"
+              @click="store.abrirModalExclusaoBase(period.competenciaCodigo)"
+              class="text-sage-muted hover:text-danger hover:underline transition flex items-center gap-1 font-semibold"
+              title="Excluir base e reiniciar ciclo"
+            >
+              <Trash2 class="h-3 w-3" />
+              <span>Excluir base</span>
+            </button>
+          </div>
         </div>
       </article>
     </section>
+
+    <!-- SEÇÃO DE CONSULTA INTEGRADA: DADOS EFETIVADOS & HISTÓRICO DE ENVIOS -->
+    <section class="rounded-2xl bg-white p-6 sm:p-7 shadow-sm border border-sage-border-light space-y-6">
+      <!-- Abas Principais de Navegação -->
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-sage-border-light pb-4">
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            @click="store.setTabAtiva('EFETIVADOS')"
+            :class="[
+              'focus-ring flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition',
+              store.tabAtiva === 'EFETIVADOS'
+                ? 'bg-brand text-brand-dark shadow-sm'
+                : 'bg-sage-light text-sage-muted hover:text-brand-dark'
+            ]"
+          >
+            <Database class="h-4 w-4" />
+            <span>Dados Efetivados</span>
+          </button>
+
+          <button
+            type="button"
+            @click="store.setTabAtiva('ENVIOS')"
+            :class="[
+              'focus-ring flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition',
+              store.tabAtiva === 'ENVIOS'
+                ? 'bg-brand text-brand-dark shadow-sm'
+                : 'bg-sage-light text-sage-muted hover:text-brand-dark'
+            ]"
+          >
+            <FileSpreadsheet class="h-4 w-4" />
+            <span>Histórico de Envios & Validação</span>
+            <span class="rounded-full bg-sage-pill px-2 py-0.5 text-[10px] font-bold text-brand-dark">
+              {{ store.enviosHistorico.length }}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Conteúdo da Aba Ativa -->
+      <EfetivadosTable v-if="store.tabAtiva === 'EFETIVADOS'" />
+      <EnviosList v-else />
+    </section>
+
+    <!-- Modais de Suporte -->
+    <ConfirmDeleteModal />
+    <EnvioReportModal />
   </div>
 </template>
 
 <script setup>
 import { onMounted } from 'vue'
-import { RefreshCw } from 'lucide-vue-next'
+import { RefreshCw, Trash2, Database, FileSpreadsheet } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import EfetivadosTable from '@/components/data/EfetivadosTable.vue'
+import EnviosList from '@/components/data/EnviosList.vue'
+import ConfirmDeleteModal from '@/components/data/ConfirmDeleteModal.vue'
+import EnvioReportModal from '@/components/data/EnvioReportModal.vue'
 import { useDataStore } from '@/stores/dataStore'
 
 const store = useDataStore()
 
-onMounted(() => {
-  store.loadCompetenciasFromSales()
+onMounted(async () => {
+  await store.loadCompetenciasFromSales()
+  if (store.dadosEfetivados.itens.length === 0) {
+    await store.carregarDadosEfetivados()
+  }
 })
 </script>

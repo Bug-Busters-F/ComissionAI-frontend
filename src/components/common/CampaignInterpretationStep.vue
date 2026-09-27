@@ -9,7 +9,7 @@
     </div>
 
     <div class="mt-6 rounded-2xl bg-sage-light px-4 py-3 text-sm leading-6 text-sage-subtle">
-      {{ interpretation.isProcessing ? 'Interpretando proposta… aguarde o retorno do Spring.' : stale ? 'O texto ou o contexto mudou desde a última interpretação. Interprete novamente para atualizar as sugestões.' : sourceMessage }}
+      {{ interpretation.isProcessing ? 'Interpretando proposta… processando regras de campanha.' : stale ? 'O texto ou o contexto mudou desde a última interpretação. Interprete novamente para atualizar as sugestões.' : sourceMessage }}
     </div>
 
     <div v-if="interpretation.isProcessing" class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-white px-4 py-3 text-sm text-brand-dark" role="status" aria-live="polite">

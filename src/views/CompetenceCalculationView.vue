@@ -202,7 +202,7 @@
       <section v-if="result.impedimentos.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="blocked-sales-heading">
         <div>
           <h2 id="blocked-sales-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Vendas com impedimento</h2>
-          <p class="mt-1 text-sm text-sage-muted">O motivo abaixo foi retornado pelo backend para cada venda.</p>
+          <p class="mt-1 text-sm text-sage-muted">Consulte o motivo do impedimento identificado para cada venda.</p>
         </div>
         <div class="mt-6 overflow-x-auto">
           <table class="w-full min-w-[720px] text-left text-sm">
@@ -243,7 +243,7 @@
     <section v-else-if="history.content.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="history-calculation-heading">
       <div>
         <h2 id="history-calculation-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Cálculos registrados</h2>
-        <p class="mt-1 text-sm leading-6 text-sage-muted">Este histórico contém os logs persistidos de cada execução concluída, incluindo a origem histórica da taxa.</p>
+        <p class="mt-1 text-sm leading-6 text-sage-muted">Este histórico contém os registros consolidados de cada execução concluída, incluindo a origem histórica da taxa.</p>
       </div>
       <div class="mt-6 overflow-x-auto">
         <table class="w-full min-w-[820px] text-left text-sm">

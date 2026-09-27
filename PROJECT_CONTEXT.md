@@ -93,3 +93,11 @@ src/
   - **HMR Instantâneo**: Atualização em tempo real de estilos e cores pelo Vite sem necessidade de reinício do servidor de desenvolvimento.
   - **Pronto para Modo Noturno**: Suporte a Dark Mode com chaveamento de variáveis via classe `.dark` no `main.css`, sem necessidade de alterar templates Vue.
 - **Aderência Estrita à Identidade Wise**: Paleta Sage para fundos e superfícies, acento verde CTA, cards arredondados (`rounded-2xl`) e feedback visual de alta legibilidade.
+- **Consulta de Dados Efetivados & Histórico de Envios (S1-B18)**:
+  - **Dados Efetivados**: Visualização paginada dos registros persistidos no banco de dados para RH (`GET /api/v1/matriculas`), Vendas (`GET /api/v1/vendas`) e Comissões Base (`COMISS`).
+  - **Filtros e Paginação**: Seletor de base (RH, Vendas, Comissões), filtro por competência/vigência, busca textual e paginação dinâmica (tamanho de página e navegação de páginas).
+  - **Histórico de Envios & Diagnósticos**: Consulta de cada lote enviado com volume de linhas, situação e modal detalhado de **Relatório de Validação** com separação clara de apontamentos `IMPEDITIVOS` vs `AVISOS`.
+  - **Governança Estrita**: Orientação em destaque ao usuário de que qualquer inconsistência deve ser corrigida no arquivo de origem e reenviada pelo upload (sem edição manual direta de registros).
+  - **Exclusão de Registros e Bases**:
+    - Exclusão pontual de vendas (`DELETE /api/v1/vendas/{id}`) e matrículas (`DELETE /api/v1/matriculas/{id}`) com modal de confirmação e tratamento de erro de integridade (HTTP 409 quando matrícula tem vendas associadas).
+    - Exclusão e reinício de base lançada por competência no card do `DataView.vue`.
