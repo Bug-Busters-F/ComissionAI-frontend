@@ -1,10 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 import DataView from '@/views/DataView.vue'
+import CompetenceCalculationView from '@/views/CompetenceCalculationView.vue'
 import CampaignsView from '@/views/CampaignsPrototypeView.vue'
 import CampaignDetailsView from '@/views/CampaignDetailsPrototypeView.vue'
 import CampaignFlowView from '@/views/CampaignFlowView.vue'
-import CampaignApurationView from '@/views/CampaignApurationView.vue'
 
 const routes = [
   {
@@ -21,6 +21,12 @@ const routes = [
     path: '/dados',
     name: 'dados',
     component: DataView,
+    meta: { section: 'dados', label: 'Dados' }
+  },
+  {
+    path: '/dados/:competencia/calculo',
+    name: 'dados-calculo',
+    component: CompetenceCalculationView,
     meta: { section: 'dados', label: 'Dados' }
   },
   {
@@ -45,12 +51,6 @@ const routes = [
     path: '/campanhas/:id',
     name: 'campanha-detalhes',
     component: CampaignDetailsView,
-    meta: { section: 'campanhas', label: 'Campanhas' }
-  },
-  {
-    path: '/campanhas/:id/apurar',
-    name: 'campanha-apurar',
-    component: CampaignApurationView,
     meta: { section: 'campanhas', label: 'Campanhas' }
   },
   {
