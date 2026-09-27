@@ -297,6 +297,33 @@ export function mapTipoBaseToImportType(tipo) {
 }
 
 export const dataService = {
+  async listSalesPage({ page = 0, size = 100, signal } = {}) {
+    const response = await api.get('/vendas', { params: { page, size }, signal })
+    return response.data
+  },
+
+  async listAllSales({ size = 100, signal } = {}) {
+    const sales = []
+    let page = 0
+    let response
+
+    do {
+      response = await this.listSalesPage({ page, size, signal })
+      const content = Array.isArray(response) ? response : response?.content || []
+      sales.push(...content)
+
+      const totalPages = Number(response?.totalPages)
+      const hasNextPage = Number.isFinite(totalPages) && totalPages > 0
+        ? page + 1 < totalPages
+        : content.length >= size
+
+      if (!hasNextPage) break
+      page += 1
+    } while (page < 1000)
+
+    return sales
+  },
+
   /**
    * Envia o ciclo conjunto de forma sequencial (RH primeiro, depois Vendas)
    * emitindo progresso a cada etapa

@@ -1,21 +1,10 @@
 import { defineStore } from 'pinia'
 import { dataService, TIPOS_BASE } from '@/services/dataService'
+import { invalidateCalculationCache } from '@/services/calculationCache'
+import { formatCompetenceCode, formatCompetenceLabel, groupSalesByCompetence, MONTH_NAMES, normalizeCompetence } from '@/services/competenceUtils'
 import { useNotificationStore } from '@/stores/notificationStore'
 
-export const MESES_NOMES = {
-  '01': 'Janeiro',
-  '02': 'Fevereiro',
-  '03': 'Março',
-  '04': 'Abril',
-  '05': 'Maio',
-  '06': 'Junho',
-  '07': 'Julho',
-  '08': 'Agosto',
-  '09': 'Setembro',
-  '10': 'Outubro',
-  '11': 'Novembro',
-  '12': 'Dezembro'
-}
+export const MESES_NOMES = MONTH_NAMES
 
 /**
  * Converte um código como "08/2025" ou "8/2025" no nome correspondente do mês ("Agosto")
@@ -33,81 +22,9 @@ export function formatarNomeCompetencia(codigo) {
 
 export const useDataStore = defineStore('data', {
   state: () => ({
-    // Lista de competências cadastradas no sistema
-    competencias: [
-      {
-        name: 'Dezembro',
-        competenciaCodigo: '12/2025',
-        status: 'Ciclo com pendências',
-        tone: 'warning',
-        cicloFechado: false,
-        bases: [
-          { tipo: 'RH', label: 'RH', value: 'Pendente' },
-          { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
-          { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
-        ]
-      },
-      {
-        name: 'Novembro',
-        competenciaCodigo: '11/2025',
-        status: 'Ciclo com pendências',
-        tone: 'warning',
-        cicloFechado: false,
-        bases: [
-          { tipo: 'RH', label: 'RH', value: 'Pendente' },
-          { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
-          { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
-        ]
-      },
-      {
-        name: 'Outubro',
-        competenciaCodigo: '10/2025',
-        status: 'Ciclo com pendências',
-        tone: 'warning',
-        cicloFechado: false,
-        bases: [
-          { tipo: 'RH', label: 'RH', value: 'Pendente' },
-          { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
-          { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
-        ]
-      },
-      {
-        name: 'Setembro',
-        competenciaCodigo: '09/2025',
-        status: 'Ciclo com pendências',
-        tone: 'warning',
-        cicloFechado: false,
-        bases: [
-          { tipo: 'RH', label: 'RH', value: 'Pendente' },
-          { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
-          { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
-        ]
-      },
-      {
-        name: 'Agosto',
-        competenciaCodigo: '08/2025',
-        status: 'Ciclo com pendências',
-        tone: 'warning',
-        cicloFechado: false,
-        bases: [
-          { tipo: 'RH', label: 'RH', value: 'Pendente' },
-          { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
-          { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
-        ]
-      },
-      {
-        name: 'Julho',
-        competenciaCodigo: '07/2025',
-        status: 'Ciclo com pendências',
-        tone: 'warning',
-        cicloFechado: false,
-        bases: [
-          { tipo: 'RH', label: 'RH', value: 'Pendente' },
-          { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
-          { tipo: 'COMISS', label: 'Comissão', value: 'Pendente' }
-        ]
-      }
-    ],
+    competencias: [],
+    competenciasLoading: false,
+    competenciasError: '',
 
     // Estado do Modal de Upload
     uploadModal: {
@@ -343,6 +260,40 @@ export const useDataStore = defineStore('data', {
   },
 
   actions: {
+    async loadCompetenciasFromSales() {
+      this.competenciasLoading = true
+      this.competenciasError = ''
+
+      try {
+        const sales = await dataService.listAllSales()
+        const previous = new Map(this.competencias.map((competencia) => [competencia.competencia, competencia]))
+
+        this.competencias = groupSalesByCompetence(sales).map((group) => {
+          const existing = previous.get(group.competence)
+          const previousCommission = existing?.bases?.find((base) => base.tipo === 'COMISS')?.value
+          return {
+            ...(existing || {}),
+            name: formatCompetenceLabel(group.competence),
+            competencia: group.competence,
+            competenciaCodigo: formatCompetenceCode(group.competence),
+            status: 'Vendas disponíveis',
+            tone: 'success',
+            cicloFechado: true,
+            vendasCount: group.salesCount,
+            bases: [
+              { tipo: 'RH', label: 'RH', value: 'Vínculos verificados no cálculo' },
+              { tipo: 'VENDAS', label: 'Vendas', value: `${group.salesCount} registros persistidos` },
+              { tipo: 'COMISS', label: 'Comissão', value: previousCommission || 'Resolvida no cálculo' }
+            ]
+          }
+        })
+      } catch (error) {
+        this.competenciasError = error?.response?.data?.message || 'Não foi possível consultar as vendas persistidas.'
+      } finally {
+        this.competenciasLoading = false
+      }
+    },
+
     /**
      * Localiza a competência pelo código (ex: '08/2025') ou cria um novo card no grid
      * caso o usuário esteja fechando um ciclo de uma competência ainda não listada
@@ -350,20 +301,23 @@ export const useDataStore = defineStore('data', {
     obterOuCriarCompetencia(codigo) {
       if (!codigo) return null
       const codTrim = String(codigo).trim()
+      const competencia = normalizeCompetence(codTrim)
 
-      // 1. Procura primeiro pelo código exato (ex: '08/2025')
-      let comp = this.competencias.find((c) => c.competenciaCodigo === codTrim)
+      // 1. Procura primeiro pelo código normalizado (ex: '2025-08')
+      let comp = this.competencias.find((c) => c.competencia === competencia || c.competenciaCodigo === codTrim)
       if (comp) return comp
 
       // 2. Se não existir, extrai o nome do mês e cria uma nova competência
-      const nomeMes = formatarNomeCompetencia(codTrim)
+      const nomeMes = formatCompetenceLabel(competencia || codTrim)
 
       comp = {
         name: nomeMes,
-        competenciaCodigo: codTrim,
+        competencia: competencia || codTrim,
+        competenciaCodigo: formatCompetenceCode(competencia) || codTrim,
         status: 'Ciclo com pendências',
         tone: 'warning',
         cicloFechado: false,
+        vendasCount: 0,
         bases: [
           { tipo: 'RH', label: 'RH', value: 'Pendente' },
           { tipo: 'VENDAS', label: 'Vendas', value: 'Pendente' },
@@ -600,6 +554,11 @@ export const useDataStore = defineStore('data', {
         const vendasFile = this.uploadModal.vendasFile
         const cenario = this.uploadModal.cenarioTeste
 
+        // O RH e as vendas podem alterar o resultado da competência mesmo quando
+        // uma das etapas falha depois de a etapa anterior já ter persistido dados.
+        const normalizedCompetence = normalizeCompetence(compCodigo)
+        invalidateCalculationCache(normalizedCompetence ? [normalizedCompetence] : null)
+
         this.uploadModal.isLoading = true
 
         // Inicializa o Job Ativo em Segundo Plano
@@ -686,6 +645,14 @@ export const useDataStore = defineStore('data', {
               targetComp.tone = 'success'
             }
 
+            if (cenario === 'real') {
+              try {
+                await this.loadCompetenciasFromSales()
+              } catch (refreshError) {
+                console.warn('Ciclo concluído, mas não foi possível atualizar as competências:', refreshError)
+              }
+            }
+
             notifStore.success(
               'Ciclo Fechado com Sucesso!',
               `Competência ${compCodigo}: ${response.rh?.totalLinhas || 0} colaboradores e ${response.vendas?.totalLinhas || 0} vendas persistidos.`,
@@ -763,6 +730,10 @@ export const useDataStore = defineStore('data', {
         const dataInicio = this.uploadModal.dataInicio
         const dataFim = this.uploadModal.dataFim
         const cenario = this.uploadModal.cenarioTeste
+
+        // Uma tabela de taxas pode afetar mais de uma competência; como o upload
+        // não informa a lista exata de vendas impactadas, invalida todo o cache.
+        invalidateCalculationCache()
 
         this.uploadModal.isLoading = true
 
@@ -1185,6 +1156,9 @@ export const useDataStore = defineStore('data', {
           const compCodigo = this.modalExclusao.item?.competenciaCodigo
           const res = await dataService.deleteVendasPorCompetencia(compCodigo)
 
+          const normalizedComp = normalizeCompetence(compCodigo)
+          invalidateCalculationCache(normalizedComp ? [normalizedComp] : null)
+
           const comp = this.competencias.find(c => c.competenciaCodigo === compCodigo)
           if (comp) {
             comp.status = 'Ciclo com pendências'
@@ -1201,9 +1175,11 @@ export const useDataStore = defineStore('data', {
             `A base de vendas da competência ${compCodigo} foi excluída com sucesso (${totalExc} registros removidos de tb_sales).`
           )
           this.fecharModalExclusao()
+          await this.loadCompetenciasFromSales()
           await this.carregarDadosEfetivados()
         } else if (this.modalExclusao.tipo === 'TODAS_VENDAS') {
           const res = await dataService.deleteTodasVendas()
+          invalidateCalculationCache()
           this.competencias.forEach(comp => {
             comp.status = 'Ciclo com pendências'
             comp.tone = 'warning'
@@ -1218,6 +1194,7 @@ export const useDataStore = defineStore('data', {
             `Todas as vendas (${totalExc} registros) foram excluídas com sucesso do banco de dados.`
           )
           this.fecharModalExclusao()
+          await this.loadCompetenciasFromSales()
           await this.carregarDadosEfetivados()
         } else if (this.modalExclusao.tipo === 'TODAS_MATRICULAS') {
           const res = await dataService.deleteTodasMatriculas()

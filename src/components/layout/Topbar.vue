@@ -3,8 +3,22 @@
     <div class="flex min-h-11 items-center justify-between gap-4">
       <p class="text-xs font-medium text-sage-muted">Workspace / {{ currentLabel }}</p>
 
-      <!-- WIDGET DE PROCESSAMENTO EM SEGUNDO PLANO -->
-      <div v-if="store.activeJob.isActive" class="flex items-center gap-2">
+      <div class="flex items-center gap-3">
+        <span v-if="isCampaignDemoEnabled" class="rounded-full border border-sage-border-dark bg-white px-3.5 py-1.5 text-xs font-semibold text-sage-subtle">Ambiente demonstrativo</span>
+
+        <button
+          v-if="calculationStore.isProcessing"
+          type="button"
+          class="focus-ring flex items-center gap-2 rounded-full border border-warning-border bg-warning-bg px-3.5 py-1.5 text-xs font-bold text-brand-dark shadow-sm transition hover:bg-warning-bg/80"
+          title="Abrir a competência em processamento"
+          @click="openCalculation"
+        >
+          <RefreshCw class="h-3.5 w-3.5 animate-spin text-warning-dark" aria-hidden="true" />
+          <span>{{ calculationStore.recalculando ? 'Recalculando comissões' : 'Calculando comissões' }} — {{ formatCompetenceLabel(calculationStore.competencia) }}</span>
+        </button>
+
+        <!-- WIDGET DE PROCESSAMENTO EM SEGUNDO PLANO -->
+        <div v-if="store.activeJob.isActive" class="flex items-center gap-2">
         <!-- Em processamento -->
         <button
           v-if="store.activeJob.status === 'PROCESSING'"
@@ -68,6 +82,7 @@
             <X class="h-3.5 w-3.5" />
           </button>
         </div>
+        </div>
       </div>
     </div>
 
@@ -89,12 +104,17 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { RefreshCw, CheckCircle2, AlertOctagon, X } from 'lucide-vue-next'
 import { useDataStore } from '@/stores/dataStore'
+import { useCalculationStore } from '@/stores/calculationStore'
+import { isCampaignDemoEnabled } from '@/services/campaignDemo'
+import { formatCompetenceLabel } from '@/services/competenceUtils'
 
 const route = useRoute()
+const router = useRouter()
 const store = useDataStore()
+const calculationStore = useCalculationStore()
 
 const navigation = [
   { label: 'Home', to: '/home', section: 'home' },
@@ -103,4 +123,9 @@ const navigation = [
 ]
 
 const currentLabel = computed(() => route.meta.label || 'Home')
+
+function openCalculation() {
+  if (!calculationStore.competencia) return
+  router.push({ name: 'dados-calculo', params: { competencia: calculationStore.competencia } })
+}
 </script>

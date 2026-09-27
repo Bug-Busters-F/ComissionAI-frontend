@@ -33,7 +33,24 @@
       </p>
     </section>
 
-    <section class="grid gap-5 lg:grid-cols-3" aria-label="Competências disponíveis">
+    <section v-if="store.competenciasLoading" class="rounded-2xl bg-white px-6 py-12 text-center text-sm text-sage-muted" role="status">
+      Consultando as vendas persistidas para montar as competências…
+    </section>
+
+    <section v-else-if="store.competenciasError" class="rounded-2xl border border-danger/30 bg-danger-bg p-6" role="alert">
+      <h2 class="text-xl font-extrabold text-danger-dark">Não foi possível carregar as competências</h2>
+      <p class="mt-2 text-sm leading-6 text-danger-dark/80">{{ store.competenciasError }}</p>
+      <button type="button" class="focus-ring mt-5 rounded-full bg-danger px-5 py-3 text-sm font-bold text-white" @click="store.loadCompetenciasFromSales()">
+        Tentar novamente
+      </button>
+    </section>
+
+    <section v-else-if="!store.competencias.length" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
+      <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma competência disponível</h2>
+      <p class="mt-2 text-sm leading-6 text-sage-muted">Importe uma base de vendas válida para habilitar o cálculo por competência.</p>
+    </section>
+
+    <section v-else class="grid gap-5 lg:grid-cols-3" aria-label="Competências disponíveis">
       <article
         v-for="period in store.competencias"
         :key="period.competenciaCodigo || period.name"
@@ -49,7 +66,7 @@
           <div class="flex items-start justify-between gap-4">
             <div>
               <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-sage-muted">
-                Competência {{ period.competenciaCodigo ? period.competenciaCodigo.split('/')[1] : '2025' }}
+                Competência {{ period.competenciaCodigo }}
               </p>
               <h2 class="mt-1 text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">{{ period.name }}</h2>
               <span class="text-xs font-semibold text-sage-muted">({{ period.competenciaCodigo }})</span>
@@ -116,6 +133,18 @@
               <span>→</span>
             </template>
           </button>
+
+          <RouterLink
+            v-if="period.vendasCount > 0"
+            :to="{ name: 'dados-calculo', params: { competencia: period.competencia } }"
+            class="focus-ring flex items-center justify-between rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-brand-hover"
+          >
+            <span>Calcular comissões</span>
+            <span>→</span>
+          </RouterLink>
+          <span v-else class="rounded-xl bg-sage-light px-4 py-2.5 text-xs font-semibold text-sage-muted text-center">
+            Cálculo indisponível sem vendas persistidas
+          </span>
 
           <div class="flex items-center justify-between pt-1 text-[11px]">
             <button
@@ -204,7 +233,7 @@ import { useDataStore } from '@/stores/dataStore'
 const store = useDataStore()
 
 onMounted(async () => {
-  await store.sincronizarCompetenciasComBanco()
+  await store.loadCompetenciasFromSales()
   if (store.dadosEfetivados.itens.length === 0) {
     await store.carregarDadosEfetivados()
   }

@@ -5,12 +5,7 @@
       <span class="text-[20px] font-extrabold tracking-[-0.04em] text-brand-dark">ComissionAI</span>
     </RouterLink>
 
-    <div class="mt-12 flex items-center gap-2 text-[11px] font-semibold tracking-[0.16em] text-sage-muted">
-      <span>BUG BUSTERS</span>
-      <span class="rounded-md border border-sage-border-dark px-1.5 py-1 text-[10px] tracking-normal text-brand-dark">DOM ROCK</span>
-    </div>
-
-    <nav class="mt-7 space-y-2" aria-label="Navegação principal">
+    <nav class="mt-12 space-y-2" aria-label="Navegação principal">
       <RouterLink
         v-for="item in navigation"
         :key="item.to"
@@ -27,21 +22,12 @@
       </RouterLink>
     </nav>
 
-    <div class="mt-auto border-t border-sage-border-light pt-6">
-      <div class="flex items-center gap-3">
-        <span class="grid h-10 w-10 place-items-center rounded-full bg-success-bg text-xs font-bold text-success-text">US</span>
-        <div>
-          <p class="text-sm font-bold text-brand-dark">Usuário</p>
-          <p class="mt-0.5 text-xs text-sage-muted">Administrador</p>
-        </div>
-      </div>
-    </div>
   </aside>
 </template>
 
 <script setup>
 import { useRoute } from 'vue-router'
-import { BarChart3, Database, House } from 'lucide-vue-next'
+import { CalendarCheck, Database, House } from 'lucide-vue-next'
 import comissionaiIcon from '@/assets/images/comissionai-icon.png'
 
 const route = useRoute()
@@ -49,6 +35,6 @@ const route = useRoute()
 const navigation = [
   { label: 'Home', to: '/home', section: 'home', icon: House },
   { label: 'Dados', to: '/dados', section: 'dados', icon: Database },
-  { label: 'Campanhas', to: '/campanhas', section: 'campanhas', icon: BarChart3 }
+  { label: 'Campanhas', to: '/campanhas', section: 'campanhas', icon: CalendarCheck }
 ]
 </script>
