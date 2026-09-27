@@ -771,28 +771,8 @@ export const dataService = {
         content
       }
     } catch (err) {
-      console.warn('Backend /comissoes indisponível, utilizando fallback estruturado:', err)
-      const mockComissoes = [
-        { id: 'comiss-1', cargo: 'VENDEDOR BALCAO', codCargo: 200, marca: 'PRETO', codMarca: 10, percentual: 0.03, vigenciaInicio: '2025-12-01', vigenciaFim: '2025-12-31' },
-        { id: 'comiss-2', cargo: 'GERENTE QUIOSQUE', codCargo: 150, marca: 'PRETO', codMarca: 10, percentual: 0.01, vigenciaInicio: '2025-12-01', vigenciaFim: '2025-12-31' },
-        { id: 'comiss-3', cargo: 'VENDEDOR BALCAO', codCargo: 200, marca: 'VERMELHO', codMarca: 40, percentual: 0.02, vigenciaInicio: '2025-12-01', vigenciaFim: '2025-12-31' },
-        { id: 'comiss-4', cargo: 'GERENTE LOJA', codCargo: 100, marca: 'BRANCO', codMarca: 20, percentual: 0.015, vigenciaInicio: '2025-12-01', vigenciaFim: '2025-12-31' },
-        { id: 'comiss-5', cargo: 'SUPERVISOR REGIONAL', codCargo: 50, marca: 'AZUL', codMarca: 30, percentual: 0.025, vigenciaInicio: '2025-12-01', vigenciaFim: '2025-12-31' }
-      ]
-
-      const start = page * size
-      const content = mockComissoes.slice(start, start + size)
-
-      return {
-        content,
-        totalElements: mockComissoes.length,
-        totalPages: Math.ceil(mockComissoes.length / size),
-        size,
-        number: page,
-        first: page === 0,
-        last: start + size >= mockComissoes.length,
-        empty: content.length === 0
-      }
+      console.error('Falha ao consultar taxas de comissão no backend:', err)
+      throw err
     }
   },
 
