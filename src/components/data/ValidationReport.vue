@@ -26,7 +26,7 @@
             </template>
           </p>
           <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-danger-dark">
-            <span>Status da API: REJEITADO</span>
+            <span>Status do Envio: REJEITADO</span>
             <span>•</span>
             <span>Importação parcial ou forçada não permitida</span>
           </div>
@@ -74,7 +74,7 @@
               As bases de <strong>RH e Vendas</strong> foram devidamente cruzadas e validadas. A competência <strong>{{ report.competencia }}</strong> está pronta para apuração e simulação de comissões.
             </template>
             <template v-else>
-              Todos os registros foram validados pelo Spring Boot e integrados à base de dados.
+              Todos os registros foram validados com sucesso e integrados ao sistema.
             </template>
           </p>
         </div>

@@ -78,7 +78,7 @@
     <section class="rounded-2xl border border-warning-border bg-warning-bg p-6 sm:p-7">
       <p class="text-xs font-bold uppercase tracking-[0.12em] text-warning-dark">Atenção aos dados</p>
       <h2 class="mt-3 text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Dezembro tem pendências para revisão</h2>
-      <p class="mt-2 max-w-2xl text-sm leading-6 text-sage-muted">A estrutura visual desta área está integrada ao fechamento e validação das bases.</p>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-sage-muted">Acompanhe as pendências e certifique-se de que os ciclos mensais foram validados antes da apuração.</p>
       <RouterLink to="/dados" class="focus-ring mt-5 inline-flex font-semibold underline underline-offset-4 text-brand-dark">Revisar competência →</RouterLink>
     </section>
   </div>

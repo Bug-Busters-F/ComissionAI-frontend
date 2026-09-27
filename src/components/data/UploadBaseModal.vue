@@ -13,7 +13,7 @@
       <div class="flex items-start justify-between gap-4 border-b border-sage-border-light pb-5">
         <div>
           <span class="rounded-md bg-sage-pill px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-sage-muted">
-            Carga de Dados • Sprint 1
+            Carga de Dados • Ingestão Mensal
           </span>
           <h2 class="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">
             <template v-if="store.uploadModal.report">
@@ -167,7 +167,7 @@
           <Info class="h-5 w-5 shrink-0 text-brand-dark mt-0.5" />
           <div class="text-xs text-sage-muted leading-relaxed">
             <strong class="text-brand-dark">Você não precisa esperar aqui:</strong>
-            O processamento continua normalmente em segundo plano no servidor Spring Boot. Você pode fechar esta tela ou navegar pelo sistema. Emitiremos uma notificação assim que tudo estiver pronto!
+            O processamento continua normalmente em segundo plano. Você pode fechar esta tela ou navegar pelo sistema. Emitiremos uma notificação assim que tudo estiver pronto!
           </div>
         </div>
 
@@ -470,27 +470,7 @@
           {{ store.uploadModal.errorMessage }}
         </div>
 
-        <!-- SELETOR DE MODO / SIMULAÇÃO (FACILITADOR PARA BANCA / TESTES DE DEV) -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl bg-sage-light px-4 py-2.5 text-xs text-sage-muted">
-          <span class="font-medium shrink-0">Simulação / Conexão Backend:</span>
-          <select
-            v-model="store.uploadModal.cenarioTeste"
-            class="w-full sm:w-auto rounded-lg border border-sage-border-dark bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-dark outline-none"
-          >
-            <option value="real">Conexão Real com Spring Boot (8080)</option>
-            <template v-if="store.uploadModal.modo === 'CICLO'">
-              <option value="cenario_cruzamento">Simular: Erro de Cruzamento (Vendedor sem cadastro no RH)</option>
-              <option value="cenario_impeditivo">Simular: Erro Impeditivo (Duplicidade no RH / Venda negativa)</option>
-              <option value="cenario_avisos">Simular: Avisos Não Impeditivos (Permite Concluir)</option>
-              <option value="cenario_sucesso">Simular: Sucesso Total (Ciclo Fechado 100%)</option>
-            </template>
-            <template v-else>
-              <option value="cenario_impeditivo">Simular: Erro Impeditivo de Vigência</option>
-              <option value="cenario_avisos">Simular: Avisos Não Impeditivos</option>
-              <option value="cenario_sucesso">Simular: Sucesso Total</option>
-            </template>
-          </select>
-        </div>
+
 
         <!-- BOTÕES DE AÇÃO -->
         <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 pt-2">

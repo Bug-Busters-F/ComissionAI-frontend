@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-5">
-    <CampaignSummary :title="'Revisão consolidada'" :subtitle="isPersisted ? 'Confira os dados reais e a última situação retornada pelo backend.' : 'Confira os dados reais antes da primeira persistência.'" :badge="stateLabel" :summary-items="summaryItems" :original-text="form.textoOriginal" />
+    <CampaignSummary :title="'Revisão consolidada'" :subtitle="isPersisted ? 'Confira as informações consolidadas da campanha e o status atual.' : 'Confira as informações da proposta antes de salvar.'" :badge="stateLabel" :summary-items="summaryItems" :original-text="form.textoOriginal" />
 
     <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="review-simulation-heading">
       <div><h2 id="review-simulation-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Premissas e cenários</h2><p class="mt-1 text-sm text-sage-muted">Consulte as premissas e os cenários antes de concluir a campanha.</p></div>

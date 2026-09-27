@@ -39,7 +39,7 @@
       <input id="campaign-budget" :value="demo.budget" type="number" min="0" step="100" class="campaign-control" @input="$emit('update-demo', 'budget', $event.target.value)" />
       <div v-if="interpretation.isProcessing" class="mt-6 rounded-2xl border border-brand/30 bg-sage-light px-4 py-3 text-sm leading-6 text-brand-dark" role="status" aria-live="polite">
         <p class="font-bold">Interpretando proposta…</p>
-        <p class="mt-1 text-sage-subtle">O texto será enviado ao Spring. Nenhuma campanha será salva nesta etapa.</p>
+        <p class="mt-1 text-sage-subtle">O texto será analisado para extração da regra. Nenhuma campanha será salva nesta etapa.</p>
         <button type="button" class="focus-ring mt-3 rounded-full border border-sage-border-dark px-3 py-2 text-xs font-bold text-brand-dark" @click="$emit('cancel-interpretation')">Cancelar interpretação</button>
       </div>
       <div v-else-if="interpretation.error" class="mt-6 rounded-2xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm leading-6 text-danger-dark" role="alert">{{ interpretation.error }}</div>

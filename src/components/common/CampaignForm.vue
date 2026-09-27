@@ -43,7 +43,7 @@
       </div>
 
       <p v-if="datesHaveDefaults" class="mt-4 rounded-xl bg-sage-light px-4 py-3 text-sm leading-6 text-sage-subtle" role="status">
-        Se a data inicial ficar vazia, o backend usará a data atual. Se a data final ficar vazia, ele usará o início mais 30 dias.
+        Caso não informadas, o sistema adotará a data atual como início e vigência padrão de 30 dias.
       </p>
     </section>
 
@@ -58,7 +58,7 @@
           <label for="campaign-rate" class="field-label">Taxa positiva (%) <span class="required-mark">*</span></label>
           <input id="campaign-rate" :value="modelValue.taxaPercentual" type="text" inputmode="decimal" placeholder="Ex.: 5 ou 0,75" class="form-control" :class="{ 'form-control-error': fieldError('taxaPercentual') }" :aria-invalid="Boolean(fieldError('taxaPercentual'))" :aria-describedby="fieldError('taxaPercentual') ? 'campaign-rate-error' : 'campaign-rate-help'" @input="updateField('taxaPercentual', $event.target.value)" />
           <p v-if="fieldError('taxaPercentual')" id="campaign-rate-error" class="field-error">{{ fieldError('taxaPercentual') }}</p>
-          <p v-else id="campaign-rate-help" class="field-help">Ex.: 5 corresponde a 0,05 enviado à API.</p>
+          <p v-else id="campaign-rate-help" class="field-help">Ex.: informe 5 para 5% de taxa de comissão.</p>
         </div>
 
         <div>

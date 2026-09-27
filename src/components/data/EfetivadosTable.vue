@@ -114,7 +114,7 @@
             type="button"
             @click="store.abrirModalExclusaoTodasVendas"
             class="focus-ring flex items-center gap-1.5 rounded-xl border border-sage-border bg-white px-3 py-2 text-xs font-semibold text-sage-muted hover:text-danger hover:border-danger/30 hover:bg-danger-bg/50 transition"
-            title="Excluir todas as vendas registradas no banco"
+            title="Excluir todas as vendas cadastradas"
           >
             <Trash2 class="h-3.5 w-3.5" />
             <span class="hidden sm:inline">Limpar vendas</span>
@@ -140,7 +140,7 @@
           @click="store.carregarDadosEfetivados"
           :disabled="store.dadosEfetivados.loading"
           class="focus-ring rounded-xl border border-sage-border bg-white p-2 text-sage-muted hover:text-brand-dark hover:bg-sage-light transition disabled:opacity-50"
-          title="Recarregar dados do servidor"
+          title="Recarregar dados"
         >
           <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': store.dadosEfetivados.loading }" />
         </button>
@@ -151,8 +151,8 @@
     <div class="rounded-xl border border-sage-border bg-sage-surface/60 p-4 text-xs text-brand-dark flex items-start gap-3">
       <Info class="h-4 w-4 text-brand-dark shrink-0 mt-0.5" />
       <div class="leading-relaxed">
-        <strong>Consulta de Dados Efetivados (S1-B18):</strong>
-        Esta visualização apresenta os registros integrados ao banco relacional. Caso identifique inconsistências nos dados, efetue os ajustes no arquivo XLSX/CSV original e realize um novo envio pelo upload. A alteração individual direta não é permitida para manter a rastreabilidade do ciclo.
+        <strong>Consulta de Dados Efetivados:</strong>
+        Esta visualização apresenta os registros consolidados e vigentes no sistema. Caso identifique inconsistências nos dados, efetue os ajustes no arquivo XLSX/CSV original e realize um novo envio pelo upload. A alteração individual direta não é permitida para manter a rastreabilidade do ciclo.
       </div>
     </div>
 
@@ -180,7 +180,7 @@
       >
         <div class="flex items-center gap-2 text-xs font-bold text-brand-dark">
           <RefreshCw class="h-4 w-4 animate-spin text-brand" />
-          <span>Consultando registros no servidor...</span>
+          <span>Consultando registros...</span>
         </div>
       </div>
 

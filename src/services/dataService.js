@@ -139,7 +139,7 @@ function gerarMockRelatorioCiclo(nomeRh, nomeVendas, competencia = '12/2025', ce
           base: 'RH',
           linha: 7,
           campo: 'matricula',
-          motivo: 'Matrícula duplicada encontrada na mesma competência (bloqueio uk_rh_competencia_matricula).',
+          motivo: 'Matrícula duplicada encontrada para a mesma competência.',
           severidade: 'IMPEDITIVO'
         },
         {
@@ -263,7 +263,7 @@ function gerarMockRelatorio(tipoBase, nomeArquivo, cenario = 'cenario_impeditivo
         linha: 7,
         campo: tipoBase === 'RH' ? 'matricula' : tipoBase === 'VENDAS' ? 'valor_venda' : 'percentual_comissao',
         motivo: tipoBase === 'RH' 
-          ? 'Matrícula duplicada encontrada na mesma competência (bloqueio uk_rh_competencia_matricula).' 
+          ? 'Matrícula duplicada encontrada para a mesma competência.' 
           : tipoBase === 'VENDAS' 
             ? 'Valor de venda negativo ou em formato monetário inválido.' 
             : 'Percentual de comissão superior ao teto permitido ou nulo.',
@@ -549,7 +549,7 @@ export const dataService = {
   },
 
   // ==========================================
-  // CONSULTA DE DADOS EFETIVADOS (S1-B18)
+  // CONSULTA DE DADOS EFETIVADOS
   // ==========================================
 
   /**

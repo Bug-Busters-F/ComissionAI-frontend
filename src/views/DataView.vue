@@ -82,7 +82,7 @@
             <div class="flex items-center justify-between text-xs font-bold text-brand-dark">
               <span class="flex items-center gap-1.5">
                 <RefreshCw class="h-3.5 w-3.5 animate-spin text-warning-dark" />
-                Processando no servidor
+                Processando dados...
               </span>
               <span>{{ store.activeJob.progress }}%</span>
             </div>
@@ -170,7 +170,7 @@
       </article>
     </section>
 
-    <!-- SEÇÃO DE CONSULTA INTEGRADA: DADOS EFETIVADOS & HISTÓRICO DE ENVIOS (S1-B18) -->
+    <!-- SEÇÃO DE CONSULTA INTEGRADA: DADOS EFETIVADOS & HISTÓRICO DE ENVIOS -->
     <section class="rounded-2xl bg-white p-6 sm:p-7 shadow-sm border border-sage-border-light space-y-6">
       <!-- Abas Principais de Navegação -->
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-sage-border-light pb-4">
@@ -186,7 +186,7 @@
             ]"
           >
             <Database class="h-4 w-4" />
-            <span>Dados Efetivados no Banco</span>
+            <span>Dados Efetivados</span>
           </button>
 
           <button

@@ -71,7 +71,7 @@ export const useDataStore = defineStore('data', {
     // Histórico de Envios e seus relatórios de validação
     enviosHistorico: [],
 
-    // Estado da Consulta de Dados Efetivados (S1-B18)
+    // Estado da Consulta de Dados Efetivados
     dadosEfetivados: {
       tipoBaseAtiva: 'RH', // 'RH' | 'VENDAS' | 'COMISS'
       competenciaFiltro: 'TODAS',
@@ -697,7 +697,7 @@ export const useDataStore = defineStore('data', {
 
             notifStore.success(
               'Taxas de Comissão Processadas',
-              `${response.totalLinhas || 0} regras de comissão válidas persistidas no backend.`,
+              `${response.totalLinhas || 0} regras de comissão válidas cadastradas com sucesso.`,
               {
                 duration: 8000,
                 actionLabel: 'Ver Relatório',
@@ -763,7 +763,7 @@ export const useDataStore = defineStore('data', {
     },
 
     // ==========================================
-    // AÇÕES DE CONSULTA E EXCLUSÃO (S1-B18)
+    // AÇÕES DE CONSULTA E EXCLUSÃO
     // ==========================================
 
     adicionarAoHistoricoEnvios(envioData) {
@@ -928,7 +928,7 @@ export const useDataStore = defineStore('data', {
         }
       } catch (err) {
         console.error('Falha ao carregar dados efetivados:', err)
-        this.dadosEfetivados.error = err.message || 'Erro ao carregar dados do servidor Spring Boot.'
+        this.dadosEfetivados.error = err.message || 'Não foi possível carregar os registros. Tente novamente mais tarde.'
         this.dadosEfetivados.itens = []
         this.dadosEfetivados.totalElements = 0
         this.dadosEfetivados.totalPages = 0
@@ -952,7 +952,7 @@ export const useDataStore = defineStore('data', {
         isOpen: true,
         tipo: 'REGISTRO',
         titulo: `Excluir Registro de ${tipo}`,
-        mensagem: 'Deseja realmente excluir este registro permanentemente do banco de dados?',
+        mensagem: 'Deseja realmente excluir este registro permanentemente do sistema?',
         detalhes: desc,
         item: { ...item, tipo },
         loading: false
@@ -966,7 +966,7 @@ export const useDataStore = defineStore('data', {
         isOpen: true,
         tipo: 'BASE_COMPETENCIA',
         titulo: `Excluir Base Lançada (${nome} - ${competenciaCodigo})`,
-        mensagem: `Deseja realmente excluir os registros da competência ${competenciaCodigo}? Todas as vendas correspondentes serão excluídas permanentemente do banco de dados relacional e o ciclo voltará ao status Pendente.`,
+        mensagem: `Deseja realmente excluir os registros da competência ${competenciaCodigo}? Todas as vendas correspondentes serão excluídas permanentemente do sistema e o ciclo voltará ao status Pendente.`,
         detalhes: `Competência ${competenciaCodigo} (${nome})`,
         item: { competenciaCodigo, nome },
         loading: false
@@ -978,8 +978,8 @@ export const useDataStore = defineStore('data', {
         isOpen: true,
         tipo: 'TODAS_VENDAS',
         titulo: 'Excluir Todas as Vendas',
-        mensagem: 'Deseja realmente remover TODAS as vendas de todas as competências do banco de dados? Esta ação liberará as matrículas para exclusão e reiniciará os ciclos.',
-        detalhes: 'Limpeza global de tb_sales no PostgreSQL',
+        mensagem: 'Deseja realmente remover TODAS as vendas de todas as competências do sistema? Esta ação liberará as matrículas para exclusão e reiniciará os ciclos.',
+        detalhes: 'Todos os registros de vendas serão removidos do sistema',
         item: null,
         loading: false
       }
@@ -990,8 +990,8 @@ export const useDataStore = defineStore('data', {
         isOpen: true,
         tipo: 'TODAS_MATRICULAS',
         titulo: 'Excluir Todas as Matrículas (RH)',
-        mensagem: 'Deseja remover todas as matrículas do banco de dados? Para concluir esta ação, certifique-se de que não existem vendas vinculadas.',
-        detalhes: 'Limpeza global de tb_registration no PostgreSQL',
+        mensagem: 'Deseja remover todas as matrículas do sistema? Para concluir esta ação, certifique-se de que não existem vendas vinculadas.',
+        detalhes: 'Todas as matrículas ativas de RH serão removidas do sistema',
         item: null,
         loading: false
       }
@@ -1057,8 +1057,8 @@ export const useDataStore = defineStore('data', {
           this.enviosHistorico = this.enviosHistorico.filter(e => e.competencia !== compCodigo)
           const totalExc = res?.totalExcluido ?? 0
           notifStore.success(
-            'Base Excluída do Banco',
-            `A base de vendas da competência ${compCodigo} foi excluída com sucesso (${totalExc} registros removidos de tb_sales).`
+            'Base Excluída',
+            `A base de vendas da competência ${compCodigo} foi excluída com sucesso (${totalExc} registros de vendas removidos).`
           )
           this.fecharModalExclusao()
           await this.loadCompetenciasFromSales()
