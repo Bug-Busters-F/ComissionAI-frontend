@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { dataService, TIPOS_BASE } from '@/services/dataService'
 import { invalidateCalculationCache } from '@/services/calculationCache'
-import { formatCompetenceCode, formatCompetenceLabel, groupSalesByCompetence, MONTH_NAMES, normalizeCompetence } from '@/services/competenceUtils'
+import { formatCompetenceCode, formatCompetenceLabel, getCompetenceDateRange, groupSalesByCompetence, MONTH_NAMES, normalizeCompetence } from '@/services/competenceUtils'
 import { useNotificationStore } from '@/stores/notificationStore'
 
 export const MESES_NOMES = MONTH_NAMES
@@ -275,13 +275,24 @@ export const useDataStore = defineStore('data', {
     openComissModal(param = null) {
       let compCodigo = '12/2025'
       let compNome = 'Dezembro'
+      let dataInicio = '2025-12-01'
+      let dataFim = '2025-12-31'
 
       if (param) {
-        if (param.includes('/')) {
+        const norm = normalizeCompetence(param)
+        if (norm) {
+          compCodigo = formatCompetenceCode(norm)
+          compNome = formatCompetenceLabel(norm)
+          const range = getCompetenceDateRange(norm)
+          if (range.dataInicio && range.dataFim) {
+            dataInicio = range.dataInicio
+            dataFim = range.dataFim
+          }
+        } else if (typeof param === 'string' && param.includes('/')) {
           compCodigo = param
           compNome = formatarNomeCompetencia(param)
         } else {
-          compNome = param
+          compNome = String(param)
         }
       }
 
@@ -290,8 +301,8 @@ export const useDataStore = defineStore('data', {
       this.uploadModal.tipoBase = 'COMISS'
       this.uploadModal.competenciaNome = compNome
       this.uploadModal.competencia = compCodigo
-      this.uploadModal.dataInicio = '2025-12-01'
-      this.uploadModal.dataFim = '2025-12-31'
+      this.uploadModal.dataInicio = dataInicio
+      this.uploadModal.dataFim = dataFim
 
       if (this.activeJob.isActive && this.activeJob.modo === 'COMISS') {
         this.uploadModal.isLoading = this.activeJob.status === 'PROCESSING'

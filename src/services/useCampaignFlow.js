@@ -680,6 +680,7 @@ function validDate(value) {
 }
 
 function createDemoInterpretationResult(form) {
+  const isMissingBase = /sem base|base ausente|bloqueio|falta de base/i.test(String(form.textoOriginal || ''))
   return {
     canal: form.canal || null,
     codMarca: form.codMarca || 10,
@@ -689,7 +690,9 @@ function createDemoInterpretationResult(form) {
     dataInicio: form.dataInicio || null,
     dataFim: form.dataFim || null,
     confianca: null,
-    pendencias: []
+    pendencias: isMissingBase
+      ? ['Sem base contratual cadastrada em tb_basecomiss para Marca Aurora e Cargo Vendedores.']
+      : []
   }
 }
 

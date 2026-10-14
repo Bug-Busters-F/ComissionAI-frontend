@@ -32,6 +32,12 @@
 - Sprint 2:
   - Sandbox de Simulação: cálculo de impacto financeiro de regras em 'draft' contra massa histórica sem comitar comissões reais no banco.
   - Human-in-the-loop (HITL): interface de revisão comparativa antes de alterar o status da regra para 'Ativa'.
+  - **Gestão de Bases Ausentes e Bloqueio de Cobertura (FRONT-10)**:
+    - Apresentação de combinações de Marca, Cargo e Competência sem taxa base cadastrada em `tb_basecomiss`.
+    - Componente `MissingBasesCard.vue` com bloqueio financeiro e proteção contra taxas fictícias, totalizando volume de vendas impactadas e montante financeiro protegido.
+    - Orientação acionável e atalho direto para ingestão de taxas (`importType=COMISSIONS`) com competência e vigência pré-carregadas.
+    - Recálculo reativo da competência pós-upload ou via ação direta do usuário.
+    - Bloqueio na simulação e proposta de campanhas quando o público-alvo não possuir base contratual, ocultando estimativas fictícias e preservando a integridade contábil.
 - Sprint 3:
   - Detecção estatística de anomalias/outliers em vendas (3 desvios padrão acima da média).
   - Explainable AI (XAI): sugestões automáticas de redução de percentuais para adequação orçamentária em caso de estouro de teto.
@@ -48,15 +54,15 @@ src/
 ├── components/              # Componentes Vue reutilizáveis organizados por domínio
 │   ├── audit/               # Componentes de auditoria, rastreabilidade e logs imutáveis de comissões
 │   ├── common/              # Componentes de UI genéricos e utilitários (PageHeader, StatusBadge, ToastContainer.vue)
-│   ├── data/                # Ingestão de dados (UploadBaseModal.vue, ValidationReport.vue)
+│   ├── data/                # Ingestão de dados (UploadBaseModal.vue, ValidationReport.vue, MissingBasesCard.vue)
 │   ├── layout/              # Cascas de layout compartilhadas (AppShell, SidebarNav, Topbar)
 │   ├── rules/               # Componentes de gestão de regras (formulário de CRUD e input de regras via NLP)
 │   └── simulation/          # Componentes da sandbox de simulação de impacto financeiro e métricas de XAI
 ├── layouts/                 # Estruturas de layout complementares
 ├── router/                  # Definição e configuração de rotas via Vue Router (index.js)
-├── services/                # Camada de integração HTTP com Axios centralizando chamadas ao Spring Boot (api.js, dataService.js)
-├── stores/                  # Gerenciamento de estado global com Pinia (dataStore.js, notificationStore.js, regras, simulações)
-├── views/                   # Telas/páginas principais conectadas às rotas (HomeView, DataView, CampaignsView)
+├── services/                # Camada de integração HTTP com Axios centralizando chamadas ao Spring Boot (api.js, dataService.js, coverageService.js)
+├── stores/                  # Gerenciamento de estado global com Pinia (dataStore.js, notificationStore.js, calculationStore.js)
+├── views/                   # Telas/páginas principais conectadas às rotas (HomeView, DataView, CampaignsView, CompetenceCalculationView.vue)
 ├── App.vue                  # Componente raiz da aplicação
 └── main.js                  # Ponto de entrada da aplicação (instanciação do Vue, Pinia e plugins)
 ```
@@ -101,3 +107,8 @@ src/
   - **Exclusão de Registros e Bases**:
     - Exclusão pontual de vendas (`DELETE /api/v1/vendas/{id}`) e matrículas (`DELETE /api/v1/matriculas/{id}`) com modal de confirmação e tratamento de erro de integridade (HTTP 409 quando matrícula tem vendas associadas).
     - Exclusão e reinício de base lançada por competência no card do `DataView.vue`.
+- **Tratamento de Bases Ausentes e Bloqueio Financeiro (FRONT-10)**:
+  - **Identificação e Parsing Determinístico**: `coverageService.js` avalia os motivos de impedimento retornados pelo backend (`Taxa de comissão não encontrada: nenhuma regra ativa aplicável... nem taxa padrão cadastrada em tb_basecomiss`), isolando impedimentos de cobertura dos erros cadastrais (RH/vínculos).
+  - **Agrupamento Executivo**: Agrupamento por chave única `competencia_marca_cargo`, totalizando número de transações impactadas e montante financeiro protegido.
+  - **Ação e Automação Pós-Carga**: Card `MissingBasesCard.vue` com atalho direto para o modal de upload com competência e vigência pré-carregadas. Recálculo reativo engatilhado automaticamente após a conclusão com sucesso do job de upload de `COMISS`.
+  - **Governança Estrita na Simulação**: Bloqueio total de estimativas ou taxas fictícias na etapa de Simulação (`CampaignSimulationStep.vue`) quando o público da campanha não tiver cobertura contratual em `tb_basecomiss` ou houver pendência na interpretação NLP.
