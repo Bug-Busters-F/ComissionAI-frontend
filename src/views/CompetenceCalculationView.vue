@@ -135,6 +135,14 @@
         </p>
       </section>
 
+      <MissingBasesCard
+        v-if="coverageGroups.length"
+        :groups="coverageGroups"
+        :competence-key="competenceKey"
+        :is-processing="isCalculating"
+        @recalculate="handleMissingBasesRecalculate"
+      />
+
       <section v-if="result.resultados.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="calculated-sales-heading">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -199,10 +207,10 @@
         <PaginationControls :page="resultPage" :total-pages="resultTotalPages" @previous="resultPage -= 1" @next="resultPage += 1" />
       </section>
 
-      <section v-if="result.impedimentos.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="blocked-sales-heading">
+      <section v-if="cadastralImpediments.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="cadastral-blocked-sales-heading">
         <div>
-          <h2 id="blocked-sales-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Vendas com impedimento</h2>
-          <p class="mt-1 text-sm text-sage-muted">Consulte o motivo do impedimento identificado para cada venda.</p>
+          <h2 id="cadastral-blocked-sales-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Vendas com impedimento cadastral (RH)</h2>
+          <p class="mt-1 text-sm text-sage-muted">Inconsistências em vínculos com colaboradores, ausência de cargo ou datas fora da vigência contratual.</p>
         </div>
         <div class="mt-6 overflow-x-auto">
           <table class="w-full min-w-[720px] text-left text-sm">
@@ -210,7 +218,7 @@
               <tr><th class="rounded-l-xl px-3 py-3">Venda</th><th class="px-3 py-3">Matrícula</th><th class="px-3 py-3">Data</th><th class="px-3 py-3">Valor</th><th class="rounded-r-xl px-3 py-3">Motivo</th></tr>
             </thead>
             <tbody class="divide-y divide-sage-border-light">
-              <tr v-for="blocked in result.impedimentos" :key="blocked.idVenda || `${blocked.matricula}-${blocked.dataVenda}`">
+              <tr v-for="blocked in cadastralImpediments" :key="blocked.idVenda || `${blocked.matricula}-${blocked.dataVenda}`">
                 <td class="px-3 py-4 font-semibold text-brand-dark">{{ shortId(blocked.idVenda) }}</td>
                 <td class="px-3 py-4 text-sage-subtle">{{ blocked.matricula || 'Não informada' }}</td>
                 <td class="px-3 py-4 text-sage-subtle">{{ formatDate(blocked.dataVenda) }}</td>
@@ -221,6 +229,28 @@
           </table>
         </div>
       </section>
+
+      <details v-if="coverageSales.length" class="group rounded-[22px] bg-white p-6 sm:p-7">
+        <summary class="cursor-pointer text-sm font-bold text-brand-dark transition hover:text-brand">
+          Ver listagem individual de vendas com bloqueio de cobertura ({{ coverageSales.length }} vendas protegidas)
+        </summary>
+        <div class="mt-5 overflow-x-auto">
+          <table class="w-full min-w-[720px] text-left text-sm">
+            <thead class="bg-sage-pill text-[10px] uppercase tracking-[0.12em] text-sage-muted">
+              <tr><th class="rounded-l-xl px-3 py-3">Venda</th><th class="px-3 py-3">Matrícula</th><th class="px-3 py-3">Data</th><th class="px-3 py-3">Valor</th><th class="rounded-r-xl px-3 py-3">Motivo</th></tr>
+            </thead>
+            <tbody class="divide-y divide-sage-border-light">
+              <tr v-for="blocked in coverageSales" :key="blocked.idVenda || `${blocked.matricula}-${blocked.dataVenda}`">
+                <td class="px-3 py-4 font-semibold text-brand-dark">{{ shortId(blocked.idVenda) }}</td>
+                <td class="px-3 py-4 text-sage-subtle">{{ blocked.matricula || 'Não informada' }}</td>
+                <td class="px-3 py-4 text-sage-subtle">{{ formatDate(blocked.dataVenda) }}</td>
+                <td class="px-3 py-4 font-semibold text-brand-dark">{{ currency(blocked.valorVenda) }}</td>
+                <td class="px-3 py-4 text-warning-dark">{{ blocked.motivo || 'Motivo não informado' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
 
       <section v-if="!result.resultados.length && !result.impedimentos.length" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
         <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
@@ -306,7 +336,10 @@ import { calculationService } from '@/services/calculationService'
 import { readCalculationCache } from '@/services/calculationCache'
 import { CALCULATION_OPERATION, SALES_QUERY_STATE, hasPreviousCalculation as hasPreviousCalculationValue, isCalculationReady, operationToRecalculate } from '@/services/calculationFlow'
 import { formatCompetenceCode, formatCompetenceLabel, getCompetenceDateRange, normalizeCompetence } from '@/services/competenceUtils'
+import { filterCadastralImpediments, groupCoverageImpediments, isCoverageImpediment } from '@/services/coverageService'
+import MissingBasesCard from '@/components/data/MissingBasesCard.vue'
 import { useCalculationStore } from '@/stores/calculationStore'
+import { useDataStore } from '@/stores/dataStore'
 
 const PaginationControls = defineComponent({
   props: { page: { type: Number, required: true }, totalPages: { type: Number, required: true } },
@@ -325,6 +358,7 @@ const PaginationControls = defineComponent({
 const route = useRoute()
 const router = useRouter()
 const calculationStore = useCalculationStore()
+const dataStore = useDataStore()
 const competenceKey = computed(() => normalizeCompetence(route.params.competencia))
 const salesCount = ref(null)
 const result = ref(null)
@@ -343,6 +377,16 @@ const resultPageSize = 10
 const competenceGeneration = ref(0)
 const salesQueryRequestId = ref(0)
 const historyRequestId = ref(0)
+
+const coverageGroups = computed(() =>
+  groupCoverageImpediments(result.value?.impedimentos || [], competenceKey.value)
+)
+const cadastralImpediments = computed(() =>
+  filterCadastralImpediments(result.value?.impedimentos || [])
+)
+const coverageSales = computed(() =>
+  (result.value?.impedimentos || []).filter((item) => isCoverageImpediment(item.motivo))
+)
 
 const summaryItems = computed(() => [
   { label: 'Vendas processadas', value: result.value?.totalVendasProcessadas ?? 0 },
@@ -530,6 +574,22 @@ function retryLastOperation() {
   if (!canCalculate.value) return
   calculate(operationToRecalculate(lastOperation.value))
 }
+
+function handleMissingBasesRecalculate() {
+  if (!canCalculate.value) return
+  calculate(true)
+}
+
+watch(
+  () => [dataStore.activeJob.status, dataStore.activeJob.modo],
+  ([status, modo], [prevStatus]) => {
+    if (modo === 'COMISS' && status === 'SUCCESS' && prevStatus === 'PROCESSING') {
+      if (coverageGroups.value.length > 0 && canCalculate.value && !isCalculating.value) {
+        calculate(true)
+      }
+    }
+  }
+)
 
 function restoreSessionResult(expectedCompetence = competenceKey.value) {
   const cached = readCalculationCache(expectedCompetence)

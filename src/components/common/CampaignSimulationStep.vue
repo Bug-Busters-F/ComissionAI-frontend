@@ -1,6 +1,63 @@
 <template>
   <div class="space-y-5">
-    <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="simulation-heading">
+    <!-- Bloqueio de Cobertura de Base na Simulação -->
+    <section
+      v-if="isBlocked"
+      class="rounded-[22px] border border-warning-border bg-white p-6 shadow-sm sm:p-7"
+      aria-labelledby="simulation-blocked-heading"
+      role="alert"
+    >
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="flex items-start gap-3.5">
+          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-warning-bg text-warning-dark">
+            <ShieldAlert class="h-6 w-6" aria-hidden="true" />
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 id="simulation-blocked-heading" class="text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">
+                Simulação Bloqueada: Base Contratual Ausente
+              </h2>
+              <StatusBadge label="Bloqueio Financeiro" tone="warning" />
+            </div>
+            <p class="mt-2 text-sm leading-6 text-sage-muted">
+              {{ coverageCheck.mensagem || 'Esta proposta atinge um público sem base de comissão aplicável cadastrada em tb_basecomiss.' }}
+            </p>
+
+            <div v-if="coverageCheck.missingBases?.length" class="mt-4 rounded-xl border border-sage-border-light bg-sage-light p-3.5">
+              <p class="text-xs font-bold uppercase tracking-[0.1em] text-sage-muted">Combinação sem cobertura contratual:</p>
+              <ul class="mt-1.5 space-y-1 text-sm font-semibold text-brand-dark">
+                <li v-for="(base, idx) in coverageCheck.missingBases" :key="idx">
+                  Marca: <span class="font-bold">{{ base.marca }}</span> · Cargo: <span class="font-bold">{{ base.cargo }}</span>
+                </li>
+              </ul>
+            </div>
+
+            <ul v-if="coverageCheck.messages?.length" class="mt-3 list-disc space-y-1 pl-5 text-xs text-warning-dark">
+              <li v-for="(msg, idx) in coverageCheck.messages" :key="idx">{{ msg }}</li>
+            </ul>
+          </div>
+        </div>
+
+        <RouterLink
+          to="/dados"
+          class="focus-ring inline-flex items-center gap-2 self-start rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-brand-dark transition hover:bg-brand-hover"
+        >
+          <UploadCloud class="h-4 w-4" aria-hidden="true" />
+          <span>Ir para Gestão de Dados (Importar COMISS)</span>
+        </RouterLink>
+      </div>
+
+      <div class="mt-6 flex items-start gap-3 rounded-2xl border border-sage-border-light bg-sage-light p-4 text-xs leading-5 text-sage-muted">
+        <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0 text-warning-dark" aria-hidden="true" />
+        <div>
+          <strong class="font-bold text-brand-dark">Proteção contra taxas fictícias:</strong>
+          Projeções numéricas e simulações foram bloqueadas para manter a governança orçamentária e a conformidade contábil. Nenhuma taxa simulada ou fictícia pode ser utilizada para contornar a ausência da tabela contratual oficial.
+        </div>
+      </div>
+    </section>
+
+    <!-- Fluxo normal de simulação quando há cobertura -->
+    <section v-else class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="simulation-heading">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 id="simulation-heading" class="text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">Simulação</h2>
@@ -34,26 +91,41 @@
         </article>
       </div>
     </section>
-
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { AlertTriangle, ShieldAlert, UploadCloud } from 'lucide-vue-next'
+import StatusBadge from '@/components/common/StatusBadge.vue'
 import { CAMPAIGN_SIMULATION_PREMISES, formatSimulationCurrency, formatSimulationPercent, getCampaignSimulationFixture, simulationUsage } from '@/services/campaignSimulation'
+import { checkProposalCoverage } from '@/services/coverageService'
 
 const props = defineProps({
-  demo: { type: Object, required: true }
+  demo: { type: Object, required: true },
+  form: { type: Object, default: () => ({}) },
+  interpretation: { type: Object, default: () => ({}) }
 })
 
 const emit = defineEmits(['update-demo'])
 const fixture = computed(() => getCampaignSimulationFixture(props.demo.simulationVariant))
 
+const coverageCheck = computed(() =>
+  checkProposalCoverage({
+    form: props.form,
+    interpretation: props.interpretation
+  })
+)
+
+const isBlocked = computed(() => coverageCheck.value.isBlocked)
+
 function simulate() {
+  if (isBlocked.value) return
   emit('update-demo', 'simulationHasRun', true)
 }
 
 function applySuggestion() {
+  if (isBlocked.value) return
   emit('update-demo', 'simulationVariant', props.demo.simulationVariant === 'adjusted' ? 'base' : 'adjusted')
   emit('update-demo', 'simulationHasRun', true)
 }

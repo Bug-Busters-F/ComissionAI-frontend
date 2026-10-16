@@ -21,7 +21,7 @@
       <template v-else>
         <CampaignProposalStep v-if="activeStep === 'proposta'" :form="form" :errors="state.fieldErrors" :demo="state.demo" :interpretation="state.interpretation" @update="updateField" @update-demo="updateDemoField" @cancel-interpretation="cancelInterpretation" />
         <CampaignInterpretationStep v-else-if="activeStep === 'interpretacao'" :form="form" :errors="state.fieldErrors" :interpretation="state.interpretation" :stale="interpretationIsStale()" @update="updateField" @cancel-interpretation="cancelInterpretation" />
-        <CampaignSimulationStep v-else-if="activeStep === 'simulacao'" :demo="state.demo" @update-demo="updateDemoField" />
+        <CampaignSimulationStep v-else-if="activeStep === 'simulacao'" :form="form" :interpretation="state.interpretation" :demo="state.demo" @update-demo="updateDemoField" />
         <CampaignReviewStep v-else :form="form" :persisted-state="state.persistedState" :campaign-id="state.campaignId" :demo="state.demo" />
       </template>
     </main>
