@@ -58,6 +58,7 @@
       />
       <CampaignProposalReviewSummary
         v-else
+        :show-python="true"
         :campaign="campaign"
         :validation="validation"
       />

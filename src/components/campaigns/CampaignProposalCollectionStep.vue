@@ -1,5 +1,6 @@
 <template>
-  <div class="space-y-5">
+  <div :class="proposals.length ? 'grid grid-cols-[minmax(0,1fr)_2.75rem] items-start gap-2 sm:gap-4' : ''">
+    <div ref="contentElement" class="min-w-0 space-y-5">
     <section class="rounded-[22px] bg-white p-5 sm:p-6">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -22,7 +23,7 @@
             {{ interpretation.isProcessing ? 'Reinterpretando…' : 'Reinterpretar regras' }}
           </button>
         </div>
-        <textarea id="proposal-campaign-description" :value="campaign.textoOriginal" rows="5" class="campaign-control mt-3 resize-y" placeholder="Descreva os públicos, percentuais e condições..." @input="$emit('update-campaign', 'textoOriginal', $event.target.value)" />
+        <textarea id="proposal-campaign-description" :value="campaign.textoOriginal" rows="5" class="campaign-control campaign-description-control mt-3 resize-y" placeholder="Descreva os públicos, percentuais e condições..." @input="$emit('update-campaign', 'textoOriginal', $event.target.value)" />
         <div v-if="interpretation.isProcessing" class="mt-3">
           <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-4 py-2 text-sm font-bold text-brand-dark" @click="$emit('cancel-interpretation')">Cancelar interpretação</button>
         </div>
@@ -40,12 +41,18 @@
       <CampaignRuleEditor v-for="(proposal, index) in proposals" :key="proposal.clientId" :provider="provider" @apply-reinterpretation="$emit('apply-reinterpretation', $event)" :proposal="proposal" :campaign="campaign" :index="index" :pendencias="validation.byProposal[proposal.clientId] || []" @update-proposal="(...args) => $emit('update-proposal', ...args)" @request-remove="$emit('request-remove', $event)" @set-all-sales="(...args) => $emit('set-all-sales', ...args)" />
       <button type="button" class="focus-ring w-full rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-bold text-brand-dark" @click="$emit('add-proposal')">＋ Adicionar outra regra</button>
     </div>
+    </div>
+    <CampaignRuleScrollNav :proposals="proposals" :content-element="contentElement" />
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import CampaignRuleEditor from './CampaignRuleEditor.vue'
+import CampaignRuleScrollNav from './CampaignRuleScrollNav.vue'
 import { formatCampaignValidity } from '@/services/campaignProposalFormatting'
+
+const contentElement = ref(null)
 
 defineProps({
   campaign: { type: Object, required: true },
@@ -62,4 +69,5 @@ defineEmits(['apply-reinterpretation', 'add-proposal', 'update-campaign', 'updat
 <style scoped>
 .campaign-label { @apply mb-2 block text-sm font-bold text-brand-dark; }
 .campaign-control { @apply focus-ring w-full rounded-xl border border-sage-border bg-white px-4 py-3 text-sm text-brand-dark outline-none transition placeholder:text-sage-muted; }
+.campaign-description-control:focus { @apply outline-none ring-0 ring-offset-0 border-brand-ring; }
 </style>

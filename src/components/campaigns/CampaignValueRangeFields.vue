@@ -3,10 +3,16 @@
     <legend class="px-1 text-sm font-bold text-brand-dark">Valor de uma venda individual</legend>
     <div class="grid gap-4 sm:grid-cols-2">
       <div>
-        <label :for="idFor('valorMinimo')" class="campaign-label">Valor mínimo (R$)</label>
+        <div class="mb-2 flex items-center gap-1">
+          <label :for="idFor('valorMinimo')" class="campaign-label !mb-0">Valor mínimo (R$)</label>
+          <CampaignFieldOriginHelp field-label="Valor mínimo (R$)" />
+        </div>
         <input :id="idFor('valorMinimo')" :value="fields.valorMinimo" type="text" inputmode="decimal" autocomplete="off" class="campaign-control" :class="errorClass('valorMinimo')" placeholder="Ex.: 1000,00" :aria-invalid="Boolean(errorFor('valorMinimo'))" :aria-describedby="errorFor('valorMinimo') ? idFor('valorMinimo') + '-error' : undefined" @input="update('valorMinimo', $event.target.value)" />
         <p v-if="errorFor('valorMinimo')" :id="idFor('valorMinimo') + '-error'" class="campaign-error">{{ errorFor('valorMinimo') }}</p>
-        <label :for="idFor('minimoInclusivo')" class="campaign-label mt-3">Operador do mínimo</label>
+        <div class="mb-2 flex items-center gap-1 mt-3">
+          <label :for="idFor('minimoInclusivo')" class="campaign-label !mb-0">Operador do mínimo</label>
+          <CampaignFieldOriginHelp field-label="Operador do mínimo" />
+        </div>
         <select :id="idFor('minimoInclusivo')" :value="selectValue(fields.minimoInclusivo)" class="campaign-control" :disabled="fields.valorMinimo === ''" :aria-invalid="Boolean(errorFor('minimoInclusivo'))" :aria-describedby="errorFor('minimoInclusivo') ? idFor('minimoInclusivo') + '-error' : undefined" @change="update('minimoInclusivo', parseOperator($event.target.value))">
           <option value="">Selecione</option>
           <option value="inclusive">A partir de (inclui)</option>
@@ -16,10 +22,16 @@
       </div>
 
       <div>
-        <label :for="idFor('valorMaximo')" class="campaign-label">Valor máximo (R$)</label>
+        <div class="mb-2 flex items-center gap-1">
+          <label :for="idFor('valorMaximo')" class="campaign-label !mb-0">Valor máximo (R$)</label>
+          <CampaignFieldOriginHelp field-label="Valor máximo (R$)" />
+        </div>
         <input :id="idFor('valorMaximo')" :value="fields.valorMaximo" type="text" inputmode="decimal" autocomplete="off" class="campaign-control" :class="errorClass('valorMaximo')" placeholder="Ex.: 5000,00" :aria-invalid="Boolean(errorFor('valorMaximo'))" :aria-describedby="errorFor('valorMaximo') ? idFor('valorMaximo') + '-error' : undefined" @input="update('valorMaximo', $event.target.value)" />
         <p v-if="errorFor('valorMaximo')" :id="idFor('valorMaximo') + '-error'" class="campaign-error">{{ errorFor('valorMaximo') }}</p>
-        <label :for="idFor('maximoInclusivo')" class="campaign-label mt-3">Operador do máximo</label>
+        <div class="mb-2 flex items-center gap-1 mt-3">
+          <label :for="idFor('maximoInclusivo')" class="campaign-label !mb-0">Operador do máximo</label>
+          <CampaignFieldOriginHelp field-label="Operador do máximo" />
+        </div>
         <select :id="idFor('maximoInclusivo')" :value="selectValue(fields.maximoInclusivo)" class="campaign-control" :disabled="fields.valorMaximo === ''" :aria-invalid="Boolean(errorFor('maximoInclusivo'))" :aria-describedby="errorFor('maximoInclusivo') ? idFor('maximoInclusivo') + '-error' : undefined" @change="update('maximoInclusivo', parseOperator($event.target.value))">
           <option value="">Selecione</option>
           <option value="inclusive">Até (inclui)</option>
@@ -35,6 +47,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import CampaignFieldOriginHelp from './CampaignFieldOriginHelp.vue'
 import { parseDecimalToMinor } from '@/services/campaignProposalValidation'
 
 const props = defineProps({

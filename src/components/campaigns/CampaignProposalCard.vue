@@ -21,12 +21,18 @@
       <h4 class="text-sm font-extrabold text-brand-dark">Público e taxa</h4>
       <div class="mt-3 grid gap-4 sm:grid-cols-2">
         <div v-for="field in textFields" :key="field.key">
-          <label :for="idFor(field.key)" class="campaign-label">{{ field.label }}</label>
+          <div class="mb-2 flex items-center gap-1">
+            <label :for="idFor(field.key)" class="campaign-label !mb-0">{{ field.label }}</label>
+            <CampaignFieldOriginHelp :field-label="field.label" />
+          </div>
           <input :id="idFor(field.key)" :value="proposal.campos[field.key]" type="text" :inputmode="field.numeric ? 'numeric' : 'text'" autocomplete="off" class="campaign-control" :class="errorClass(field.key)" :aria-invalid="Boolean(errorFor(field.key))" :aria-describedby="errorFor(field.key) ? idFor(field.key) + '-error' : undefined" :placeholder="field.placeholder" @input="$emit('update-proposal', proposal.clientId, field.key, $event.target.value)" />
           <p v-if="errorFor(field.key)" :id="idFor(field.key) + '-error'" class="campaign-error">{{ errorFor(field.key) }}</p>
         </div>
         <div>
-          <label :for="idFor('taxaPercentual')" class="campaign-label">Taxa percentual final <span class="text-danger">*</span></label>
+          <div class="mb-2 flex items-center gap-1">
+            <label :for="idFor('taxaPercentual')" class="campaign-label !mb-0">Taxa percentual final <span class="text-danger">*</span></label>
+            <CampaignFieldOriginHelp field-label="Taxa percentual final" />
+          </div>
           <div class="flex items-center gap-2">
             <input :id="idFor('taxaPercentual')" :value="proposal.campos.taxaPercentual" type="text" inputmode="decimal" autocomplete="off" class="campaign-control" :class="errorClass('taxaPercentual')" :aria-invalid="Boolean(errorFor('taxaPercentual'))" :aria-describedby="errorFor('taxaPercentual') ? idFor('taxaPercentual') + '-error' : undefined" placeholder="Ex.: 5,5" @input="$emit('update-proposal', proposal.clientId, 'taxaPercentual', $event.target.value)" />
             <span class="font-bold text-brand-dark" aria-hidden="true">%</span>
@@ -36,7 +42,7 @@
         </div>
       </div>
 
-      <div v-if="!hasAudienceFilters" class="mt-5">
+      <div v-if="!hasAudienceFilters" class="mt-5 flex items-start gap-2">
         <label class="flex items-start gap-3 rounded-xl border border-sage-border px-4 py-3">
           <input class="mt-1 h-4 w-4 accent-brand" type="checkbox" :checked="proposal.campos.publicoTodasVendas" @change="requestAllSales($event.target.checked)" />
           <span>
@@ -44,6 +50,7 @@
             <span class="mt-1 block text-xs leading-5 text-sage-muted">Use quando esta regra não tiver filtros de público.</span>
           </span>
         </label>
+        <CampaignFieldOriginHelp class="mt-3" field-label="Aplicar a todas as vendas" />
       </div>
     </div>
 
@@ -63,6 +70,7 @@
 import { computed } from 'vue'
 import { RULE_FIELD_LABELS as fieldLabels } from '@/services/ruleReinterpretation'
 import CampaignValueRangeFields from './CampaignValueRangeFields.vue'
+import CampaignFieldOriginHelp from './CampaignFieldOriginHelp.vue'
 
 const props = defineProps({
   proposal: { type: Object, required: true },

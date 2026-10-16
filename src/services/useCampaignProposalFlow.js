@@ -1,3 +1,4 @@
+import { focusCampaignStepStart } from './campaignStepNavigation'
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { campaignProposalToCanonical, normalizeCampaignProposalResponse } from './campaignProposalMappers'
@@ -63,6 +64,7 @@ export function useCampaignProposalFlow() {
         }
         await router.replace({ query: { ...route.query, etapa: allowed } })
       }
+      await focusCampaignStepStart()
     },
     { immediate: true }
   )
@@ -95,7 +97,7 @@ export function useCampaignProposalFlow() {
         message.value = 'Corrija ' + blockingCount + (blockingCount === 1 ? ' pendência impeditiva' : ' pendências impeditivas') + ' antes de continuar.'
       }
       await router.replace({ query: { ...route.query, etapa: allowed } })
-      await focusFirstPending()
+      await focusCampaignStepStart()
       return false
     }
 
@@ -103,6 +105,7 @@ export function useCampaignProposalFlow() {
       activeStep.value = 'dados'
       message.value = 'Confirme que deseja manter as regras atuais depois de alterar a descrição.'
       await router.replace({ query: { ...route.query, etapa: 'dados' } })
+      await focusCampaignStepStart()
       return false
     }
 
@@ -110,25 +113,8 @@ export function useCampaignProposalFlow() {
     activeStep.value = target
     const method = replace ? 'replace' : 'push'
     await router[method]({ query: { ...route.query, etapa: target } })
-    await nextTick()
-    document.querySelector('[data-campaign-main]')?.focus()
+    await focusCampaignStepStart()
     return true
-  }
-
-  async function focusFirstPending() {
-    const first = validation.value.blockers[0]
-    if (!first) return
-    if (first.clientId) {
-      await nextTick()
-      const target = first.campo
-        ? document.getElementById(proposalFieldId(first.clientId, first.campo))
-        : document.getElementById('proposal-card-' + encodeURIComponent(first.clientId))
-      target?.focus?.()
-      return
-    }
-    await nextTick()
-    const id = first.campo ? 'campaign-' + first.campo : 'campaign-title'
-    document.getElementById(id)?.focus?.()
   }
 
   function updateCampaign(field, value) {

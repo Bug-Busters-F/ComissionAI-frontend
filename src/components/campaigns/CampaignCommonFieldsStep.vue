@@ -27,23 +27,23 @@
       </div>
     </section>
 
-    <aside class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="campaign-rules-heading">
+    <aside class="rounded-[22px] border border-sage-border-dark bg-white p-6 sm:p-7" aria-labelledby="campaign-rules-heading">
       <h2 id="campaign-rules-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Uma campanha, várias regras</h2>
-      <p class="mt-2 text-sm leading-6 text-sage-muted">Cada regra fica vinculada a esta campanha.</p>
+      <p class="mt-2 text-sm leading-6 text-sage-subtle">Cada regra fica vinculada a esta campanha.</p>
 
       <div class="mt-6 space-y-4">
-        <div class="flex items-start gap-3 rounded-2xl p-4">
-          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-extrabold text-brand-dark" aria-hidden="true">%</span>
+        <div class="flex items-start gap-3 rounded-2xl border border-sage-border bg-white p-4">
+          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-success-surface text-sm font-extrabold text-success-dark" aria-hidden="true">%</span>
           <div>
             <h3 class="text-sm font-extrabold text-brand-dark">Percentual sobre vendas</h3>
-            <p class="mt-1 text-sm leading-5 text-sage-muted">A taxa informada será vinculada à regra e ao público definido nela.</p>
+            <p class="mt-1 text-sm leading-5 text-sage-subtle">A taxa informada será vinculada à regra e ao público definido nela.</p>
           </div>
         </div>
-        <div class="flex items-start gap-3 rounded-2xl p-4">
-          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-extrabold text-brand-dark" aria-hidden="true">1</span>
+        <div class="flex items-start gap-3 rounded-2xl border border-sage-border bg-white p-4">
+          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-success-surface text-sm font-extrabold text-success-dark" aria-hidden="true"><Layers :size="18" :stroke-width="2" /></span>
           <div>
             <h3 class="text-sm font-extrabold text-brand-dark">Regras independentes</h3>
-            <p class="mt-1 text-sm leading-5 text-sage-muted">Cada bloco terá seu próprio público, percentual e condições.</p>
+            <p class="mt-1 text-sm leading-5 text-sage-subtle">Cada bloco terá seu próprio público, percentual e condições.</p>
           </div>
         </div>
       </div>
@@ -52,6 +52,8 @@
 </template>
 
 <script setup>
+import { Layers } from 'lucide-vue-next'
+
 const props = defineProps({
   campaign: { type: Object, required: true },
   errors: { type: Object, default: () => ({}) },
