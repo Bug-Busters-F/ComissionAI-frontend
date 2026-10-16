@@ -33,6 +33,8 @@ export function createCampaignProposal(fields = {}) {
     serverId: fields.serverId ?? null,
     origem: fields.origem || 'manual',
     textoOrigem: fields.textoOrigem || '',
+    trechoOriginal: fields.trechoOriginal ?? fields.textoOrigem ?? '',
+    resumo: fields.resumo || '',
     campos: {
       codMarca: '',
       descrMarca: '',

@@ -11,6 +11,16 @@
       </div>
     </header>
 
+    <section v-if="provider.mode === 'demo'" class="flex flex-wrap items-end gap-3 rounded-2xl border border-warning-border bg-warning-bg p-4">
+      <div class="min-w-0 flex-1">
+        <label for="proposal-demo-example" class="block text-xs font-bold text-warning-text">Carregar campanha demonstrativa (substitui os dados após confirmação)</label>
+        <select id="proposal-demo-example" v-model="demoExample" class="focus-ring mt-2 w-full rounded-xl border border-warning-border bg-white p-3 text-sm">
+          <option v-for="(example, key) in demoExamples" :key="key" :value="key">{{ example.label }}</option>
+        </select>
+      </div>
+      <button type="button" class="focus-ring rounded-full border border-warning-border bg-white px-4 py-3 text-sm font-bold" @click="loadDemoExample">Carregar exemplo</button>
+    </section>
+
     <CampaignStepNav :steps="steps" :current-step="activeStep" :current-step-number="activeStepIndex + 1" @select="navigateTo" />
 
     <main data-campaign-main tabindex="-1" class="outline-none">
@@ -28,6 +38,8 @@
         :proposals="campaign.propostas"
         :validation="validation"
         :interpretation="interpretation"
+        :provider="provider"
+        @apply-reinterpretation="applyReinterpretation"
         :description-changed="descriptionChanged"
         @add-proposal="addProposal"
         @update-campaign="updateCampaign"
@@ -97,6 +109,7 @@ import CampaignProposalCollectionStep from '@/components/campaigns/CampaignPropo
 import CampaignProposalHandoffStep from '@/components/campaigns/CampaignProposalHandoffStep.vue'
 import CampaignProposalRemoveDialog from '@/components/campaigns/CampaignProposalRemoveDialog.vue'
 import CampaignProposalReviewSummary from '@/components/campaigns/CampaignProposalReviewSummary.vue'
+import { CAMPAIGN_PROPOSAL_SCENARIOS as demoExamples } from '@/services/campaignProposalFixtures'
 import { useCampaignProposalFlow } from '@/services/useCampaignProposalFlow'
 
 const router = useRouter()
@@ -106,8 +119,10 @@ const {
   canonicalSnapshot, isDirty, pendingRemovalId, descriptionChanged, descriptionNeedsConfirmation,
   navigateTo, updateCampaign, confirmRetainProposals, startManualEntry, addProposal: addProposalToCampaign,
   updateProposal, setAllSales, requestRemoveProposal, confirmRemoveProposal, cancelRemoveProposal,
-  interpretDescription, cancelInterpretation
+  interpretDescription, cancelInterpretation, applyReinterpretation, loadExample
 } = useCampaignProposalFlow()
+const demoExample = ref('threeComplete')
+async function loadDemoExample() { if (loadExample(demoExample.value)) await navigateTo('propostas') }
 const discardDialogOpen = ref(false)
 const pendingRoute = ref('/campanhas')
 const pendingRemovalIndex = computed(() => campaign.propostas.findIndex((item) => item.clientId === pendingRemovalId.value) + 1)

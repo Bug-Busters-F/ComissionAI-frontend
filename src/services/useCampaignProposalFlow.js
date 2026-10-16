@@ -192,6 +192,13 @@ export function useCampaignProposalFlow() {
     markChanged()
   }
 
+  function applyReinterpretation(updated) {
+    const proposal = campaign.propostas.find((item) => item.clientId === updated.clientId)
+    if (!proposal || proposal.origem === 'manual') return
+    Object.assign(proposal, updated)
+    markChanged()
+  }
+
   function setAllSales(clientId, enabled) {
     const proposal = campaign.propostas.find((item) => item.clientId === clientId)
     if (!proposal) return
@@ -355,6 +362,7 @@ export function useCampaignProposalFlow() {
     startManualEntry,
     addProposal,
     updateProposal,
+    applyReinterpretation,
     setAllSales,
     requestRemoveProposal,
     confirmRemoveProposal,

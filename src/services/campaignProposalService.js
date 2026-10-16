@@ -1,4 +1,5 @@
 import { getCampaignProposalFixture } from './campaignProposalFixtures'
+import { reinterpretRuleDemo } from './ruleReinterpretationDemo'
 
 export class CampaignProposalIntegrationUnavailableError extends Error {
   constructor(action) {
@@ -23,6 +24,7 @@ export function createCampaignProposalProvider({ mode = defaultMode(), client = 
   const capabilities = safeMode === 'api' && client
     ? {
         interpret: typeof client.interpretCampaign === 'function',
+        reinterpret: typeof client.reinterpretRule === 'function',
         validate: typeof client.validateCampaign === 'function',
         persist: typeof client.saveDraft === 'function',
         simulate: typeof client.simulateCampaign === 'function',
@@ -30,6 +32,7 @@ export function createCampaignProposalProvider({ mode = defaultMode(), client = 
       }
     : {
         interpret: false,
+        reinterpret: safeMode === 'demo',
         validate: false,
         persist: false,
         simulate: false,
@@ -46,6 +49,10 @@ export function createCampaignProposalProvider({ mode = defaultMode(), client = 
     interpretCampaign(input, options = {}) {
       if (!capabilities.interpret) return unavailable('interpretCampaign')
       return client.interpretCampaign(input, options)
+    },
+    reinterpretRule(input, options = {}) {
+      if (!capabilities.reinterpret) return unavailable('reinterpretRule')
+      return safeMode === 'demo' ? reinterpretRuleDemo(input, options) : client.reinterpretRule(input, options)
     },
     validateCampaign(input, options = {}) {
       if (!capabilities.validate) return unavailable('validateCampaign')

@@ -9,9 +9,13 @@
       <button type="button" class="focus-ring rounded-full border border-danger/30 px-4 py-2 text-sm font-bold text-danger-dark" :aria-label="'Remover regra ' + (index + 1)" @click="$emit('request-remove', proposal.clientId)">Remover regra</button>
     </header>
 
-    <p class="mt-4 rounded-xl bg-sage-light px-4 py-3 text-sm leading-6 text-sage-subtle">
-      {{ proposal.textoOrigem || 'Regra configurada nesta campanha.' }}
-    </p>
+    <slot name="rule-text" />
+
+    <details v-if="proposal.trechoOriginal" class="mt-4 text-xs leading-5 text-sage-muted">
+      <summary class="focus-ring cursor-pointer rounded">Ver trecho original</summary>
+      <p class="mt-2 whitespace-pre-wrap break-words">{{ proposal.trechoOriginal }}</p>
+    </details>
+    <p v-if="proposal.camposManuais.length" class="mt-3 text-xs text-sage-muted">Campos editados manualmente: {{ proposal.camposManuais.map((field) => fieldLabels[field]).join(', ') }}.</p>
 
     <div class="mt-5">
       <h4 class="text-sm font-extrabold text-brand-dark">Público e taxa</h4>
@@ -45,11 +49,6 @@
 
     <CampaignValueRangeFields class="mt-5" :fields="proposal.campos" :client-id="proposal.clientId" :pendencias="pendencias" @update="(field, value) => $emit('update-proposal', proposal.clientId, field, value)" />
 
-    <div class="mt-5 rounded-xl border border-sage-border bg-sage-light px-4 py-3">
-      <p class="text-xs font-bold text-sage-subtle">Vigência comum — somente leitura</p>
-      <p class="mt-1 text-sm font-semibold text-brand-dark">{{ formatCampaignValidity(campaign, true) }}</p>
-    </div>
-
     <div v-if="pendencias.length" class="mt-5 space-y-2">
       <p class="text-sm font-bold text-brand-dark">Pendências deste bloco</p>
       <p v-for="item in pendencias" :key="item.id" class="rounded-xl px-3 py-2 text-sm leading-5" :class="item.severidade === 'IMPEDITIVO' ? 'bg-danger-bg text-danger-dark' : 'bg-warning-bg text-warning-text'">
@@ -62,8 +61,8 @@
 
 <script setup>
 import { computed } from 'vue'
+import { RULE_FIELD_LABELS as fieldLabels } from '@/services/ruleReinterpretation'
 import CampaignValueRangeFields from './CampaignValueRangeFields.vue'
-import { formatCampaignValidity } from '@/services/campaignProposalFormatting'
 
 const props = defineProps({
   proposal: { type: Object, required: true },

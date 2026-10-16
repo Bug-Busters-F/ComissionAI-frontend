@@ -106,6 +106,8 @@ function normalizeProposal(raw, index) {
     serverId: source.serverId ?? null,
     origem: ['manual', 'interpretacao', 'demonstracao'].includes(source.origem) ? source.origem : 'interpretacao',
     textoOrigem: textValue(source.textoOrigem),
+    trechoOriginal: textValue(source.trechoOriginal ?? source.textoOrigem),
+    resumo: textValue(source.resumo),
     campos,
     camposManuais: Array.isArray(source.camposManuais) ? source.camposManuais : [],
     pendenciasRemotas: external,
@@ -252,6 +254,8 @@ export function campaignProposalToCanonical(campaign) {
         clientId: proposal.clientId,
         serverId: proposal.serverId,
         textoOrigem: proposal.textoOrigem,
+        trechoOriginal: proposal.trechoOriginal,
+        resumo: proposal.resumo,
         filtros: {
           codMarca: canonicalCode(fields.codMarca),
           descrMarca: nullableText(fields.descrMarca),
