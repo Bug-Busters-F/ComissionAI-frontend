@@ -34,7 +34,7 @@ export function normalizeInterpretationError(error) {
     return {
       status,
       kind: 'validation',
-      message: backendMessage || 'Não foi possível interpretar este texto. Revise a proposta e tente novamente.'
+      message: backendMessage || 'Não foi possível interpretar este texto. Revise a regra e tente novamente.'
     }
   }
 

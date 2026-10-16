@@ -247,7 +247,7 @@ export function useCampaignFlow() {
     }
 
     if (normalized === 'interpretacao' && !form.textoOriginal.trim()) {
-      state.fieldErrors = { ...state.fieldErrors, textoOriginal: 'Informe o texto da proposta para abrir a interpretação.' }
+      state.fieldErrors = { ...state.fieldErrors, textoOriginal: 'Informe a descrição da campanha para abrir a interpretação.' }
       await router.push({ query: { ...route.query, etapa: 'proposta' } })
       await nextTick()
       document.querySelector('#campaign-original-text')?.focus()
@@ -281,7 +281,7 @@ export function useCampaignFlow() {
 
     const originalText = String(form.textoOriginal ?? '')
     if (!originalText.trim()) {
-      state.fieldErrors = { ...state.fieldErrors, textoOriginal: 'Informe o texto da proposta para interpretar.' }
+      state.fieldErrors = { ...state.fieldErrors, textoOriginal: 'Informe a descrição da campanha para interpretar.' }
       await router.push({ query: { ...route.query, etapa: 'proposta' } })
       await nextTick()
       document.querySelector('#campaign-original-text')?.focus()
@@ -359,7 +359,7 @@ export function useCampaignFlow() {
         error: ''
       }
       await router.push({ query: { ...route.query, etapa: 'interpretacao' } })
-      notifications.success(isDemo.value ? 'Interpretação demonstrativa aplicada' : 'Proposta interpretada', isDemo.value ? 'Revise os campos fictícios antes de continuar.' : 'Revise os campos sugeridos antes de salvar a campanha.')
+      notifications.success(isDemo.value ? 'Interpretação demonstrativa aplicada' : 'Regra interpretada', isDemo.value ? 'Revise os campos fictícios antes de continuar.' : 'Revise os campos sugeridos antes de salvar a campanha.')
       return true
     } catch (error) {
       if (!isCurrentInterpretationRequest(requestId, originalText, context)) {

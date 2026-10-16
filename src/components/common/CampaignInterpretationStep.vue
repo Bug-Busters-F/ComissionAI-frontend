@@ -3,17 +3,17 @@
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
         <h2 id="interpretation-heading" class="text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">Confira a interpretação</h2>
-        <p class="mt-2 text-sm text-sage-muted">Revise os parâmetros da única regra vinculada antes de continuar.</p>
+        <p class="mt-2 text-sm text-sage-muted">Revise os parâmetros da regra vinculada antes de continuar.</p>
       </div>
       <span class="rounded-full px-3 py-1.5 text-xs font-bold" :class="interpretation.isProcessing ? 'bg-sage-light text-brand-dark' : interpretation.status === 'error' ? 'bg-danger-bg text-danger-dark' : 'bg-success-surface text-success-text'">{{ sourceLabel }}</span>
     </div>
 
     <div class="mt-6 rounded-2xl bg-sage-light px-4 py-3 text-sm leading-6 text-sage-subtle">
-      {{ interpretation.isProcessing ? 'Interpretando proposta… processando regras de campanha.' : stale ? 'O texto ou o contexto mudou desde a última interpretação. Interprete novamente para atualizar as sugestões.' : sourceMessage }}
+      {{ interpretation.isProcessing ? 'Interpretando campanha… processando regras.' : stale ? 'O texto ou o contexto mudou desde a última interpretação. Interprete novamente para atualizar as regras.' : sourceMessage }}
     </div>
 
     <div v-if="interpretation.isProcessing" class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-white px-4 py-3 text-sm text-brand-dark" role="status" aria-live="polite">
-      <span>Interpretando proposta…</span>
+      <span>Interpretando campanha…</span>
       <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-3 py-2 text-xs font-bold" @click="$emit('cancel-interpretation')">Cancelar</button>
     </div>
     <div v-if="interpretation.error" class="mt-4 rounded-2xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm leading-6 text-danger-dark" role="alert">{{ interpretation.error }}</div>
