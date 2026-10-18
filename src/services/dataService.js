@@ -365,11 +365,32 @@ export const dataService = {
     // ==========================================
     // FLUXO DE UPLOAD SEQUENCIAL (RH primeiro, depois Vendas)
     // ==========================================
+    const pollImportUntilDone = async (initialData, { stage, startPct, endPct, label }) => {
+      if (!initialData?.reportId) return initialData
+      let current = initialData
+      let attempts = 0
+      while (
+        (current.status === 'PENDENTE' || current.status === 'PROCESSANDO') &&
+        attempts < 120
+      ) {
+        await new Promise((r) => setTimeout(r, 400))
+        attempts += 1
+        const pct = Math.min(endPct, startPct + Math.round((attempts / 20) * (endPct - startPct)))
+        onProgress?.({
+          stage,
+          progress: pct,
+          message: `Processando ${label} no servidor (lote #${current.reportId})...`
+        })
+        const res = await api.get(`/imports/${current.reportId}`, { signal })
+        current = res.data
+      }
+      return current
+    }
 
     // 1. Etapa 1: Envio da base de RH
     onProgress?.({
       stage: 'RH',
-      progress: 20,
+      progress: 15,
       message: `Enviando e processando base de RH (${rhFile.name})...`
     })
 
@@ -377,30 +398,58 @@ export const dataService = {
     formRh.append('file', rhFile)
     formRh.append('importType', 'HR')
 
-    let respRh = null
-    try {
-      const httpRespRh = await api.post('/imports/upload', formRh, {
-        params: { importType: 'HR' },
-        signal
-      })
-      respRh = httpRespRh.data
-    } catch (err) {
-      console.warn('Backend /imports/upload para RH falhou ou retornou erro; operando em modo resiliente:', err)
-      const rhEstimado = Math.max(10, Math.round(rhFile.size / 420)) || 467
-      respRh = {
-        nomeArquivo: rhFile.name,
-        tipoBase: 'HR',
-        totalLinhas: rhEstimado,
-        linhasValidas: rhEstimado,
-        status: 'SUCESSO'
+    const httpRespRh = await api.post('/imports/upload', formRh, {
+      params: { importType: 'HR' },
+      signal
+    })
+    const respRh = await pollImportUntilDone(httpRespRh.data, {
+      stage: 'RH',
+      startPct: 20,
+      endPct: 50,
+      label: `base de RH (${rhFile.name})`
+    })
+
+    if (respRh?.status === 'FALHOU') {
+      const motivoRh = respRh.mensagem || 'A importação da base de RH falhou (possível matrícula duplicada ou erro estrutural).'
+      return {
+        isCiclo: true,
+        competencia,
+        nomeArquivo: `${rhFile.name} & ${vendasFile.name}`,
+        tipoBase: 'CICLO_MENSAL',
+        status: 'REJEITADO',
+        totalLinhas: 0,
+        linhasValidas: 0,
+        rejeicaoIntegral: true,
+        rh: {
+          nomeArquivo: rhFile.name,
+          totalLinhas: 0,
+          linhasValidas: 0,
+          status: 'REJEITADO'
+        },
+        vendas: {
+          nomeArquivo: vendasFile.name,
+          totalLinhas: 0,
+          linhasValidas: 0,
+          status: 'PENDENTE'
+        },
+        inconsistencias: [
+          {
+            base: 'RH',
+            linha: '-',
+            campo: 'Planilha de RH',
+            motivo: motivoRh,
+            severidade: 'IMPEDITIVO'
+          }
+        ],
+        processadoEm: new Date().toISOString()
       }
     }
 
-    // 2. Etapa 2: Envio da base de Vendas
-    const rhLinhas = respRh.totalLinhas ?? (respRh.linhasValidas ?? 467)
+    // 2. Etapa 2: Envio da base de Vendas (somente após RH concluir no banco)
+    const rhLinhas = respRh?.totalLinhas ?? respRh?.linhasValidas ?? 0
     onProgress?.({
       stage: 'VENDAS',
-      progress: 60,
+      progress: 55,
       message: `RH processado (${rhLinhas} registros). Enviando base de Vendas (${vendasFile.name})...`
     })
 
@@ -408,27 +457,55 @@ export const dataService = {
     formVendas.append('file', vendasFile)
     formVendas.append('importType', 'SALES')
 
-    let respVendas = null
-    try {
-      const httpRespVendas = await api.post('/imports/upload', formVendas, {
-        params: { importType: 'SALES' },
-        signal
-      })
-      respVendas = httpRespVendas.data
-    } catch (err) {
-      console.warn('Backend /imports/upload para Vendas falhou ou retornou erro; operando em modo resiliente:', err)
-      const vendasEstimadas = Math.max(50, Math.round(vendasFile.size / 45)) || 4994
-      respVendas = {
-        nomeArquivo: vendasFile.name,
-        tipoBase: 'SALES',
-        totalLinhas: vendasEstimadas,
-        linhasValidas: vendasEstimadas,
-        status: 'SUCESSO'
+    const httpRespVendas = await api.post('/imports/upload', formVendas, {
+      params: { importType: 'SALES' },
+      signal
+    })
+    const respVendas = await pollImportUntilDone(httpRespVendas.data, {
+      stage: 'VENDAS',
+      startPct: 60,
+      endPct: 95,
+      label: `base de Vendas (${vendasFile.name})`
+    })
+
+    if (respVendas?.status === 'FALHOU') {
+      const motivoVendas = respVendas.mensagem || 'A importação da base de Vendas falhou na validação relacional.'
+      return {
+        isCiclo: true,
+        competencia,
+        nomeArquivo: `${rhFile.name} & ${vendasFile.name}`,
+        tipoBase: 'CICLO_MENSAL',
+        status: 'REJEITADO',
+        totalLinhas: rhLinhas,
+        linhasValidas: 0,
+        rejeicaoIntegral: true,
+        rh: {
+          nomeArquivo: rhFile.name,
+          totalLinhas: rhLinhas,
+          linhasValidas: rhLinhas,
+          status: 'SUCESSO'
+        },
+        vendas: {
+          nomeArquivo: vendasFile.name,
+          totalLinhas: 0,
+          linhasValidas: 0,
+          status: 'REJEITADO'
+        },
+        inconsistencias: [
+          {
+            base: 'VENDAS',
+            linha: '-',
+            campo: 'Planilha de Vendas',
+            motivo: motivoVendas,
+            severidade: 'IMPEDITIVO'
+          }
+        ],
+        processadoEm: new Date().toISOString()
       }
     }
 
     // 3. Etapa 3: Consolidação dos resultados com sucesso
-    const vendasLinhas = respVendas.totalLinhas ?? (respVendas.linhasValidas ?? 4994)
+    const vendasLinhas = respVendas?.totalLinhas ?? respVendas?.linhasValidas ?? 0
     const totalGeral = rhLinhas + vendasLinhas
 
     onProgress?.({
@@ -440,20 +517,20 @@ export const dataService = {
     return {
       isCiclo: true,
       competencia,
-      nomeArquivo: `${respRh.nomeArquivo || rhFile.name} & ${respVendas.nomeArquivo || vendasFile.name}`,
+      nomeArquivo: `${respRh?.nomeArquivo || rhFile.name} & ${respVendas?.nomeArquivo || vendasFile.name}`,
       tipoBase: 'CICLO_MENSAL',
       status: 'SUCESSO',
       totalLinhas: totalGeral,
       linhasValidas: totalGeral,
       rejeicaoIntegral: false,
       rh: {
-        nomeArquivo: respRh.nomeArquivo || rhFile.name,
+        nomeArquivo: respRh?.nomeArquivo || rhFile.name,
         totalLinhas: rhLinhas,
         linhasValidas: rhLinhas,
         status: 'SUCESSO'
       },
       vendas: {
-        nomeArquivo: respVendas.nomeArquivo || vendasFile.name,
+        nomeArquivo: respVendas?.nomeArquivo || vendasFile.name,
         totalLinhas: vendasLinhas,
         linhasValidas: vendasLinhas,
         status: 'SUCESSO'
@@ -496,55 +573,72 @@ export const dataService = {
 
     onProgress?.({
       stage: 'ENVIO',
-      progress: 40,
+      progress: 35,
       message: `Enviando planilha ${file.name} (${importType})...`
     })
 
-    try {
-      const response = await api.post('/imports/upload', formData, {
-        params: { importType },
-        signal
-      })
+    const response = await api.post('/imports/upload', formData, {
+      params: { importType },
+      signal
+    })
 
-      const data = response.data
-      const total = data.totalLinhas ?? 0
-
+    let data = response.data
+    let attempts = 0
+    while (
+      data?.reportId &&
+      (data.status === 'PENDENTE' || data.status === 'PROCESSANDO') &&
+      attempts < 120
+    ) {
+      await new Promise((r) => setTimeout(r, 400))
+      attempts += 1
       onProgress?.({
-        stage: 'CONCLUIDO',
-        progress: 100,
-        message: `Base processada com sucesso! (${total} linhas)`
+        stage: 'ENVIO',
+        progress: Math.min(90, 40 + attempts * 5),
+        message: `Processando planilha ${file.name} no servidor (lote #${data.reportId})...`
       })
+      const pollRes = await api.get(`/imports/${data.reportId}`, { signal })
+      data = pollRes.data
+    }
 
+    if (data?.status === 'FALHOU') {
+      const motivo = data.mensagem || 'Não foi possível concluir a importação da planilha.'
       return {
         nomeArquivo: data.nomeArquivo || file.name,
         tipoBase: data.tipoBase || importType,
-        status: 'SUCESSO',
-        totalLinhas: total,
-        linhasValidas: total,
-        rejeicaoIntegral: false,
-        inconsistencias: [],
+        status: 'REJEITADO',
+        totalLinhas: 0,
+        linhasValidas: 0,
+        rejeicaoIntegral: true,
+        inconsistencias: [
+          {
+            base: tipoBase,
+            linha: '-',
+            campo: 'Planilha',
+            motivo,
+            severidade: 'IMPEDITIVO'
+          }
+        ],
         processadoEm: new Date().toISOString()
       }
-    } catch (err) {
-      console.warn(`Upload backend (${importType}) falhou; operando em modo resiliente com dados da planilha:`, err)
-      const total = Math.max(5, Math.round(file.size / 500)) || 16
+    }
 
-      onProgress?.({
-        stage: 'CONCLUIDO',
-        progress: 100,
-        message: `Base processada com sucesso! (${total} linhas)`
-      })
+    const total = data?.totalLinhas ?? 0
 
-      return {
-        nomeArquivo: file.name,
-        tipoBase: importType,
-        status: 'SUCESSO',
-        totalLinhas: total,
-        linhasValidas: total,
-        rejeicaoIntegral: false,
-        inconsistencias: [],
-        processadoEm: new Date().toISOString()
-      }
+    onProgress?.({
+      stage: 'CONCLUIDO',
+      progress: 100,
+      message: `Base processada com sucesso! (${total} linhas)`
+    })
+
+    return {
+      nomeArquivo: data?.nomeArquivo || file.name,
+      tipoBase: data?.tipoBase || importType,
+      status: 'SUCESSO',
+      totalLinhas: total,
+      linhasValidas: total,
+      rejeicaoIntegral: false,
+      inconsistencias: [],
+      processadoEm: new Date().toISOString()
     }
   },
 
@@ -561,6 +655,15 @@ export const dataService = {
       return response.data
     } catch (err) {
       console.warn('Endpoint /vendas/resumo-competencias falhou ou indisponível:', err)
+      return null
+    }
+  },
+
+  async fetchCompetenciasReferencia() {
+    try {
+      const response = await api.get('/referencias/competencias')
+      return Array.isArray(response.data) ? response.data : null
+    } catch {
       return null
     }
   },
@@ -711,19 +814,26 @@ export const dataService = {
     ]
 
     try {
-      const response = await api.get('/comissoes', {
+      const response = await api.get('/bases-comissao', {
         params: { page, size }
       })
       const data = response.data
       const content = (data.content || []).map((it) => ({
         id: it.id,
-        cargo: it.position?.description || 'Cargo Geral',
-        codCargo: it.position?.code || 0,
-        marca: it.brand?.description || 'Marca Geral',
-        codMarca: it.brand?.code || 0,
-        percentual: it.percentage != null ? Number(it.percentage) : 0.0,
-        vigenciaInicio: it.referenceMonth || '2025-01-01',
-        vigenciaFim: it.referenceMonth || '2025-12-31'
+        cargo: it.descriCargo || it.position?.description || 'Cargo Geral',
+        codCargo: it.codCargo ?? it.position?.code ?? 0,
+        marca: it.descrMarca || it.brand?.description || 'Marca Geral',
+        codMarca: it.codMarca ?? it.brand?.code ?? 0,
+        percentual:
+          it.percentual != null
+            ? Number(it.percentual)
+            : it.taxaComissao != null
+              ? Number(it.taxaComissao)
+              : it.percentage != null
+                ? Number(it.percentage)
+                : 0.0,
+        vigenciaInicio: it.mesReferencia || it.referenceMonth || '2025-01-01',
+        vigenciaFim: it.mesReferencia || it.referenceMonth || '2025-12-31'
       }))
 
       if (content.length > 0) {
@@ -732,8 +842,37 @@ export const dataService = {
           content
         }
       }
-    } catch (err) {
-      console.warn('Backend sem endpoint /comissoes; utilizando taxas base configuradas no sistema:', err)
+    } catch {
+      try {
+        const response = await api.get('/comissoes', {
+          params: { page, size }
+        })
+        const data = response.data
+        const content = (data.content || []).map((it) => ({
+          id: it.id,
+          cargo: it.position?.description || 'Cargo Geral',
+          codCargo: it.position?.code || 0,
+          marca: it.brand?.description || 'Marca Geral',
+          codMarca: it.brand?.code || 0,
+          percentual:
+            it.percentual != null
+              ? Number(it.percentual)
+              : it.percentage != null
+                ? Number(it.percentage)
+                : 0.0,
+          vigenciaInicio: it.referenceMonth || '2025-01-01',
+          vigenciaFim: it.referenceMonth || '2025-12-31'
+        }))
+
+        if (content.length > 0) {
+          return {
+            ...data,
+            content
+          }
+        }
+      } catch (err) {
+        console.warn('Backend sem endpoint /bases-comissao ou /comissoes; utilizando taxas base configuradas no sistema:', err)
+      }
     }
 
     const start = page * size

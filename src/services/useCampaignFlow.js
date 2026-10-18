@@ -1,11 +1,17 @@
 import { computed, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { useNotificationStore } from '@/stores/notificationStore'
+import { ASYNC_EXECUTION_STATES } from './asyncExecutionService'
 import { applyInterpretationToForm, normalizeInterpretationResult } from './campaignInterpretation'
 import { campaignDemo, isCampaignDemoEnabled } from './campaignDemo'
 import { campaignService, mapCampaignFieldErrors, normalizeCampaignError } from './campaignService'
 import { campaignInterpretationService, normalizeInterpretationError } from './campaignInterpretationService'
 import { campaignFormToPayload, campaignResponseToForm, createEmptyCampaignForm } from './campaignMappers'
+import {
+  campaignSimulationService,
+  createSimulationFingerprint,
+  evaluateSimulationValidity
+} from './campaignSimulationService'
 import { hasValidationErrors, validateCampaignForm } from './campaignValidation'
 
 export const CAMPAIGN_STEPS = [
@@ -51,30 +57,9 @@ export function useCampaignFlow() {
     fieldErrors: {},
     generalError: '',
     discardDialogOpen: false,
-    interpretation: {
-      status: 'manual',
-      isProcessing: false,
-      requestId: 0,
-      requestRouteName: null,
-      requestRouteId: null,
-      source: null,
-      sourceText: null,
-      requestContext: {},
-      lastResponse: null,
-      manualFields: [],
-      dirtyFields: [],
-      suggestedFields: [],
-      preservedFields: [],
-      pending: [],
-      confidence: null,
-      error: ''
-    },
-    demo: {
-      budget: '',
-      bonus: 100,
-      simulationVariant: 'base',
-      simulationHasRun: false
-    }
+    interpretation: createInterpretationState(),
+    simulation: createSimulationState(),
+    demo: createDemoState()
   })
   const activeStep = ref(normalizeCampaignStep(route.query.etapa))
   const loadError = ref('')
@@ -84,6 +69,7 @@ export function useCampaignFlow() {
   const pendingNavigation = ref(null)
   let interpretationSequence = 0
   let activeInterpretationController = null
+  let activeSimulationController = null
   let componentActive = true
   const isDemo = computed(() => isCampaignDemoEnabled)
   const isEdit = computed(() => route.name === 'campanha-editar')
@@ -100,6 +86,8 @@ export function useCampaignFlow() {
   onBeforeUnmount(() => {
     loadSequence.value += 1
     invalidateInterpretationRequest({ silent: true })
+    activeSimulationController?.abort()
+    activeSimulationController = null
     componentActive = false
     window.removeEventListener('beforeunload', handleBeforeUnload)
   })
@@ -118,6 +106,9 @@ export function useCampaignFlow() {
       if (step !== normalized) {
         router.replace({ query: { ...route.query, etapa: normalized } })
         return
+      }
+      if (normalized === 'simulacao' || normalized === 'revisao') {
+        ensureSimulationInitialized()
       }
       focusMainStart()
     },
@@ -203,16 +194,20 @@ export function useCampaignFlow() {
     state.persistedState = null
     state.persistedRecord = null
     state.interpretation = createInterpretationState()
+    state.simulation = createSimulationState()
     state.demo = createDemoState()
     state.persistedSnapshot = createSnapshot()
   }
 
-  function setFormFromResponse(campaign, { resetDemo = false } = {}) {
+  function setFormFromResponse(campaign, { resetDemo = false, preserveSimulation = false } = {}) {
     Object.assign(form, campaignResponseToForm(campaign))
     state.campaignId = campaign?.id ?? null
     state.persistedState = campaign?.estado ?? null
     state.persistedRecord = campaign ?? null
     state.interpretation = createInterpretationState()
+    if (!preserveSimulation) {
+      state.simulation = createSimulationState()
+    }
     if (resetDemo) state.demo = createDemoState()
     state.persistedSnapshot = createSnapshot()
   }
@@ -221,6 +216,7 @@ export function useCampaignFlow() {
     if (!(field in form)) {
       return
     }
+    const previousValue = form[field]
     form[field] = value
     if (!state.interpretation.manualFields.includes(field)) {
       state.interpretation.manualFields.push(field)
@@ -231,6 +227,9 @@ export function useCampaignFlow() {
     state.fieldErrors = { ...state.fieldErrors, [field]: undefined }
     state.generalError = ''
     state.interpretation.error = ''
+    if (previousValue !== value) {
+      invalidateSimulationIfChanged()
+    }
   }
 
   function updateDemoField(field, value) {
@@ -358,6 +357,7 @@ export function useCampaignFlow() {
         confidence: normalized.confidence,
         error: ''
       }
+      invalidateSimulationIfChanged()
       await router.push({ query: { ...route.query, etapa: 'interpretacao' } })
       notifications.success(isDemo.value ? 'Interpretação demonstrativa aplicada' : 'Proposta interpretada', isDemo.value ? 'Revise os campos fictícios antes de continuar.' : 'Revise os campos sugeridos antes de salvar a campanha.')
       return true
@@ -389,6 +389,268 @@ export function useCampaignFlow() {
     state.interpretation.status = state.interpretation.sourceText ? 'stale' : 'manual'
   }
 
+  async function ensureSimulationInitialized({ force = false } = {}) {
+    if (state.simulation.isLoadingCompetences) return
+    if (state.simulation.initialized && !force) {
+      if (state.simulation.selectedCompetencia) {
+        await validateSimulationReference({ silentIfUnchanged: true })
+      }
+      return
+    }
+    await loadSimulationCompetences({ preserveSelection: true })
+  }
+
+  async function loadSimulationCompetences({ preserveSelection = true } = {}) {
+    state.simulation.isLoadingCompetences = true
+    state.simulation.competencesError = ''
+    try {
+      const response = await campaignSimulationService.listReferenceCompetences({ isDemo: isDemo.value })
+      const items = Array.isArray(response?.items) ? response.items : []
+      state.simulation.competences = items
+      state.simulation.competencesSource = response?.source || 'local'
+      state.simulation.initialized = true
+
+      const current = state.simulation.selectedCompetencia
+      const hasCurrent = preserveSelection && current && items.some((item) => item.competencia === current)
+      const firstWithSales = items.find((item) => Number(item.totalVendas) > 0)
+      const nextCompetencia = hasCurrent ? current : (firstWithSales?.competencia || items[0]?.competencia || '')
+
+      if (nextCompetencia) {
+        await selectSimulationCompetence(nextCompetencia, { forceValidation: true })
+      } else {
+        state.simulation.selectedCompetencia = ''
+        state.simulation.referenceValidation = null
+      }
+      return items
+    } catch (error) {
+      state.simulation.competencesError = error?.message || 'Não foi possível carregar as competências cadastradas.'
+      return []
+    } finally {
+      state.simulation.isLoadingCompetences = false
+    }
+  }
+
+  async function selectSimulationCompetence(competencia, { forceValidation = false } = {}) {
+    const normalized = String(competencia || '').trim()
+    const changed = state.simulation.selectedCompetencia !== normalized
+    state.simulation.selectedCompetencia = normalized
+    state.simulation.referenceError = ''
+
+    if (changed) {
+      invalidateSimulationIfChanged()
+      if (state.simulation.result && state.simulation.result.competencia !== normalized) {
+        state.simulation.status = ''
+        state.simulation.progress = 0
+        state.simulation.stageMessage = ''
+        state.simulation.error = ''
+      }
+    }
+
+    if (!normalized) {
+      state.simulation.referenceValidation = null
+      return null
+    }
+
+    if (changed || forceValidation || !state.simulation.referenceValidation) {
+      return await validateSimulationReference({ competencia: normalized })
+    }
+    return state.simulation.referenceValidation
+  }
+
+  async function validateSimulationReference({ competencia = state.simulation.selectedCompetencia, silentIfUnchanged = false } = {}) {
+    const targetCompetencia = String(competencia || '').trim()
+    if (!targetCompetencia) {
+      state.simulation.referenceValidation = null
+      return null
+    }
+
+    state.simulation.isValidatingReference = true
+    state.simulation.referenceError = ''
+    try {
+      const validation = await campaignSimulationService.validateAndSliceReference({
+        competencia: targetCompetencia,
+        form,
+        isDemo: isDemo.value
+      })
+      state.simulation.referenceValidation = validation
+      invalidateSimulationIfChanged({ latestBasesFingerprint: validation?.basesFingerprint })
+      return validation
+    } catch (error) {
+      if (!silentIfUnchanged) {
+        state.simulation.referenceError = error?.message || 'Não foi possível validar o recorte do público e as bases de comissão.'
+      }
+      return null
+    } finally {
+      state.simulation.isValidatingReference = false
+    }
+  }
+
+  async function runSimulation() {
+    if (state.simulation.isRunning) return false
+    const competencia = state.simulation.selectedCompetencia
+    if (!competencia) {
+      state.simulation.error = 'Selecione uma competência cadastrada antes de executar a simulação.'
+      return false
+    }
+
+    const validation = await validateSimulationReference({ competencia })
+    if (!validation) {
+      state.simulation.error = state.simulation.referenceError || 'Não foi possível validar a referência selecionada.'
+      return false
+    }
+
+    if (!validation.canExecute) {
+      const blockingReason = validation.impediments?.[0]?.message || 'Corrija os impedimentos antes de executar a simulação.'
+      state.simulation.error = blockingReason
+      return false
+    }
+
+    activeSimulationController?.abort()
+    const controller = new AbortController()
+    activeSimulationController = controller
+
+    state.simulation.isRunning = true
+    state.simulation.error = ''
+    state.simulation.status = ASYNC_EXECUTION_STATES.AGUARDANDO
+    state.simulation.progress = 10
+    state.simulation.stageMessage = 'Solicitando execução da simulação...'
+    state.simulation.accepted = false
+    state.simulation.explicitActivationConfirmed = false
+    state.simulation.invalidationReasons = []
+
+    try {
+      const result = await campaignSimulationService.executeSimulation({
+        competencia,
+        form,
+        referenceValidation: validation,
+        isDemo: isDemo.value,
+        signal: controller.signal,
+        onStatusUpdate: (execution) => {
+          if (!execution) return
+          state.simulation.executionId = execution.executionId || state.simulation.executionId
+          state.simulation.status = execution.status || state.simulation.status
+          state.simulation.progress = Number(execution.progress ?? state.simulation.progress)
+          state.simulation.stageMessage = execution.stageMessage || state.simulation.stageMessage
+          if (execution.errorMessage) {
+            state.simulation.error = execution.errorMessage
+          }
+        }
+      })
+
+      state.simulation.executionId = result.simulationId
+      state.simulation.status = ASYNC_EXECUTION_STATES.CONCLUIDA
+      state.simulation.progress = 100
+      state.simulation.stageMessage = 'Simulação concluída com sucesso.'
+      state.simulation.result = result
+      state.simulation.page = 1
+      state.demo.simulationHasRun = true
+      notifications.success(
+        'Simulação concluída',
+        `Referência ${competencia} processada com ${result.totals?.totalVendasConsideradas ?? 0} venda(s) do público.`
+      )
+      return result
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        state.simulation.status = ''
+        state.simulation.isRunning = false
+        return false
+      }
+      state.simulation.status = ASYNC_EXECUTION_STATES.FALHOU
+      state.simulation.error = error?.message || 'A execução da simulação falhou. Tente novamente.'
+      return false
+    } finally {
+      state.simulation.isRunning = false
+      if (activeSimulationController === controller) {
+        activeSimulationController = null
+      }
+    }
+  }
+
+  async function acceptSimulation({ advanceToReview = true } = {}) {
+    const result = state.simulation.result
+    if (!result || state.simulation.status !== ASYNC_EXECUTION_STATES.CONCLUIDA) {
+      state.simulation.error = 'Execute e aguarde a conclusão da simulação antes de aceitá-la.'
+      return false
+    }
+
+    const validity = evaluateSimulationValidity({
+      acceptedSimulation: result,
+      currentForm: form,
+      currentCompetencia: state.simulation.selectedCompetencia,
+      currentBasesFingerprint: state.simulation.referenceValidation?.basesFingerprint
+    })
+
+    if (!validity.valid) {
+      state.simulation.accepted = false
+      state.simulation.invalidationReasons = validity.reasons
+      state.simulation.error = 'Os parâmetros da campanha mudaram após a execução. Execute uma nova simulação antes de aceitar.'
+      return false
+    }
+
+    state.simulation.accepted = true
+    state.simulation.acceptedAt = new Date().toISOString()
+    state.simulation.acceptedSimulationId = result.simulationId
+    state.simulation.acceptedCompetencia = result.competencia
+    state.simulation.acceptedFingerprint = result.fingerprint
+    state.simulation.invalidationReasons = []
+    state.simulation.error = ''
+    state.simulation.explicitActivationConfirmed = false
+
+    notifications.success(
+      'Simulação aceita',
+      'O resultado da simulação foi vinculado à proposta. Revise os dados e confirme explicitamente para ativar a campanha.'
+    )
+
+    if (advanceToReview) {
+      await goToStep('revisao')
+    }
+    return true
+  }
+
+  function invalidateSimulationIfChanged({ latestBasesFingerprint, backendReason } = {}) {
+    const currentResult = state.simulation.result
+    if (!currentResult && !state.simulation.accepted) {
+      return { valid: true, reasons: [] }
+    }
+
+    if (backendReason) {
+      state.simulation.accepted = false
+      state.simulation.explicitActivationConfirmed = false
+      state.simulation.invalidationReasons = [backendReason]
+      return { valid: false, reasons: [backendReason] }
+    }
+
+    const basesFingerprint = latestBasesFingerprint ?? state.simulation.referenceValidation?.basesFingerprint
+    const check = evaluateSimulationValidity({
+      acceptedSimulation: currentResult,
+      currentForm: form,
+      currentCompetencia: state.simulation.selectedCompetencia,
+      currentBasesFingerprint: basesFingerprint
+    })
+
+    if (!check.valid) {
+      state.simulation.accepted = false
+      state.simulation.explicitActivationConfirmed = false
+      state.simulation.invalidationReasons = check.reasons
+    } else {
+      state.simulation.invalidationReasons = []
+    }
+    return check
+  }
+
+  function setSimulationPage(page) {
+    state.simulation.page = Math.max(1, Number(page) || 1)
+  }
+
+  function setSimulationPageSize(pageSize) {
+    state.simulation.pageSize = Math.max(1, Number(pageSize) || 10)
+    state.simulation.page = 1
+  }
+
+  function setExplicitActivationConfirmed(confirmed) {
+    state.simulation.explicitActivationConfirmed = Boolean(confirmed)
+  }
+
   async function saveDraft({ returnToCampaigns = true } = {}) {
     if (state.isSaving || state.isApproving) return false
     if (!(await validateBeforePersistence())) return false
@@ -400,7 +662,7 @@ export function useCampaignFlow() {
       const currentState = state.campaignId && state.persistedState && state.persistedState !== 'DRAFT'
         ? state.persistedState
         : 'DRAFT'
-      const campaign = await persistCampaign({ desiredState: currentState })
+      const campaign = await persistCampaign({ desiredState: currentState, preserveSimulation: true })
       notifications.success('Rascunho salvo', isDemo.value ? 'Apenas o exemplo demonstrativo foi atualizado.' : 'A campanha foi persistida como rascunho.')
       if (returnToCampaigns) await leaveAfterPersistence()
       return campaign
@@ -412,9 +674,23 @@ export function useCampaignFlow() {
     }
   }
 
-  async function approveCampaign() {
+  async function approveCampaign({ requireAcceptedSimulation = false } = {}) {
     if (state.isSaving || state.isApproving) return false
     if (!(await validateBeforePersistence())) return false
+
+    if (requireAcceptedSimulation) {
+      const validity = invalidateSimulationIfChanged()
+      if (!state.simulation.accepted || !state.simulation.result || !validity.valid) {
+        state.generalError = state.simulation.invalidationReasons?.[0] ||
+          'Aceite uma simulação concluída e atualizada antes de ativar a campanha.'
+        await router.push({ query: { ...route.query, etapa: 'simulacao' } })
+        return false
+      }
+      if (!state.simulation.explicitActivationConfirmed) {
+        state.generalError = 'Confirme explicitamente a revisão dos resultados da simulação antes de ativar a campanha.'
+        return false
+      }
+    }
 
     state.isApproving = true
     state.generalError = ''
@@ -422,7 +698,27 @@ export function useCampaignFlow() {
     let draftPersisted = false
 
     try {
-      const draft = await persistCampaign({ desiredState: 'DRAFT' })
+      if (state.simulation.accepted && state.simulation.selectedCompetencia) {
+        const latestValidation = await validateSimulationReference({
+          competencia: state.simulation.selectedCompetencia,
+          silentIfUnchanged: true
+        })
+        if (latestValidation && !latestValidation.canExecute) {
+          const reason = latestValidation.impediments?.[0]?.message || 'A base de dados ou referência sofreu alterações que invalidam a simulação aceita.'
+          invalidateSimulationIfChanged({ backendReason: reason })
+          state.generalError = `${reason} Execute uma nova simulação antes de ativar.`
+          return false
+        }
+        const postCheck = invalidateSimulationIfChanged({
+          latestBasesFingerprint: latestValidation?.basesFingerprint
+        })
+        if (!postCheck.valid) {
+          state.generalError = `${postCheck.reasons.join(' ')} Execute uma nova simulação antes de ativar.`
+          return false
+        }
+      }
+
+      const draft = await persistCampaign({ desiredState: 'DRAFT', preserveSimulation: true })
       if (!draft?.id) {
         throw createCampaignFlowError('A campanha foi salva, mas o backend não retornou o ID necessário para ativação.')
       }
@@ -436,14 +732,18 @@ export function useCampaignFlow() {
         throw createCampaignFlowError('A ativação não retornou uma campanha válida.')
       }
 
-      setFormFromResponse(activeCampaign)
+      setFormFromResponse(activeCampaign, { preserveSimulation: true })
       notifications.success('Campanha aprovada', 'A campanha foi ativada com sucesso.')
       await leaveAfterPersistence()
       return activeCampaign
     } catch (error) {
       if (draftPersisted) {
         state.activationFailed = true
-        state.generalError = 'A campanha foi salva como rascunho, mas não foi possível ativá-la. Corrija a conexão e tente novamente.'
+        const normalized = normalizeCampaignError(error)
+        if (/simul|base|refer|compet|inval/i.test(normalized.message || '')) {
+          invalidateSimulationIfChanged({ backendReason: normalized.message })
+        }
+        state.generalError = normalized.message || 'A campanha foi salva como rascunho, mas não foi possível ativá-la. Corrija a conexão e tente novamente.'
       } else {
         handlePersistenceError(error)
       }
@@ -470,7 +770,7 @@ export function useCampaignFlow() {
     document.querySelector(target.selector)?.focus()
   }
 
-  async function persistCampaign({ desiredState }) {
+  async function persistCampaign({ desiredState, preserveSimulation = false }) {
     const payload = campaignFormToPayload(form, { estado: desiredState })
     const campaign = isDemo.value
       ? state.campaignId
@@ -484,7 +784,7 @@ export function useCampaignFlow() {
       throw createCampaignFlowError('A operação foi concluída, mas o backend não retornou o ID da campanha. Verifique a listagem antes de tentar novamente.')
     }
 
-    setFormFromResponse(campaign)
+    setFormFromResponse(campaign, { preserveSimulation })
     return campaign
   }
 
@@ -629,6 +929,16 @@ export function useCampaignFlow() {
     goToStep,
     interpretProposal,
     cancelInterpretation,
+    ensureSimulationInitialized,
+    loadSimulationCompetences,
+    selectSimulationCompetence,
+    validateSimulationReference,
+    runSimulation,
+    acceptSimulation,
+    invalidateSimulationIfChanged,
+    setSimulationPage,
+    setSimulationPageSize,
+    setExplicitActivationConfirmed,
     saveDraft,
     approveCampaign,
     updateField,
@@ -648,6 +958,36 @@ function createDemoState() {
     bonus: 100,
     simulationVariant: 'base',
     simulationHasRun: false
+  }
+}
+
+function createSimulationState() {
+  return {
+    initialized: false,
+    isLoadingCompetences: false,
+    competences: [],
+    selectedCompetencia: '',
+    competencesSource: '',
+    competencesError: '',
+    isValidatingReference: false,
+    referenceValidation: null,
+    referenceError: '',
+    executionId: '',
+    status: '',
+    progress: 0,
+    stageMessage: '',
+    isRunning: false,
+    error: '',
+    result: null,
+    page: 1,
+    pageSize: 10,
+    accepted: false,
+    acceptedAt: null,
+    acceptedSimulationId: '',
+    acceptedCompetencia: '',
+    acceptedFingerprint: '',
+    invalidationReasons: [],
+    explicitActivationConfirmed: false
   }
 }
 

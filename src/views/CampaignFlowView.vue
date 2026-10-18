@@ -19,10 +19,51 @@
         <div class="mt-5 flex flex-wrap gap-3"><button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-white" @click="reload">Tentar novamente</button><RouterLink to="/campanhas" class="focus-ring rounded-full border border-danger/30 px-5 py-3 text-sm font-bold text-danger-dark">Voltar para campanhas</RouterLink></div>
       </section>
       <template v-else>
-        <CampaignProposalStep v-if="activeStep === 'proposta'" :form="form" :errors="state.fieldErrors" :demo="state.demo" :interpretation="state.interpretation" @update="updateField" @update-demo="updateDemoField" @cancel-interpretation="cancelInterpretation" />
-        <CampaignInterpretationStep v-else-if="activeStep === 'interpretacao'" :form="form" :errors="state.fieldErrors" :interpretation="state.interpretation" :stale="interpretationIsStale()" @update="updateField" @cancel-interpretation="cancelInterpretation" />
-        <CampaignSimulationStep v-else-if="activeStep === 'simulacao'" :form="form" :interpretation="state.interpretation" :demo="state.demo" @update-demo="updateDemoField" />
-        <CampaignReviewStep v-else :form="form" :persisted-state="state.persistedState" :campaign-id="state.campaignId" :demo="state.demo" />
+        <CampaignProposalStep
+          v-if="activeStep === 'proposta'"
+          :form="form"
+          :errors="state.fieldErrors"
+          :demo="state.demo"
+          :interpretation="state.interpretation"
+          @update="updateField"
+          @update-demo="updateDemoField"
+          @cancel-interpretation="cancelInterpretation"
+        />
+        <CampaignInterpretationStep
+          v-else-if="activeStep === 'interpretacao'"
+          :form="form"
+          :errors="state.fieldErrors"
+          :interpretation="state.interpretation"
+          :stale="interpretationIsStale()"
+          @update="updateField"
+          @cancel-interpretation="cancelInterpretation"
+        />
+        <CampaignSimulationStep
+          v-else-if="activeStep === 'simulacao'"
+          :form="form"
+          :interpretation="state.interpretation"
+          :demo="state.demo"
+          :simulation="state.simulation"
+          @update-demo="updateDemoField"
+          @select-competence="selectSimulationCompetence"
+          @refresh-competences="loadSimulationCompetences({ preserveSelection: true })"
+          @run-simulation="runSimulation"
+          @accept-simulation="acceptSimulation({ advanceToReview: true })"
+          @change-page="setSimulationPage"
+          @change-page-size="setSimulationPageSize"
+          @back-to-rules="goToStep('interpretacao')"
+        />
+        <CampaignReviewStep
+          v-else
+          :form="form"
+          :persisted-state="state.persistedState"
+          :campaign-id="state.campaignId"
+          :demo="state.demo"
+          :can-approve="canApprove"
+          :simulation="state.simulation"
+          @go-to-simulation="goToStep('simulacao')"
+          @toggle-activation-confirm="setExplicitActivationConfirmed"
+        />
       </template>
     </main>
 
@@ -34,11 +75,28 @@
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
         <button v-if="activeStep === 'proposta'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="state.interpretation.isProcessing" @click="interpretProposal">{{ state.interpretation.isProcessing ? 'Interpretando…' : 'Interpretar proposta →' }}</button>
         <button v-else-if="activeStep === 'interpretacao'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover" @click="goToStep('simulacao')">Ir para simulação →</button>
-        <button v-else-if="activeStep === 'simulacao'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover" @click="goToStep('revisao')">Ir para revisão →</button>
+        <button
+          v-else-if="activeStep === 'simulacao'"
+          type="button"
+          class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="!canAdvanceFromSimulation"
+          @click="handleSimulationContinue"
+        >
+          {{ state.simulation.accepted && !hasSimulationInvalidation ? 'Ir para revisão →' : 'Aceitar simulação e ir para revisão →' }}
+        </button>
         <template v-else>
           <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark disabled:cursor-not-allowed disabled:opacity-60" :disabled="state.isSaving || state.isApproving" @click="requestLeave('/campanhas')">Cancelar</button>
           <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark disabled:cursor-not-allowed disabled:opacity-60" :disabled="state.isSaving || state.isApproving" @click="saveDraft({ returnToCampaigns: true })">{{ state.isSaving ? 'Salvando…' : isPersisted ? 'Salvar alterações' : 'Salvar como rascunho' }}</button>
-          <button v-if="canApprove" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="state.isSaving || state.isApproving" @click="approveCampaign">{{ state.isApproving ? 'Ativando…' : 'Aprovar campanha' }}</button>
+          <button
+            v-if="canApprove"
+            type="button"
+            data-testid="approve-campaign-btn"
+            class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="state.isSaving || state.isApproving || !canActivateInReview"
+            @click="approveCampaign({ requireAcceptedSimulation: true })"
+          >
+            {{ state.isApproving ? 'Ativando…' : 'Aprovar e ativar campanha' }}
+          </button>
         </template>
       </div>
     </footer>
@@ -48,6 +106,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import CampaignDiscardDialog from '@/components/common/CampaignDiscardDialog.vue'
 import CampaignInterpretationStep from '@/components/common/CampaignInterpretationStep.vue'
 import CampaignProposalStep from '@/components/common/CampaignProposalStep.vue'
@@ -70,6 +129,13 @@ const {
   goToStep,
   interpretProposal,
   cancelInterpretation,
+  loadSimulationCompetences,
+  selectSimulationCompetence,
+  runSimulation,
+  acceptSimulation,
+  setSimulationPage,
+  setSimulationPageSize,
+  setExplicitActivationConfirmed,
   saveDraft,
   approveCampaign,
   updateField,
@@ -80,6 +146,37 @@ const {
   cancelDiscard,
   reload
 } = useCampaignFlow()
+
+const hasSimulationInvalidation = computed(() =>
+  Array.isArray(state.simulation.invalidationReasons) &&
+  state.simulation.invalidationReasons.length > 0
+)
+
+const canAdvanceFromSimulation = computed(() =>
+  Boolean(
+    state.simulation.status === 'CONCLUIDA' &&
+      state.simulation.result &&
+      !state.simulation.isRunning &&
+      !hasSimulationInvalidation.value
+  )
+)
+
+const canActivateInReview = computed(() =>
+  Boolean(
+    state.simulation.accepted &&
+      state.simulation.result &&
+      !hasSimulationInvalidation.value &&
+      state.simulation.explicitActivationConfirmed
+  )
+)
+
+async function handleSimulationContinue() {
+  if (state.simulation.accepted && !hasSimulationInvalidation.value) {
+    await goToStep('revisao')
+    return
+  }
+  await acceptSimulation({ advanceToReview: true })
+}
 
 function handleBack() {
   requestLeave('/campanhas')
