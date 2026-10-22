@@ -959,11 +959,9 @@ export const dataService = {
         vigenciaFim: it.mesReferencia || it.referenceMonth || '2025-12-31'
       }))
 
-      if (content.length > 0) {
-        return {
-          ...data,
-          content
-        }
+      return {
+        ...data,
+        content
       }
     } catch {
       try {
@@ -987,11 +985,9 @@ export const dataService = {
           vigenciaFim: it.referenceMonth || '2025-12-31'
         }))
 
-        if (content.length > 0) {
-          return {
-            ...data,
-            content
-          }
+        return {
+          ...data,
+          content
         }
       } catch (err) {
         console.warn('Backend sem endpoint /bases-comissao ou /comissoes; utilizando taxas base configuradas no sistema:', err)
@@ -1017,7 +1013,7 @@ export const dataService = {
    */
   async deleteComissao(id) {
     try {
-      await api.delete(`/comissoes/${id}`)
+      await api.delete(`/bases-comissao/${id}`)
       return true
     } catch (err) {
       console.warn(`Simulando exclusão de taxa de comissão ${id}:`, err)
@@ -1030,11 +1026,16 @@ export const dataService = {
    */
   async deleteTodasComissoes() {
     try {
-      const response = await api.delete('/comissoes/todas')
+      const response = await api.delete('/bases-comissao/todas')
       return response.data
     } catch (err) {
-      console.warn('Simulando exclusão de todas as comissões:', err)
-      return { totalExcluido: 16 }
+      try {
+        const fallback = await api.delete('/comissoes/todas')
+        return fallback.data
+      } catch (fallbackErr) {
+        console.warn('Simulando exclusão de todas as comissões:', fallbackErr)
+        return { totalExcluido: 0 }
+      }
     }
   }
 }
