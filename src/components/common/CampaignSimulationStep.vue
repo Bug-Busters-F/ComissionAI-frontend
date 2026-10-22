@@ -1,11 +1,11 @@
 <template>
-  <div class="space-y-5">
+  <div class="space-y-6">
     <!-- 1. Seleção da Competência, Origem dos Dados e Período da Campanha ([FRONT-4]) -->
-    <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="simulation-heading">
+    <section class="rounded-[24px] border border-sage-border-light bg-white p-6 shadow-sm sm:p-7" aria-labelledby="simulation-heading">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div class="flex flex-wrap items-center gap-2.5">
-            <h2 id="simulation-heading" class="text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">
+            <h2 id="simulation-heading" class="text-2xl font-black tracking-[-0.04em] text-brand-dark">
               Simulação da Campanha
             </h2>
             <StatusBadge
@@ -24,8 +24,8 @@
               tone="neutral"
             />
           </div>
-          <p class="mt-2 max-w-3xl text-sm leading-6 text-sage-muted">
-            Selecione exatamente uma competência já cadastrada em Dados para recortar o público da campanha, validar a cobertura contratual e simular o impacto real e projetado. Não é necessário realizar apuração prévia.
+          <p class="mt-1.5 max-w-2xl text-sm leading-6 text-sage-muted">
+            Selecione a competência de referência para recortar o público, auditar a base contratual e simular o impacto financeiro com projeção temporal.
           </p>
         </div>
 
@@ -49,72 +49,99 @@
         </div>
       </div>
 
-      <!-- Seletor de Competência + Cards de Origem e Período -->
-      <div class="mt-6 grid gap-4 lg:grid-cols-3">
-        <!-- Card 1: Seleção de Competência -->
-        <div class="rounded-2xl border border-sage-border-light bg-sage-light p-4">
-          <label
-            for="simulation-competence-select"
-            class="block text-xs font-bold uppercase tracking-[0.12em] text-sage-muted"
-          >
-            Competência de referência (única)
-          </label>
-          <div class="mt-2">
-            <select
-              id="simulation-competence-select"
-              :value="simulation.selectedCompetencia"
-              :disabled="simulation.isLoadingCompetences || simulation.isRunning || !competenceOptions.length"
-              class="focus-ring w-full rounded-xl border border-sage-border-dark bg-white px-3.5 py-2.5 text-sm font-bold text-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
-              @change="$emit('select-competence', $event.target.value)"
+      <!-- Seletor de Competência + Cards Dinâmicos de Contexto -->
+      <div class="mt-6 grid gap-4 lg:grid-cols-12">
+        <!-- Card 1: Seleção de Competência (5 colunas) -->
+        <div class="rounded-2xl border border-sage-border-light bg-sage-light/80 p-5 flex flex-col justify-between lg:col-span-5">
+          <div>
+            <label
+              for="simulation-competence-select"
+              class="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-sage-muted"
             >
-              <option v-if="!competenceOptions.length" value="">
-                Nenhuma competência cadastrada
-              </option>
-              <option
-                v-for="item in competenceOptions"
-                :key="item.competencia"
-                :value="item.competencia"
+              <Database class="h-4 w-4 text-brand-dark" aria-hidden="true" />
+              Competência de Referência
+            </label>
+            <div class="mt-2.5">
+              <select
+                id="simulation-competence-select"
+                :value="simulation.selectedCompetencia"
+                :disabled="simulation.isLoadingCompetences || simulation.isRunning || !competenceOptions.length"
+                class="focus-ring w-full rounded-xl border border-sage-border-dark bg-white px-4 py-3 text-sm font-extrabold text-brand-dark shadow-sm transition hover:border-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+                @change="$emit('select-competence', $event.target.value)"
               >
-                {{ item.competencia }} — {{ item.label }} ({{ item.totalVendas }} vendas)
-              </option>
-            </select>
+                <option v-if="!competenceOptions.length" value="">
+                  Nenhuma competência cadastrada
+                </option>
+                <option
+                  v-for="item in competenceOptions"
+                  :key="item.competencia"
+                  :value="item.competencia"
+                >
+                  {{ item.competencia }} — {{ item.label }} ({{ item.totalVendas }} vendas)
+                </option>
+              </select>
+            </div>
           </div>
-          <p class="mt-2 text-xs leading-5 text-sage-muted">
-            Sem upload exclusivo na simulação. Os dados vêm diretamente das importações cadastradas.
-          </p>
+          <div class="mt-3 flex items-center gap-2 text-xs text-sage-muted">
+            <span class="inline-block h-2 w-2 rounded-full bg-success"></span>
+            <span class="truncate">Origem auditada: Vendas, RH e Base Contratual</span>
+          </div>
         </div>
 
-        <!-- Card 2: Origem dos Dados -->
-        <article class="rounded-2xl border border-sage-border-light bg-sage-light p-4">
-          <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">
-            Origem dos dados utilizados
-          </p>
-          <p class="mt-2 text-sm font-extrabold text-brand-dark">
-            {{ dataOriginLabel }}
-          </p>
-          <p class="mt-1.5 text-xs leading-5 text-sage-muted">
-            <template v-if="referenceValidation">
-              Competência <strong class="font-bold text-brand-dark">{{ referenceValidation.competencia }}</strong>:
-              {{ referenceValidation.totalVendasCompetencia }} venda(s) na base ·
-              <strong class="font-bold text-brand-dark">{{ referenceValidation.totalVendasRecortadas }}</strong> no recorte do público.
-            </template>
-            <template v-else>
-              Selecione uma competência para inspecionar o volume de vendas e a cobertura contratual.
-            </template>
+        <!-- Card 2: Recorte do Público Auditado (4 colunas) -->
+        <article class="rounded-2xl border border-sage-border-light bg-white p-5 shadow-sm lg:col-span-4 flex flex-col justify-between">
+          <div class="flex items-center justify-between gap-2">
+            <span class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">
+              <Users class="h-4 w-4 text-brand-dark" aria-hidden="true" />
+              Público Recortado
+            </span>
+            <span
+              v-if="referenceValidation"
+              class="rounded-full bg-success-surface px-2.5 py-0.5 text-xs font-bold text-success-dark"
+            >
+              Auditado
+            </span>
+          </div>
+
+          <div class="my-2">
+            <div v-if="referenceValidation" class="flex items-baseline gap-2">
+              <span class="text-3xl font-black tracking-[-0.03em] text-brand-dark">
+                {{ referenceValidation.totalVendasRecortadas }}
+              </span>
+              <span class="text-xs text-sage-muted">
+                de {{ referenceValidation.totalVendasCompetencia }} vendas na base
+              </span>
+            </div>
+            <p v-else class="text-sm font-bold text-sage-muted">
+              Aguardando seleção de competência…
+            </p>
+          </div>
+
+          <p class="text-xs text-sage-muted">
+            Filtros combinados por E (marca, cargo, loja) e união sem duplicação de vendas.
           </p>
         </article>
 
-        <!-- Card 3: Período e Duração da Campanha -->
-        <article class="rounded-2xl border border-sage-border-light bg-sage-light p-4">
-          <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">
-            Período e duração da campanha
-          </p>
-          <p class="mt-2 text-sm font-extrabold text-brand-dark">
-            {{ periodSummary }}
-          </p>
-          <p class="mt-1.5 text-xs leading-5 text-sage-muted">
-            Duração considerada: <strong class="font-bold text-brand-dark">{{ durationDays }} dia(s) corridos</strong> (datas inicial e final inclusivas) ·
-            Mês comercial de <strong class="font-bold text-brand-dark">30 dias</strong> (fator <strong class="font-bold text-brand-dark">{{ durationFactorText }}</strong>).
+        <!-- Card 3: Vigência e Projeção (3 colunas) -->
+        <article class="rounded-2xl border border-sage-border-light bg-white p-5 shadow-sm lg:col-span-3 flex flex-col justify-between">
+          <div class="flex items-center justify-between gap-2">
+            <span class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">
+              <Calendar class="h-4 w-4 text-brand-dark" aria-hidden="true" />
+              Vigência da Campanha
+            </span>
+          </div>
+
+          <div class="my-2">
+            <p class="text-base font-extrabold text-brand-dark">
+              {{ periodSummary }}
+            </p>
+            <p class="mt-0.5 text-xs text-sage-muted">
+              <strong class="font-bold text-brand-dark">{{ durationDays }} dias</strong> · Fator {{ durationFactorText }}
+            </p>
+          </div>
+
+          <p class="text-[11px] text-sage-muted">
+            Projetado proporcionalmente pelo mês comercial de 30 dias.
           </p>
         </article>
       </div>
@@ -401,187 +428,256 @@
 
     <!-- 7. Resultados da Simulação ([FRONT-5]): Totais, Cenários (80%, 120%, 150%), Tabela Paginada e Memória do Cálculo -->
     <template v-if="hasValidSimulationResult && !isMissingBaseBlocked && !isInsufficientReference">
-      <!-- Premissas Explícitas e Totais de Todo o Recorte -->
-      <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="simulation-totals-heading">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h3 id="simulation-totals-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">
-              Totais do recorte e projeção pela duração da campanha
-            </h3>
-            <p class="mt-1 text-sm text-sage-muted">
-              Os totais abaixo consideram <strong class="font-bold text-brand-dark">todas as {{ simulationTotals.totalVendasConsideradas }} vendas do público da campanha</strong> (independentemente da página atual da tabela). Vendas fora do público não entram nos totais.
-            </p>
+      <!-- 7.1 HERO CARD EXECUTIVO: IMPACTO ORÇAMENTÁRIO DA PROPOSTA -->
+      <section
+        class="relative overflow-hidden rounded-[26px] bg-brand-dark text-white p-6 sm:p-8 shadow-xl"
+        aria-labelledby="simulation-totals-heading"
+      >
+        <!-- Acentos de luz sutil no fundo (Glow Wise) -->
+        <div class="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-brand/15 blur-3xl" aria-hidden="true"></div>
+        <div class="pointer-events-none absolute -left-16 -bottom-16 h-64 w-64 rounded-full bg-brand/10 blur-3xl" aria-hidden="true"></div>
+
+        <div class="relative z-10">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <span class="grid h-8 w-8 place-items-center rounded-xl bg-brand text-brand-dark shadow-sm">
+                <TrendingUp class="h-4 w-4 stroke-[2.5]" aria-hidden="true" />
+              </span>
+              <div>
+                <span class="text-xs font-bold uppercase tracking-[0.14em] text-sage-border">
+                  Projeção Orçamentária da Campanha
+                </span>
+                <p class="text-[11px] text-sage-muted">Impacto total sobre o público recortado</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-sage-border backdrop-blur-sm">
+              <Calendar class="h-3.5 w-3.5 text-brand" aria-hidden="true" />
+              <span>Vigência: <strong class="text-white">{{ simulationTotals.duracaoCampanhaDias }} dias</strong> (Fator {{ simulationTotals.fatorDuracaoTexto }})</span>
+            </div>
           </div>
-          <span class="rounded-full bg-sage-light px-3.5 py-1.5 text-xs font-bold text-brand-dark">
-            Mês comercial: 30 dias · Fator: {{ simulationTotals.fatorDuracaoTexto }}
-          </span>
-        </div>
 
-        <!-- Comparativo: Histórico (100% no mês de referência) vs Projetado na Duração -->
-        <div class="mt-6 grid gap-4 lg:grid-cols-2">
-          <!-- Card Totais Históricos (100% da competência) -->
-          <article class="rounded-2xl border border-sage-border-light bg-sage-light p-5">
-            <div class="flex items-center justify-between gap-2">
-              <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">
-                Totais históricos na competência {{ simulationResult.competencia }} (30 dias)
-              </p>
-              <span class="rounded-full bg-white px-2.5 py-0.5 text-xs font-bold text-brand-dark">
-                Base 100%
-              </span>
-            </div>
-            <dl class="mt-4 grid gap-3 sm:grid-cols-2">
-              <div class="rounded-xl bg-white p-3.5">
-                <dt class="text-xs text-sage-muted">Vendas do público</dt>
-                <dd class="mt-1 text-base font-extrabold text-brand-dark">
-                  {{ currency(simulationTotals.historico.totalVendas) }}
-                </dd>
-              </div>
-              <div class="rounded-xl bg-white p-3.5">
-                <dt class="text-xs text-sage-muted">Comissão base (sem campanha)</dt>
-                <dd class="mt-1 text-base font-extrabold text-brand-dark">
-                  {{ currency(simulationTotals.historico.comissaoBase) }}
-                </dd>
-              </div>
-              <div class="rounded-xl bg-white p-3.5">
-                <dt class="text-xs text-sage-muted">Comissão com campanha proposta</dt>
-                <dd class="mt-1 text-base font-extrabold text-brand-dark">
-                  {{ currency(simulationTotals.historico.comissaoProposta) }}
-                </dd>
-              </div>
-              <div class="rounded-xl bg-white p-3.5">
-                <dt class="text-xs text-sage-muted">Diferença histórica</dt>
-                <dd class="mt-1 text-base font-extrabold text-brand-dark">
-                  {{ signedCurrency(simulationTotals.historico.diferenca) }}
-                  <span class="ml-1 text-xs font-semibold text-sage-muted">
-                    ({{ percent(simulationTotals.historico.impactoPct) }})
-                  </span>
-                </dd>
-              </div>
-            </dl>
-          </article>
-
-          <!-- Card Totais Projetados pela Duração (dias / 30) -->
-          <article class="rounded-2xl border-2 border-brand/60 bg-sage-light p-5">
-            <div class="flex items-center justify-between gap-2">
-              <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">
-                Projeção para a vigência da campanha ({{ simulationTotals.duracaoCampanhaDias }} dias)
-              </p>
-              <span class="rounded-full bg-brand px-2.5 py-0.5 text-xs font-bold text-brand-dark">
-                Fator {{ simulationTotals.fatorDuracaoTexto }}
-              </span>
-            </div>
-            <dl class="mt-4 grid gap-3 sm:grid-cols-2">
-              <div class="rounded-xl bg-white p-3.5">
-                <dt class="text-xs text-sage-muted">Vendas projetadas no período</dt>
-                <dd class="mt-1 text-base font-extrabold text-brand-dark">
-                  {{ currency(simulationTotals.projetado.totalVendas) }}
-                </dd>
-              </div>
-              <div class="rounded-xl bg-white p-3.5">
-                <dt class="text-xs text-sage-muted">Comissão base projetada</dt>
-                <dd class="mt-1 text-base font-extrabold text-brand-dark">
-                  {{ currency(simulationTotals.projetado.comissaoBase) }}
-                </dd>
-              </div>
-              <div class="rounded-xl bg-white p-3.5">
-                <dt class="text-xs text-sage-muted">Comissão proposta projetada</dt>
-                <dd class="mt-1 text-base font-extrabold text-brand-dark">
-                  {{ currency(simulationTotals.projetado.comissaoProposta) }}
-                </dd>
-              </div>
-              <div class="rounded-xl bg-white p-3.5">
-                <dt class="text-xs text-sage-muted">Diferença projetada na campanha</dt>
-                <dd class="mt-1 text-base font-extrabold text-brand-dark">
-                  {{ signedCurrency(simulationTotals.projetado.diferenca) }}
-                  <span class="ml-1 text-xs font-semibold text-sage-muted">
-                    ({{ percent(simulationTotals.projetado.impactoPct) }})
-                  </span>
-                </dd>
-              </div>
-            </dl>
-          </article>
-        </div>
-
-        <!-- Cards de Cenários Projetados (80%, 120% e 150%) ([FRONT-5]) -->
-        <div class="mt-7">
-          <div class="flex flex-wrap items-end justify-between gap-3">
+          <!-- Métrica Principal em Destaque: Diferença / Impacto Financeiro da Proposta -->
+          <div class="mt-7 flex flex-wrap items-baseline gap-4 sm:gap-6">
             <div>
-              <h4 class="text-lg font-extrabold tracking-[-0.02em] text-brand-dark">
-                Cenários projetados de variação de vendas (80%, 120% e 150%)
-              </h4>
-              <p class="mt-1 text-xs leading-5 text-sage-muted">
-                <strong class="font-bold text-brand-dark">Premissa de variação uniforme:</strong>
-                Cada venda do público tem seu valor multiplicado pelo percentual do cenário (`0,80`, `1,20` ou `1,50`), reavaliando faixa de valor e recalculando a comissão venda a venda antes da projeção pela duração ({{ simulationTotals.fatorDuracaoTexto }}).
+              <p class="text-xs font-medium uppercase tracking-[0.08em] text-sage-muted">
+                Investimento Adicional Estimado (Impacto da Proposta)
               </p>
+              <h3 id="simulation-totals-heading" class="mt-1 text-4xl sm:text-5xl font-black tracking-[-0.04em] text-white">
+                {{ signedCurrency(simulationTotals.projetado.diferenca) }}
+              </h3>
+            </div>
+            <div class="flex items-center gap-2 rounded-full bg-brand px-4 py-1.5 text-sm font-black text-brand-dark shadow-md">
+              <span>{{ simulationTotals.projetado.diferenca >= 0 ? '▲ +' : '▼ ' }}{{ percent(simulationTotals.projetado.impactoPct) }}</span>
+              <span class="text-xs font-bold opacity-80">vs. Base Contratual</span>
             </div>
           </div>
 
-          <div class="mt-4 grid gap-4 xl:grid-cols-3">
-            <article
-              v-for="scenario in projectedVariationCards"
-              :key="scenario.key"
-              class="rounded-2xl border border-sage-border-light p-5"
-              :class="scenario.key === '120' ? 'ring-2 ring-brand/50' : ''"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">
-                    {{ scenario.percentage }} do valor das vendas
-                  </p>
-                  <h5 class="mt-1.5 text-xl font-extrabold text-brand-dark">
-                    {{ scenario.classification }}
-                  </h5>
-                </div>
-                <span class="rounded-full bg-sage-light px-3 py-1 text-xs font-bold text-brand-dark">
-                  {{ scenario.percentage }}
-                </span>
-              </div>
+          <!-- 3 Sub-Cards Translúcidos de Indicadores Chave -->
+          <div class="mt-8 grid gap-4 sm:grid-cols-3">
+            <!-- Sub-Card 1: Volume de Vendas -->
+            <div class="rounded-2xl border border-white/10 bg-white/[0.06] p-4 sm:p-5 backdrop-blur-sm transition hover:bg-white/[0.08]">
+              <p class="text-xs font-medium uppercase tracking-[0.06em] text-sage-muted">Volume de Vendas Projetado</p>
+              <p class="mt-2 text-2xl font-black text-white">
+                {{ currency(simulationTotals.projetado.totalVendas) }}
+              </p>
+              <p class="mt-1 text-xs text-sage-border">
+                {{ simulationTotals.totalVendasConsideradas }} vendas únicas consideradas
+              </p>
+            </div>
 
-              <dl class="mt-5 space-y-2.5 text-sm">
-                <div class="flex justify-between gap-3">
-                  <dt class="text-sage-muted">Vendas projetadas ({{ simulationTotals.duracaoCampanhaDias }}d)</dt>
-                  <dd class="font-bold text-brand-dark">{{ currency(scenario.sales) }}</dd>
-                </div>
-                <div class="flex justify-between gap-3">
-                  <dt class="text-sage-muted">Comissão base projetada</dt>
-                  <dd class="font-bold text-brand-dark">{{ currency(scenario.withoutProposal) }}</dd>
-                </div>
-                <div class="flex justify-between gap-3">
-                  <dt class="text-sage-muted">Comissão com campanha</dt>
-                  <dd class="font-bold text-brand-dark">{{ currency(scenario.withProposal) }}</dd>
-                </div>
-                <div class="flex justify-between gap-3 border-t border-sage-border-light pt-2.5">
-                  <dt class="font-semibold text-brand-dark">Diferença (impacto)</dt>
-                  <dd class="font-extrabold text-brand-dark">
-                    {{ signedCurrency(scenario.impact) }} ({{ percent(scenario.impactPct) }})
-                  </dd>
-                </div>
-              </dl>
+            <!-- Sub-Card 2: Comissão Base -->
+            <div class="rounded-2xl border border-white/10 bg-white/[0.06] p-4 sm:p-5 backdrop-blur-sm transition hover:bg-white/[0.08]">
+              <p class="text-xs font-medium uppercase tracking-[0.06em] text-sage-muted">Comissão Base (Sem Campanha)</p>
+              <p class="mt-2 text-2xl font-black text-white">
+                {{ currency(simulationTotals.projetado.comissaoBase) }}
+              </p>
+              <p class="mt-1 text-xs text-sage-border">
+                Taxa contratual em tb_basecomiss
+              </p>
+            </div>
 
-              <div class="mt-4 rounded-xl bg-sage-light px-3 py-2 text-xs text-sage-muted">
-                <span v-if="scenario.vendasQueMudaramDeFaixa > 0" class="font-semibold text-brand-dark">
-                  {{ scenario.vendasQueMudaramDeFaixa }} venda(s) mudaram de faixa de valor neste cenário.
-                </span>
-                <span v-else>
-                  Recálculo venda a venda concluído (mesma faixa de valor).
-                </span>
-              </div>
-            </article>
+            <!-- Sub-Card 3: Comissão com a Campanha -->
+            <div class="rounded-2xl border border-brand/40 bg-brand/[0.08] p-4 sm:p-5 backdrop-blur-sm transition hover:bg-brand/[0.12]">
+              <p class="text-xs font-medium uppercase tracking-[0.06em] text-brand">Comissão Total com a Campanha</p>
+              <p class="mt-2 text-2xl font-black text-brand">
+                {{ currency(simulationTotals.projetado.comissaoProposta) }}
+              </p>
+              <p class="mt-1 text-xs text-brand/80">
+                Aplicação das regras propostas
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- Tabela Paginada do Público Considerado + Memória do Cálculo ([FRONT-5]) -->
-      <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="simulation-table-heading">
+      <!-- 7.2 CENÁRIOS PROJETADOS DE SENSIBILIDADE (80%, 120%, 150%) -->
+      <section class="rounded-[24px] border border-sage-border-light bg-white p-6 shadow-sm sm:p-7">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="inline-block h-2 w-2 rounded-full bg-brand"></span>
+              <h4 class="text-xl font-black tracking-[-0.03em] text-brand-dark">
+                Análise de Sensibilidade Orçamentária
+              </h4>
+            </div>
+            <p class="mt-1 text-sm text-sage-muted">
+              Cenários de variação de vendas recalculados venda a venda antes da projeção temporal.
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-6 grid gap-5 xl:grid-cols-3">
+          <article
+            v-for="scenario in projectedVariationCards"
+            :key="scenario.key"
+            class="flex flex-col justify-between rounded-2xl p-5 sm:p-6 transition hover:shadow-md"
+            :class="[
+              scenario.key === '80'
+                ? 'border border-amber-200/80 bg-gradient-to-b from-amber-50/40 via-white to-white'
+                : scenario.key === '120'
+                  ? 'border-2 border-brand bg-gradient-to-b from-brand/[0.08] via-white to-white shadow-sm ring-1 ring-brand/30'
+                  : 'border border-emerald-200 bg-gradient-to-b from-emerald-50/40 via-white to-white'
+            ]"
+          >
+            <div>
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <span
+                    class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-extrabold"
+                    :class="[
+                      scenario.key === '80'
+                        ? 'bg-amber-100 text-amber-900 border border-amber-300/60'
+                        : scenario.key === '120'
+                          ? 'bg-brand text-brand-dark font-black'
+                          : 'bg-emerald-100 text-emerald-900 border border-emerald-300/60'
+                    ]"
+                  >
+                    {{ scenario.key === '120' ? '★ ' : '' }}{{ scenario.percentage }} do volume
+                  </span>
+                  <h5 class="mt-2 text-lg font-black text-brand-dark">
+                    {{
+                      scenario.key === '80'
+                        ? 'Cenário Conservador'
+                        : scenario.key === '120'
+                          ? 'Cenário Meta Esperada'
+                          : 'Cenário Superação de Meta'
+                    }}
+                  </h5>
+                  <p class="text-xs text-sage-muted">
+                    {{
+                      scenario.key === '80'
+                        ? 'Desaceleração (-20% nas vendas)'
+                        : scenario.key === '120'
+                          ? 'Aceleração (+20% com o incentivo)'
+                          : 'Crescimento máximo (+50%)'
+                    }}
+                  </p>
+                </div>
+              </div>
+
+              <dl class="mt-5 space-y-2.5 text-sm">
+                <div class="flex justify-between gap-3">
+                  <dt class="text-xs text-sage-muted">Vendas Projetadas:</dt>
+                  <dd class="font-extrabold text-brand-dark">{{ currency(scenario.sales) }}</dd>
+                </div>
+                <div class="flex justify-between gap-3">
+                  <dt class="text-xs text-sage-muted">Comissão Base:</dt>
+                  <dd class="font-medium text-brand-dark">{{ currency(scenario.withoutProposal) }}</dd>
+                </div>
+                <div class="flex justify-between gap-3">
+                  <dt class="text-xs text-sage-muted">Comissão Proposta:</dt>
+                  <dd class="font-bold text-brand-dark">{{ currency(scenario.withProposal) }}</dd>
+                </div>
+                <div class="flex justify-between gap-3 border-t border-sage-border-light pt-2.5">
+                  <dt class="text-xs font-bold text-brand-dark">Impacto Financeiro (Δ):</dt>
+                  <dd
+                    class="font-black"
+                    :class="scenario.impact >= 0 ? 'text-brand-dark' : 'text-danger-dark'"
+                  >
+                    {{ signedCurrency(scenario.impact) }}
+                    <span class="ml-1 text-xs font-semibold text-sage-muted">
+                      ({{ percent(scenario.impactPct) }})
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            <div class="mt-4 rounded-xl bg-sage-light/80 px-3.5 py-2 text-xs text-sage-muted">
+              <span v-if="scenario.vendasQueMudaramDeFaixa > 0" class="font-bold text-brand-dark">
+                {{ scenario.vendasQueMudaramDeFaixa }} venda(s) migraram de faixa monetária neste cenário.
+              </span>
+              <span v-else>
+                Recálculo proporcional concluído sem alteração de faixa.
+              </span>
+            </div>
+          </article>
+        </div>
+
+        <!-- Botão Retrátil para Premissas Técnicas e Totais Históricos (Accordion) -->
+        <div class="mt-6 border-t border-sage-border-light pt-4">
+          <button
+            type="button"
+            class="focus-ring inline-flex items-center gap-2 text-xs font-bold text-sage-muted transition hover:text-brand-dark"
+            @click="showPremises = !showPremises"
+          >
+            <Info class="h-4 w-4 text-brand-dark" aria-hidden="true" />
+            <span>{{ showPremises ? 'Ocultar premissas e comparação histórica' : 'Ver premissas de cálculo e comparação histórica da competência (100%)' }}</span>
+            <ChevronUp v-if="showPremises" class="h-3.5 w-3.5" aria-hidden="true" />
+            <ChevronDown v-else class="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+
+          <!-- Conteúdo expandido das premissas e comparativo histórico -->
+          <div v-if="showPremises" class="mt-4 rounded-2xl border border-sage-border-light bg-sage-light/50 p-5 space-y-4">
+            <div class="grid gap-4 lg:grid-cols-2">
+              <article class="rounded-xl border border-sage-border-light bg-white p-4">
+                <p class="text-xs font-bold uppercase tracking-[0.1em] text-sage-muted">
+                  Totais históricos na competência {{ simulationResult.competencia }} (30 dias)
+                </p>
+                <dl class="mt-3 grid gap-2.5 sm:grid-cols-2 text-xs">
+                  <div>
+                    <dt class="text-sage-muted">Vendas históricas:</dt>
+                    <dd class="font-bold text-brand-dark">{{ currency(simulationTotals.historico.totalVendas) }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sage-muted">Comissão base histórica:</dt>
+                    <dd class="font-bold text-brand-dark">{{ currency(simulationTotals.historico.comissaoBase) }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sage-muted">Comissão proposta histórica:</dt>
+                    <dd class="font-bold text-brand-dark">{{ currency(simulationTotals.historico.comissaoProposta) }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sage-muted">Diferença histórica:</dt>
+                    <dd class="font-bold text-brand-dark">{{ signedCurrency(simulationTotals.historico.diferenca) }} ({{ percent(simulationTotals.historico.impactoPct) }})</dd>
+                  </div>
+                </dl>
+              </article>
+
+              <article class="rounded-xl border border-sage-border-light bg-white p-4 text-xs leading-5 text-sage-muted">
+                <p class="font-bold uppercase tracking-[0.1em] text-brand-dark">Critérios e Premissas Auditáveis</p>
+                <ul class="mt-2 list-disc space-y-1 pl-4">
+                  <li><strong>Mês comercial:</strong> Projeção padronizada em 30 dias corridos (dias inclusivos ÷ 30).</li>
+                  <li><strong>Arredondamento:</strong> Padrão bancário <code>HALF_UP</code> para duas casas decimais em cada comissão individual.</li>
+                  <li><strong>Sobreposições:</strong> Resolvidas deterministricamente pela maior especificidade de filtros (matrícula &gt; loja &gt; cargo &gt; canal &gt; marca).</li>
+                </ul>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7.3 TABELA PAGINADA DE VENDAS DO PÚBLICO -->
+      <section class="rounded-[24px] border border-sage-border-light bg-white p-6 shadow-sm sm:p-7" aria-labelledby="simulation-table-heading">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h3 id="simulation-table-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">
-              Vendas do público consideradas na simulação
+            <h3 id="simulation-table-heading" class="text-xl font-black tracking-[-0.03em] text-brand-dark">
+              Vendas do Público Consideradas na Simulação
             </h3>
             <p class="mt-1 text-sm text-sage-muted">
               Exibindo {{ paginationInfo.startIndex }}–{{ paginationInfo.endIndex }} de
               <strong class="font-bold text-brand-dark">{{ paginationInfo.totalItems }}</strong> venda(s) únicas do recorte.
-              Clique em <strong class="font-bold text-brand-dark">Detalhes</strong> para inspecionar a memória do cálculo.
             </p>
           </div>
 
@@ -590,7 +686,7 @@
             <select
               id="simulation-page-size"
               :value="simulation.pageSize"
-              class="focus-ring rounded-xl border border-sage-border-dark bg-white px-2.5 py-1.5 font-bold text-brand-dark"
+              class="focus-ring rounded-xl border border-sage-border-dark bg-white px-3 py-1.5 font-bold text-brand-dark shadow-sm"
               @change="$emit('change-page-size', Number($event.target.value))"
             >
               <option :value="5">5</option>
@@ -604,55 +700,63 @@
           <table class="min-w-full divide-y divide-sage-border-light text-left text-sm">
             <thead class="bg-sage-light text-xs font-bold uppercase tracking-[0.08em] text-sage-muted">
               <tr>
-                <th scope="col" class="px-4 py-3.5">Matrícula</th>
-                <th scope="col" class="px-4 py-3.5">Loja</th>
-                <th scope="col" class="px-4 py-3.5 text-right">Valor da venda</th>
-                <th scope="col" class="px-4 py-3.5 text-right">Comissão base</th>
-                <th scope="col" class="px-4 py-3.5 text-right">Comissão com campanha proposta</th>
-                <th scope="col" class="px-4 py-3.5 text-center">Detalhes</th>
+                <th scope="col" class="px-4 py-3.5">Matrícula / Colaborador</th>
+                <th scope="col" class="px-4 py-3.5">Loja / Marca / Cargo</th>
+                <th scope="col" class="px-4 py-3.5 text-right">Valor da Venda</th>
+                <th scope="col" class="px-4 py-3.5 text-right">Comissão Base</th>
+                <th scope="col" class="px-4 py-3.5 text-right">Comissão com a Campanha</th>
+                <th scope="col" class="px-4 py-3.5 text-center">Memória</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-sage-border-light bg-white">
               <tr
                 v-for="row in paginatedRows"
                 :key="row.saleId"
-                class="transition hover:bg-sage-light/60"
+                class="transition hover:bg-sage-light/50"
               >
-                <td class=" whitespace-nowrap px-4 py-3.5 font-bold text-brand-dark">
+                <td class="whitespace-nowrap px-4 py-3.5 font-bold text-brand-dark">
                   {{ row.matricula }}
                   <span v-if="row.colaborador" class="block text-xs font-normal text-sage-muted">
                     {{ row.colaborador }}
                   </span>
                 </td>
                 <td class="whitespace-nowrap px-4 py-3.5 text-brand-dark">
-                  Loja {{ row.loja }}
-                  <span class="block text-xs text-sage-muted">
-                    {{ row.marca }} · {{ row.cargo }}
-                  </span>
-                </td>
-                <td class="whitespace-nowrap px-4 py-3.5 text-right font-semibold text-brand-dark">
-                  {{ currency(row.valorVenda) }}
-                </td>
-                <td class="whitespace-nowrap px-4 py-3.5 text-right text-brand-dark">
-                  {{ currency(row.comissaoBase) }}
-                  <span class="block text-xs text-sage-muted">
-                    Taxa {{ percent(row.taxaBasePct) }}
+                  <div class="flex items-center gap-1.5">
+                    <span class="rounded bg-sage-pill px-1.5 py-0.5 text-xs font-bold">Loja {{ row.loja }}</span>
+                    <span class="rounded bg-sage-pill px-1.5 py-0.5 text-xs font-semibold text-sage-subtle">{{ row.marca }}</span>
+                  </div>
+                  <span class="block mt-1 text-xs text-sage-muted">
+                    {{ row.cargo }}
                   </span>
                 </td>
                 <td class="whitespace-nowrap px-4 py-3.5 text-right font-bold text-brand-dark">
-                  {{ currency(row.comissaoProposta) }}
-                  <span class="block text-xs font-normal text-sage-muted">
-                    Taxa {{ percent(row.taxaPropostaPct) }} ({{ signedCurrency(row.diferenca) }})
+                  {{ currency(row.valorVenda) }}
+                </td>
+                <td class="whitespace-nowrap px-4 py-3.5 text-right text-brand-dark">
+                  <span class="font-medium">{{ currency(row.comissaoBase) }}</span>
+                  <span class="block text-[11px] text-sage-muted">
+                    Taxa {{ percent(row.taxaBasePct) }}
                   </span>
+                </td>
+                <td class="whitespace-nowrap px-4 py-3.5 text-right font-black text-brand-dark">
+                  <span>{{ currency(row.comissaoProposta) }}</span>
+                  <div class="mt-0.5">
+                    <span
+                      class="inline-block rounded-md px-1.5 py-0.5 text-[11px] font-black"
+                      :class="row.diferenca >= 0 ? 'bg-success-surface text-success-dark' : 'bg-danger-bg text-danger-dark'"
+                    >
+                      {{ signedCurrency(row.diferenca) }} (Taxa {{ percent(row.taxaPropostaPct) }})
+                    </span>
+                  </div>
                 </td>
                 <td class="whitespace-nowrap px-4 py-3.5 text-center">
                   <button
                     type="button"
-                    class="focus-ring inline-flex items-center gap-1.5 rounded-full border border-sage-border-dark px-3.5 py-1.5 text-xs font-bold text-brand-dark transition hover:bg-sage-light"
+                    class="focus-ring inline-flex items-center gap-1.5 rounded-full border border-sage-border-dark px-3 py-1.5 text-xs font-bold text-brand-dark shadow-sm transition hover:border-brand-dark hover:bg-sage-light"
                     @click="openMemoryModal(row)"
                   >
-                    <FileText class="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>Detalhes</span>
+                    <FileText class="h-3.5 w-3.5 text-sage-subtle" aria-hidden="true" />
+                    <span>Ver Memória</span>
                   </button>
                 </td>
               </tr>
@@ -665,12 +769,12 @@
           <span>
             Página <strong class="font-bold text-brand-dark">{{ paginationInfo.page }}</strong> de
             <strong class="font-bold text-brand-dark">{{ paginationInfo.totalPages }}</strong>
-            · Os totais exibidos acima refletem todo o recorte ({{ paginationInfo.totalItems }} vendas).
+            · Totais refletem todo o recorte de {{ paginationInfo.totalItems }} vendas.
           </span>
           <div class="flex items-center gap-2">
             <button
               type="button"
-              class="focus-ring rounded-full border border-sage-border-dark px-3.5 py-1.5 font-bold text-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
+              class="focus-ring rounded-full border border-sage-border-dark px-3.5 py-1.5 font-bold text-brand-dark shadow-sm transition hover:bg-sage-light disabled:cursor-not-allowed disabled:opacity-40"
               :disabled="!paginationInfo.hasPrev"
               @click="$emit('change-page', paginationInfo.page - 1)"
             >
@@ -678,7 +782,7 @@
             </button>
             <button
               type="button"
-              class="focus-ring rounded-full border border-sage-border-dark px-3.5 py-1.5 font-bold text-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
+              class="focus-ring rounded-full border border-sage-border-dark px-3.5 py-1.5 font-bold text-brand-dark shadow-sm transition hover:bg-sage-light disabled:cursor-not-allowed disabled:opacity-40"
               :disabled="!paginationInfo.hasNext"
               @click="$emit('change-page', paginationInfo.page + 1)"
             >
@@ -687,25 +791,25 @@
           </div>
         </div>
 
-        <!-- Rodapé de Decisão da Simulação ([FRONT-6]): Aceitar Simulação ou Voltar para Regras -->
-        <div class="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-sage-border-light bg-sage-light p-4">
+        <!-- 7.4 RODAPÉ DE DECISÃO DA SIMULAÇÃO ([FRONT-6]) -->
+        <div class="mt-7 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-sage-border-light bg-sage-light/70 p-5">
           <div>
-            <p class="text-sm font-extrabold text-brand-dark">
+            <p class="text-sm font-black text-brand-dark">
               {{
                 simulation.accepted && !hasInvalidation
                   ? 'Simulação aceita e vinculada à proposta atual.'
-                  : 'Conferiu a memória do cálculo e os cenários projetados?'
+                  : 'Conferiu a memória de cálculo e os cenários projetados?'
               }}
             </p>
             <p class="mt-0.5 text-xs text-sage-muted">
-              O aceite registra a competência {{ simulationResult.competencia }} e preserva o resultado para a etapa de Revisão (sem ativar a campanha automaticamente).
+              O aceite registra a competência {{ simulationResult.competencia }} e avança para a etapa final de Revisão.
             </p>
           </div>
 
           <div class="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              class="focus-ring rounded-full border border-sage-border-dark bg-white px-4 py-2.5 text-xs font-bold text-brand-dark transition hover:bg-sage-light"
+              class="focus-ring rounded-full border border-sage-border-dark bg-white px-4 py-2.5 text-xs font-bold text-brand-dark shadow-sm transition hover:bg-sage-light"
               @click="$emit('back-to-rules')"
             >
               ← Voltar e ajustar regras
@@ -713,7 +817,7 @@
             <button
               type="button"
               data-testid="accept-simulation-btn"
-              class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+              class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-6 py-2.5 text-sm font-black text-brand-dark shadow-md transition hover:bg-brand-hover hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="simulation.isRunning || hasInvalidation"
               @click="$emit('accept-simulation')"
             >
@@ -851,12 +955,29 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { AlertTriangle, CheckCircle2, Database, FileText, Play, RefreshCw, ShieldAlert, UploadCloud } from 'lucide-vue-next'
+import {
+  AlertTriangle,
+  Calendar,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Database,
+  FileText,
+  Info,
+  Play,
+  RefreshCw,
+  ShieldAlert,
+  TrendingUp,
+  UploadCloud,
+  Users
+} from 'lucide-vue-next'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { formatPeriodArrow } from '@/services/campaignMappers'
 import { formatSimulationCurrency, formatSimulationPercent } from '@/services/campaignSimulation'
 import { calculateCampaignDuration, paginateSimulationItems } from '@/services/campaignSimulationService'
 import { checkProposalCoverage } from '@/services/coverageService'
+
+const showPremises = ref(false)
 
 const props = defineProps({
   demo: { type: Object, required: true },

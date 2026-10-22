@@ -1,4 +1,5 @@
 import api from './api'
+import { normalizeCompetence, extractCompetenceFromFileName } from './competenceUtils'
 
 /**
  * Mapeamento dos tipos de base e modalidades aceitos pela aplicação
@@ -369,13 +370,14 @@ export const dataService = {
       if (!initialData?.reportId) return initialData
       let current = initialData
       let attempts = 0
+      const maxAttempts = 300 // Até 5 minutos para processamento de planilhas extensas
       while (
         (current.status === 'PENDENTE' || current.status === 'PROCESSANDO') &&
-        attempts < 120
+        attempts < maxAttempts
       ) {
-        await new Promise((r) => setTimeout(r, 400))
+        await new Promise((r) => setTimeout(r, 1000))
         attempts += 1
-        const pct = Math.min(endPct, startPct + Math.round((attempts / 20) * (endPct - startPct)))
+        const pct = Math.min(endPct, startPct + Math.round((attempts / maxAttempts) * (endPct - startPct)))
         onProgress?.({
           stage,
           progress: pct,
@@ -398,16 +400,39 @@ export const dataService = {
     formRh.append('file', rhFile)
     formRh.append('importType', 'HR')
 
-    const httpRespRh = await api.post('/imports/upload', formRh, {
-      params: { importType: 'HR' },
-      signal
-    })
-    const respRh = await pollImportUntilDone(httpRespRh.data, {
-      stage: 'RH',
-      startPct: 20,
-      endPct: 50,
-      label: `base de RH (${rhFile.name})`
-    })
+    let respRh = null
+    try {
+      const httpRespRh = await api.post('/imports/upload', formRh, {
+        params: { importType: 'HR' },
+        signal
+      })
+      respRh = await pollImportUntilDone(httpRespRh.data, {
+        stage: 'RH',
+        startPct: 20,
+        endPct: 50,
+        label: `base de RH (${rhFile.name})`
+      })
+    } catch (errRh) {
+      // Se já houver lote ativo de RH (ex: tentativa anterior onde RH concluiu e vendas falhou)
+      const conflictMsg = errRh.response?.data?.message || ''
+      const matchReport = conflictMsg.match(/reportId=(\d+)/i)
+      if (errRh.response?.status === 409 && matchReport) {
+        const existingReportId = matchReport[1]
+        const existingRh = await api.get(`/imports/${existingReportId}`, { signal })
+        if (existingRh.data?.status === 'CONCLUIDO') {
+          respRh = existingRh.data
+        } else {
+          respRh = await pollImportUntilDone(existingRh.data, {
+            stage: 'RH',
+            startPct: 20,
+            endPct: 50,
+            label: `base de RH existente (#${existingReportId})`
+          })
+        }
+      } else {
+        throw errRh
+      }
+    }
 
     if (respRh?.status === 'FALHOU') {
       const motivoRh = respRh.mensagem || 'A importação da base de RH falhou (possível matrícula duplicada ou erro estrutural).'
@@ -453,14 +478,45 @@ export const dataService = {
       message: `RH processado (${rhLinhas} registros). Enviando base de Vendas (${vendasFile.name})...`
     })
 
+    // O backend exige obrigatoriamente a competência no formato YYYY-MM para o upload de vendas
+    const normalizedComp =
+      normalizeCompetence(competencia) ||
+      normalizeCompetence(extractCompetenceFromFileName(vendasFile?.name)) ||
+      normalizeCompetence(extractCompetenceFromFileName(rhFile?.name))
+
+    if (!normalizedComp) {
+      throw new Error(
+        'A competência é obrigatória para a importação da base de vendas. Informe a competência no formato MM/AAAA (ex: 07/2025).'
+      )
+    }
+
     const formVendas = new FormData()
     formVendas.append('file', vendasFile)
     formVendas.append('importType', 'SALES')
 
-    const httpRespVendas = await api.post('/imports/upload', formVendas, {
-      params: { importType: 'SALES' },
-      signal
-    })
+    const salesParams = {
+      importType: 'SALES',
+      competencia: normalizedComp
+    }
+
+    let httpRespVendas = null
+    try {
+      httpRespVendas = await api.post('/imports/upload', formVendas, {
+        params: salesParams,
+        signal
+      })
+    } catch (errVendas) {
+      const conflictMsg = errVendas.response?.data?.message || ''
+      const matchReport = conflictMsg.match(/reportId=(\d+)/i)
+      if (errVendas.response?.status === 409 && matchReport) {
+        const existingReportId = matchReport[1]
+        const existingSales = await api.get(`/imports/${existingReportId}`, { signal })
+        httpRespVendas = existingSales
+      } else {
+        throw errVendas
+      }
+    }
+
     const respVendas = await pollImportUntilDone(httpRespVendas.data, {
       stage: 'VENDAS',
       startPct: 60,
@@ -550,12 +606,20 @@ export const dataService = {
   /**
    * Envia uma planilha avulsa para validação e carga (ex: COMISS com vigência)
    */
+  async excluirLote(reportId, motivo = 'Exclusão solicitada pelo usuário') {
+    const response = await api.delete(`/imports/${reportId}`, {
+      data: { motivo }
+    })
+    return response.data
+  },
+
   async uploadBase({
     tipoBase,
     file,
     competencia,
     dataInicio,
     dataFim,
+    substituirBase = false,
     simulacao = 'real',
     onProgress = null,
     signal = null
@@ -567,6 +631,38 @@ export const dataService = {
     }
 
     const importType = mapTipoBaseToImportType(tipoBase)
+    const normalizedComp =
+      normalizeCompetence(competencia) ||
+      normalizeCompetence(String(dataInicio || '').slice(0, 7)) ||
+      normalizeCompetence(extractCompetenceFromFileName(file?.name))
+
+    // Se solicitado a substituição da base existente para COMISSIONS, remove lotes concluídos anteriores da mesma competência
+    if (substituirBase && normalizedComp && importType === 'COMISSIONS') {
+      try {
+        const lotesRes = await api.get('/imports', {
+          params: { tipoBase: 'COMISSIONS', competencia: normalizedComp, status: 'CONCLUIDO' },
+          signal
+        })
+        const items = Array.isArray(lotesRes.data?.content)
+          ? lotesRes.data.content
+          : Array.isArray(lotesRes.data)
+            ? lotesRes.data
+            : []
+        for (const lote of items) {
+          if (lote.reportId) {
+            onProgress?.({
+              stage: 'LIMPEZA',
+              progress: 25,
+              message: `Removendo base anterior da competência ${normalizedComp} (lote #${lote.reportId})...`
+            })
+            await this.excluirLote(lote.reportId, 'Substituição pelo usuário').catch(() => {})
+          }
+        }
+      } catch {
+        // Ignora silenciosamente caso não haja lotes anteriores
+      }
+    }
+
     const formData = new FormData()
     formData.append('file', file)
     formData.append('importType', importType)
@@ -577,23 +673,50 @@ export const dataService = {
       message: `Enviando planilha ${file.name} (${importType})...`
     })
 
-    const response = await api.post('/imports/upload', formData, {
-      params: { importType },
-      signal
-    })
+    const params = { importType }
+    if (normalizedComp && (importType === 'COMISSIONS' || importType === 'SALES')) {
+      params.competencia = normalizedComp
+    }
+
+    let response = null
+    try {
+      response = await api.post('/imports/upload', formData, {
+        params,
+        signal
+      })
+    } catch (uploadErr) {
+      const conflictMsg = uploadErr.response?.data?.message || ''
+      const matchReport = conflictMsg.match(/reportId=(\d+)/i)
+
+      if (uploadErr.response?.status === 409 && matchReport) {
+        const existingReportId = matchReport[1]
+        if (substituirBase && importType === 'COMISSIONS') {
+          await this.excluirLote(existingReportId, 'Substituição automática solicitada pelo usuário').catch(() => {})
+          response = await api.post('/imports/upload', formData, {
+            params,
+            signal
+          })
+        } else {
+          response = await api.get(`/imports/${existingReportId}`, { signal })
+        }
+      } else {
+        throw uploadErr
+      }
+    }
 
     let data = response.data
     let attempts = 0
+    const maxAttempts = 300
     while (
       data?.reportId &&
       (data.status === 'PENDENTE' || data.status === 'PROCESSANDO') &&
-      attempts < 120
+      attempts < maxAttempts
     ) {
-      await new Promise((r) => setTimeout(r, 400))
+      await new Promise((r) => setTimeout(r, 1000))
       attempts += 1
       onProgress?.({
         stage: 'ENVIO',
-        progress: Math.min(90, 40 + attempts * 5),
+        progress: Math.min(95, 35 + Math.round((attempts / maxAttempts) * 60)),
         message: `Processando planilha ${file.name} no servidor (lote #${data.reportId})...`
       })
       const pollRes = await api.get(`/imports/${data.reportId}`, { signal })

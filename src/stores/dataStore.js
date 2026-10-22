@@ -49,6 +49,7 @@ export const useDataStore = defineStore('data', {
       comissFile: null,
       dataInicio: '2025-12-01',
       dataFim: '2025-12-31',
+      substituirBaseExistente: true,
       // Estados de processamento
       isLoading: false,
       errorMessage: null,
@@ -731,6 +732,7 @@ export const useDataStore = defineStore('data', {
             file: comissFile,
             dataInicio,
             dataFim,
+            substituirBase: Boolean(this.uploadModal.substituirBaseExistente),
             simulacao: cenario,
             onProgress: (p) => {
               if (this.activeJob.isActive) {
@@ -1166,10 +1168,15 @@ export const useDataStore = defineStore('data', {
           this.fecharModalExclusao()
           await this.carregarDadosEfetivados()
         } else if (this.modalExclusao.tipo === 'ENVIO') {
-          const id = this.modalExclusao.item?.id
+          const item = this.modalExclusao.item
+          if (item?.reportId) {
+            await dataService.excluirLote(item.reportId, 'Exclusão solicitada pelo usuário').catch(() => {})
+          }
+          const id = item?.id
           this.enviosHistorico = this.enviosHistorico.filter(e => e.id !== id)
-          notifStore.success('Envio Excluído', 'O registro de envio foi removido do histórico com sucesso.')
+          notifStore.success('Envio Excluído', 'O registro de envio e seus dados correspondentes foram removidos com sucesso.')
           this.fecharModalExclusao()
+          await this.carregarDadosEfetivados()
         }
       } catch (err) {
         console.error('Falha na exclusão:', err)

@@ -29,7 +29,12 @@ export function createEmptyCampaignForm() {
 }
 
 function emptyToNull(value) {
-  if (value === undefined || value === null || String(value).trim() === '') {
+  if (value === undefined || value === null) {
+    return null
+  }
+
+  const str = String(value).trim()
+  if (str === '' || str.toUpperCase() === 'TODOS' || str.toUpperCase() === 'TODAS' || str.toUpperCase() === 'PADRAO') {
     return null
   }
 
@@ -38,7 +43,11 @@ function emptyToNull(value) {
 
 function integerOrNull(value) {
   const normalized = emptyToNull(value)
-  return normalized === null ? null : Number(normalized)
+  if (normalized === null) {
+    return null
+  }
+  const num = Number(normalized)
+  return Number.isFinite(num) ? num : null
 }
 
 export function percentToDecimal(value) {
