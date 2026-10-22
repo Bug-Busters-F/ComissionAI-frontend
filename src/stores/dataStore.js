@@ -1027,7 +1027,8 @@ export const useDataStore = defineStore('data', {
       } else if (tipo === 'RH') {
         desc = `Matrícula: ${item.registration || item.id} | Cargo: ${item.position?.description || '-'} | Loja: ${item.store?.description || '-'}`
       } else {
-        desc = `Taxa: ${item.cargo} | Marca: ${item.marca} | ${(item.percentual * 100).toFixed(2)}%`
+        const pct = item?.percentual != null ? (Number(item.percentual) * 100).toFixed(2) : '0.00'
+        desc = `Taxa: ${item?.cargo || '-'} | Marca: ${item?.marca || '-'} | ${pct}%`
       }
 
       this.modalExclusao = {
@@ -1079,6 +1080,17 @@ export const useDataStore = defineStore('data', {
       }
     },
 
+    abrirModalExclusaoTodasComissoes() {
+      this.modalExclusao = {
+        isOpen: true,
+        tipo: 'TODAS_COMISSOES',
+        titulo: 'Excluir Todas as Taxas de Comissão Base',
+        mensagem: 'Deseja remover todas as taxas de comissão base do sistema? Esta ação é permitida apenas se não houver cálculos ou auditorias vinculadas.',
+        detalhes: 'Todas as taxas contratuais padrão cadastradas serão removidas do sistema',
+        item: null,
+        loading: false
+      }
+    },
     abrirModalExclusaoEnvio(envio) {
       this.modalExclusao = {
         isOpen: true,
@@ -1164,6 +1176,21 @@ export const useDataStore = defineStore('data', {
           notifStore.success(
             'Matrículas Limpas',
             `Todas as matrículas (${totalExc} registros) foram excluídas com sucesso do banco de dados.`
+          )
+          this.fecharModalExclusao()
+          await this.carregarDadosEfetivados()
+        } else if (this.modalExclusao.tipo === 'TODAS_COMISSOES') {
+          const res = await dataService.deleteTodasComissoes()
+          invalidateCalculationCache()
+          this.competencias.forEach(comp => {
+            const comiss = comp.bases.find(b => b.tipo === 'COMISS')
+            if (comiss) comiss.value = 'Pendente'
+          })
+
+          const totalExc = res?.totalExcluido ?? 0
+          notifStore.success(
+            'Comissões Limpas',
+            `Todas as taxas de comissão base (${totalExc} registros) foram excluídas com sucesso do banco de dados.`
           )
           this.fecharModalExclusao()
           await this.carregarDadosEfetivados()
