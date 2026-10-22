@@ -1,29 +1,30 @@
 import api from './api'
+import { normalizeCampaignRecord } from './campaignMappers'
 
 export const campaignService = {
   async list() {
     const response = await api.get('/campanhas')
-    return response.data
+    return Array.isArray(response.data) ? response.data.map(normalizeCampaignRecord) : response.data
   },
 
   async get(id) {
     const response = await api.get(`/campanhas/${id}`)
-    return response.data
+    return normalizeCampaignRecord(response.data)
   },
 
   async create(payload) {
     const response = await api.post('/campanhas', payload)
-    return response.data
+    return normalizeCampaignRecord(response.data)
   },
 
   async update(id, payload) {
     const response = await api.put(`/campanhas/${id}`, payload)
-    return response.data
+    return normalizeCampaignRecord(response.data)
   },
 
   async updateStatus(id, estado) {
     const response = await api.patch(`/campanhas/${id}/estado`, { estado })
-    return response.data
+    return normalizeCampaignRecord(response.data)
   },
 
   async remove(id) {
