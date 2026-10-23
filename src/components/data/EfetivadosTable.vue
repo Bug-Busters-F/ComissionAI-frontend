@@ -134,6 +134,19 @@
           </button>
         </template>
 
+        <template v-else-if="store.dadosEfetivados.tipoBaseAtiva === 'COMISS'">
+          <!-- Excluir Todas as Comissões Base -->
+          <button
+            type="button"
+            @click="store.abrirModalExclusaoTodasComissoes"
+            class="focus-ring flex items-center gap-1.5 rounded-xl border border-sage-border bg-white px-3 py-2 text-xs font-semibold text-sage-muted hover:text-danger hover:border-danger/30 hover:bg-danger-bg/50 transition"
+            title="Excluir todas as taxas de comissão base se não houver cálculos vinculados"
+          >
+            <Trash2 class="h-3.5 w-3.5" />
+            <span class="hidden sm:inline">Limpar comissões</span>
+          </button>
+        </template>
+
         <!-- Botão Recarregar -->
         <button
           type="button"

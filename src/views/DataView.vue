@@ -5,7 +5,7 @@
         <div class="flex items-center gap-3">
           <button
             type="button"
-            @click="store.openComissModal('Dezembro')"
+            @click="store.openComissModal(store.competencias[0]?.competenciaCodigo || null)"
             class="focus-ring rounded-full border border-sage-border-dark bg-white px-4 py-3 text-sm font-semibold text-brand-dark hover:bg-sage-light"
           >
             Tabelas de Comissão
@@ -149,7 +149,7 @@
           <div class="flex items-center justify-between pt-1 text-[11px]">
             <button
               type="button"
-              @click="store.openComissModal(period.name)"
+              @click="store.openComissModal(period.competenciaCodigo)"
               class="font-semibold text-sage-muted hover:text-brand-dark hover:underline"
             >
               Taxas de comissão

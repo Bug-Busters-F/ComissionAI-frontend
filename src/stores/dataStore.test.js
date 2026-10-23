@@ -73,4 +73,20 @@ describe('dataStore calculation cache invalidation', () => {
     expect(readCalculationCache('2025-07')).toBeNull()
     expect(readCalculationCache('2025-08')).toBeNull()
   })
+
+  it('auto-detects competence month and year when attaching RH or Vendas files', () => {
+    const store = useDataStore()
+    store.openCicloModal(null)
+    expect(store.uploadModal.competencia).toBe('')
+
+    store.setRhFile({ name: 'BASE RH_NOV25.xlsx' })
+    expect(store.uploadModal.competencia).toBe('11/2025')
+    expect(store.uploadModal.competenciaNome).toBe('Novembro')
+    expect(store.nomeCompetenciaFormatada).toBe('Novembro')
+
+    store.setVendasFile({ name: 'BASE_VENDAS_JUL25.xlsx' })
+    expect(store.uploadModal.competencia).toBe('07/2025')
+    expect(store.uploadModal.competenciaNome).toBe('Julho')
+  })
 })
+

@@ -29,7 +29,12 @@ export function createEmptyCampaignForm() {
 }
 
 function emptyToNull(value) {
-  if (value === undefined || value === null || String(value).trim() === '') {
+  if (value === undefined || value === null) {
+    return null
+  }
+
+  const str = String(value).trim()
+  if (str === '' || str.toUpperCase() === 'TODOS' || str.toUpperCase() === 'TODAS' || str.toUpperCase() === 'PADRAO') {
     return null
   }
 
@@ -38,7 +43,11 @@ function emptyToNull(value) {
 
 function integerOrNull(value) {
   const normalized = emptyToNull(value)
-  return normalized === null ? null : Number(normalized)
+  if (normalized === null) {
+    return null
+  }
+  const num = Number(normalized)
+  return Number.isFinite(num) ? num : null
 }
 
 export function percentToDecimal(value) {
@@ -70,8 +79,20 @@ export function decimalToPercent(value) {
   return String(Number(percent.toFixed(10)))
 }
 
+export function normalizeCampaignRecord(record) {
+  if (!record || typeof record !== 'object') return record
+  const normalized = { ...record }
+  if (Array.isArray(normalized.regras) && !normalized.regra) {
+    normalized.regra = normalized.regras[0] || null
+  } else if (normalized.regra && !Array.isArray(normalized.regras)) {
+    normalized.regras = [normalized.regra]
+  }
+  return normalized
+}
+
 export function campaignResponseToForm(response) {
-  const regra = response?.regra || {}
+  const firstRule = Array.isArray(response?.regras) && response.regras.length > 0 ? response.regras[0] : null
+  const regra = response?.regra || firstRule || {}
 
   return {
     titulo: response?.titulo ?? '',
@@ -89,6 +110,65 @@ export function campaignResponseToForm(response) {
   }
 }
 
+export function buildCampaignRulesPayload(form = {}) {
+  if (Array.isArray(form?.regras) && form.regras.length > 0) {
+    return form.regras.map((r, idx) => ({
+      blocoId: r.blocoId || `bloco-${idx + 1}`,
+      trechoOrigem: emptyToNull(r.trechoOrigem ?? form.textoOriginal),
+      nome: emptyToNull(r.nome) || (form.titulo ? `Regra ${idx + 1} - ${String(form.titulo).trim()}` : `Regra ${idx + 1}`),
+      canal: emptyToNull(r.canal),
+      codMarca: integerOrNull(r.codMarca),
+      descrMarca: emptyToNull(r.descrMarca),
+      codLoja: integerOrNull(r.codLoja),
+      codCargo: integerOrNull(r.codCargo),
+      descriCargo: emptyToNull(r.descriCargo),
+      matricula: emptyToNull(r.matricula),
+      valorMinimo: r.valorMinimo !== undefined && r.valorMinimo !== null && r.valorMinimo !== '' ? Number(r.valorMinimo) : null,
+      minInclusivo: typeof r.minInclusivo === 'boolean' ? r.minInclusivo : null,
+      valorMaximo: r.valorMaximo !== undefined && r.valorMaximo !== null && r.valorMaximo !== '' ? Number(r.valorMaximo) : null,
+      maxInclusivo: typeof r.maxInclusivo === 'boolean' ? r.maxInclusivo : null,
+      tipoOperacao: r.tipoOperacao || 'DEFINIR_TAXA',
+      valorAjuste: r.valorAjuste !== undefined && r.valorAjuste !== null && r.valorAjuste !== '' ? Number(r.valorAjuste) : null,
+      tipoBaseReferencia: emptyToNull(r.tipoBaseReferencia),
+      taxaBaseConsultada: r.taxaBaseConsultada !== undefined && r.taxaBaseConsultada !== null ? Number(r.taxaBaseConsultada) : null,
+      descricaoReferencia: emptyToNull(r.descricaoReferencia),
+      taxa: r.taxa !== undefined && r.taxa !== null ? Number(r.taxa) : percentToDecimal(r.taxaPercentual ?? form.taxaPercentual),
+      explicacao: emptyToNull(r.explicacao),
+      pythonEquivalente: emptyToNull(r.pythonEquivalente),
+      pendencias: Array.isArray(r.pendencias) ? r.pendencias : [],
+      completa: typeof r.completa === 'boolean' ? r.completa : (r.taxa != null || percentToDecimal(r.taxaPercentual ?? form.taxaPercentual) !== null),
+      bonusPercentual: r.bonusPercentual !== undefined && r.bonusPercentual !== null && Number(r.bonusPercentual) > 0 ? Number(r.bonusPercentual) : null,
+      bonusValorFixo: r.bonusValorFixo !== undefined && r.bonusValorFixo !== null && Number(r.bonusValorFixo) > 0 ? Number(r.bonusValorFixo) : null
+    }))
+  }
+
+  const taxaDecimal = percentToDecimal(form.taxaPercentual)
+  const tituloTrim = String(form.titulo ?? '').trim()
+
+  return [
+    {
+      blocoId: 'bloco-1',
+      trechoOrigem: emptyToNull(form.textoOriginal),
+      nome: tituloTrim ? `Regra - ${tituloTrim}` : 'Regra Principal',
+      canal: emptyToNull(form.canal),
+      codMarca: integerOrNull(form.codMarca),
+      descrMarca: emptyToNull(form.descrMarca),
+      codLoja: integerOrNull(form.codLoja),
+      codCargo: integerOrNull(form.codCargo),
+      descriCargo: emptyToNull(form.descriCargo),
+      matricula: emptyToNull(form.matricula),
+      valorMinimo: form.valorMinimo !== undefined && form.valorMinimo !== null && form.valorMinimo !== '' ? Number(form.valorMinimo) : null,
+      minInclusivo: typeof form.minInclusivo === 'boolean' ? form.minInclusivo : null,
+      valorMaximo: form.valorMaximo !== undefined && form.valorMaximo !== null && form.valorMaximo !== '' ? Number(form.valorMaximo) : null,
+      maxInclusivo: typeof form.maxInclusivo === 'boolean' ? form.maxInclusivo : null,
+      tipoOperacao: form.tipoOperacao || 'DEFINIR_TAXA',
+      valorAjuste: form.valorAjuste !== undefined && form.valorAjuste !== null && form.valorAjuste !== '' ? Number(form.valorAjuste) : null,
+      taxa: taxaDecimal,
+      completa: taxaDecimal !== null
+    }
+  ]
+}
+
 export function campaignFormToPayload(form, options = {}) {
   const payload = {
     titulo: String(form.titulo ?? '').trim(),
@@ -102,7 +182,8 @@ export function campaignFormToPayload(form, options = {}) {
     matricula: emptyToNull(form.matricula),
     taxa: percentToDecimal(form.taxaPercentual),
     dataInicio: emptyToNull(form.dataInicio),
-    dataFim: emptyToNull(form.dataFim)
+    dataFim: emptyToNull(form.dataFim),
+    regras: buildCampaignRulesPayload(form)
   }
 
   if (options.estado) {
