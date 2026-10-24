@@ -18,7 +18,10 @@
             Planilha com pendências: corrija e envie novamente
           </h3>
           <p class="mt-1 text-sm leading-6 text-sage-subtle">
-            <template v-if="report.isCiclo">
+            <template v-if="report.isCiclo && report.rh?.status === 'SUCESSO'">
+              A importação de vendas foi rejeitada. O RH confirmado permanece no banco; corrija as pendências de vendas e envie novamente.
+            </template>
+            <template v-else-if="report.isCiclo">
               O ciclo da competência <strong>{{ report.competencia }}</strong> foi <strong>integralmente rejeitado</strong> devido a inconsistências impeditivas em RH, Vendas ou violação de integridade relacional entre as bases. Nenhuma linha foi gravada no banco de dados.
             </template>
             <template v-else>
@@ -71,7 +74,7 @@
           </h3>
           <p class="mt-1 text-sm leading-6 text-success-dark">
             <template v-if="report.isCiclo">
-              As bases de <strong>RH e Vendas</strong> foram devidamente cruzadas e validadas. A competência <strong>{{ report.competencia }}</strong> está pronta para apuração e simulação de comissões.
+              O backend confirmou o processamento de <strong>RH e Vendas</strong> para a competência <strong>{{ report.competencia }}</strong>. A disponibilidade para simulação depende também dos vínculos e das taxas de comissão cadastradas.
             </template>
             <template v-else>
               Todos os registros foram validados com sucesso e integrados ao sistema.
@@ -81,6 +84,11 @@
       </div>
     </div>
 
+    <div v-if="report.mensagens?.length" class="rounded-xl border border-sage-border bg-white p-4 text-sm text-sage-muted">
+      <p class="font-bold text-brand-dark">Mensagens do processamento</p>
+      <ul class="mt-2 list-disc space-y-1 pl-5"><li v-for="(message, index) in report.mensagens" :key="index">{{ message }}</li></ul>
+    </div>
+
     <!-- RESUMO NUMÉRICO DA VALIDAÇÃO -->
     <div v-if="report.isCiclo" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <div class="rounded-xl border border-sage-border-light bg-white p-4">
@@ -88,7 +96,7 @@
         <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">
           {{ report.rh?.linhasValidas || 0 }} <span class="text-xs font-normal text-sage-muted">/ {{ report.rh?.totalLinhas || 0 }}</span>
         </p>
-        <p class="mt-0.5 text-[11px] font-semibold text-success">Colaboradores válidos</p>
+        <p class="mt-0.5 text-[11px] font-semibold text-success">Linhas de RH processadas</p>
       </div>
 
       <div class="rounded-xl border border-sage-border-light bg-white p-4">

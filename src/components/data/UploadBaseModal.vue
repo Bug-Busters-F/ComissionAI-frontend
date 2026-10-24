@@ -410,7 +410,7 @@
               </div>
             </div>
             <p class="mt-2 text-xs text-sage-muted">
-              Taxas sem vigência determinada geram inconsistências operacionais e sobreposição de regras.
+              As taxas valem para o mês inteiro da data de início. Selecione datas do mesmo mês; para outra competência, faça um novo envio.
             </p>
           </div>
 

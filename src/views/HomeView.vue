@@ -94,7 +94,7 @@ import { campaignStateTone, formatCampaignState, formatPeriod } from '@/services
 
 const metrics = [
   { label: 'Competências cadastradas', value: '3', detail: 'RH, Vendas e Comissão', highlight: true },
-  { label: 'Campanhas', value: '2', detail: 'Propostas e campanhas aprovadas' },
+  { label: 'Campanhas', value: '2', detail: 'Regras e campanhas aprovadas' },
   { label: 'Aguardando apuração', value: '1', detail: 'Campanhas com vigência encerrada' },
   { label: 'Pendências nos dados', value: '3', detail: 'Revisão antes dos cálculos' }
 ]
@@ -106,7 +106,7 @@ const campaignsError = ref('')
 const process = [
   { number: 1, title: 'Prepare as bases mensais', detail: 'Importe RH, Vendas e Comissão.' },
   { number: 2, title: 'Crie e simule a campanha', detail: 'Revise as regras e o orçamento.' },
-  { number: 3, title: 'Aprove a proposta', detail: 'Registre a decisão e a versão.' },
+  { number: 3, title: 'Aprove a regra', detail: 'Registre a decisão e a versão.' },
   { number: 4, title: 'Apure os resultados', detail: 'Compare a simulação com o realizado.' }
 ]
 
