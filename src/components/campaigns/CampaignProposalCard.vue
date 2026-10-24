@@ -6,7 +6,7 @@
         <span class="mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold" :class="statusTone">{{ statusLabel }}</span>
         <span v-if="proposal.origem === 'demonstracao'" class="ml-2 inline-flex rounded-full bg-warning-bg px-3 py-1 text-xs font-bold text-warning-text">Demonstração — dados fictícios</span>
       </div>
-      <button type="button" class="focus-ring rounded-full border border-danger/30 px-4 py-2 text-sm font-bold text-danger-dark" :aria-label="'Remover regra ' + (index + 1)" @click="$emit('request-remove', proposal.clientId)">Remover regra</button>
+      <button v-if="!reviewOnly" type="button" class="focus-ring rounded-full border border-danger/30 px-4 py-2 text-sm font-bold text-danger-dark transition-colors hover:border-danger hover:bg-danger-bg" :aria-label="'Remover regra ' + (index + 1)" @click="$emit('request-remove', proposal.clientId)">Remover regra</button>
     </header>
 
     <slot name="rule-text" />
@@ -23,7 +23,7 @@
         <div v-for="field in textFields" :key="field.key">
           <div class="mb-2 flex items-center gap-1">
             <label :for="idFor(field.key)" class="campaign-label !mb-0">{{ field.label }}</label>
-            <CampaignFieldOriginHelp :field-label="field.label" />
+            <CampaignFieldOriginHelp :field-label="field.label" :origin="describeFieldOrigin(proposal, field.key)" />
           </div>
           <input :id="idFor(field.key)" :value="proposal.campos[field.key]" type="text" :inputmode="field.numeric ? 'numeric' : 'text'" autocomplete="off" class="campaign-control" :class="errorClass(field.key)" :aria-invalid="Boolean(errorFor(field.key))" :aria-describedby="errorFor(field.key) ? idFor(field.key) + '-error' : undefined" :placeholder="field.placeholder" @input="$emit('update-proposal', proposal.clientId, field.key, $event.target.value)" />
           <p v-if="errorFor(field.key)" :id="idFor(field.key) + '-error'" class="campaign-error">{{ errorFor(field.key) }}</p>
@@ -31,7 +31,7 @@
         <div>
           <div class="mb-2 flex items-center gap-1">
             <label :for="idFor('taxaPercentual')" class="campaign-label !mb-0">Taxa percentual final <span class="text-danger">*</span></label>
-            <CampaignFieldOriginHelp field-label="Taxa percentual final" />
+            <CampaignFieldOriginHelp field-label="Taxa percentual final" :origin="describeFieldOrigin(proposal, 'taxaPercentual')" />
           </div>
           <div class="flex items-center gap-2">
             <input :id="idFor('taxaPercentual')" :value="proposal.campos.taxaPercentual" type="text" inputmode="decimal" autocomplete="off" class="campaign-control" :class="errorClass('taxaPercentual')" :aria-invalid="Boolean(errorFor('taxaPercentual'))" :aria-describedby="errorFor('taxaPercentual') ? idFor('taxaPercentual') + '-error' : undefined" placeholder="Ex.: 5,5" @input="$emit('update-proposal', proposal.clientId, 'taxaPercentual', $event.target.value)" />
@@ -50,14 +50,15 @@
             <span class="mt-1 block text-xs leading-5 text-sage-muted">Use quando esta regra não tiver filtros de público.</span>
           </span>
         </label>
-        <CampaignFieldOriginHelp class="mt-3" field-label="Aplicar a todas as vendas" />
+        <CampaignFieldOriginHelp class="mt-3" field-label="Aplicar a todas as vendas" :origin="describeFieldOrigin(proposal, 'publicoTodasVendas')" />
       </div>
     </div>
 
-    <CampaignValueRangeFields class="mt-5" :fields="proposal.campos" :client-id="proposal.clientId" :pendencias="pendencias" @update="(field, value) => $emit('update-proposal', proposal.clientId, field, value)" />
+    <CampaignValueRangeFields class="mt-5" :fields="proposal.campos" :proposal="proposal" :client-id="proposal.clientId" :pendencias="pendencias" @update="(field, value) => $emit('update-proposal', proposal.clientId, field, value)" />
 
     <div v-if="pendencias.length" class="mt-5 space-y-2">
       <p class="text-sm font-bold text-brand-dark">Pendências deste bloco</p>
+      <p v-if="pendencias.some((item) => item.codigo === 'PERSISTIDA_NAO_REAVALIADA' && item.severidade === 'IMPEDITIVO')" class="text-xs leading-5 text-sage-muted">O backend guardou estas pendências somente em texto. Reinterprete este bloco para reavaliá-las após as correções.</p>
       <p v-for="item in pendencias" :key="item.id" class="rounded-xl px-3 py-2 text-sm leading-5" :class="item.severidade === 'IMPEDITIVO' ? 'bg-danger-bg text-danger-dark' : 'bg-warning-bg text-warning-text'">
         <strong>{{ item.severidade === 'IMPEDITIVO' ? 'Impeditiva:' : 'Aviso:' }}</strong> {{ item.mensagem }}
       </p>
@@ -68,12 +69,14 @@
 
 <script setup>
 import { computed } from 'vue'
+import { describeFieldOrigin } from '@/services/campaignFieldOrigins'
 import { RULE_FIELD_LABELS as fieldLabels } from '@/services/ruleReinterpretation'
 import CampaignValueRangeFields from './CampaignValueRangeFields.vue'
 import CampaignFieldOriginHelp from './CampaignFieldOriginHelp.vue'
 
 const props = defineProps({
   proposal: { type: Object, required: true },
+  reviewOnly: Boolean,
   campaign: { type: Object, required: true },
   index: { type: Number, required: true },
   pendencias: { type: Array, default: () => [] }

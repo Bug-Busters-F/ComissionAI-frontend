@@ -1,3 +1,5 @@
+> Atualização: este documento registra a entrega anterior da interface/modo demonstrativo. Para o modo API e a integração atual, consulte [o guia consolidado](GUIA-INTEGRACAO-MULTIRREGRAS.md).
+
 # Guia rápido — criação de campanha com múltiplas regras
 
 ## O que está pronto

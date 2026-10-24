@@ -108,8 +108,8 @@ function validateProposal(proposal) {
     addBlocker(pending, proposal, 'TAXA_AUSENTE', 'taxaPercentual', 'Informe a taxa percentual final.')
   } else {
     const rate = parseDecimalToMinor(fields.taxaPercentual, RATE_MAX_DECIMALS)
-    if (!Number.isFinite(rate) || rate <= 0) {
-      addBlocker(pending, proposal, 'TAXA_INVALIDA', 'taxaPercentual', 'Informe uma taxa percentual positiva, com até duas casas decimais.')
+    if (!Number.isFinite(rate) || rate <= 0 || rate > 10000) {
+      addBlocker(pending, proposal, 'TAXA_INVALIDA', 'taxaPercentual', 'Informe uma taxa percentual maior que zero e até 100%, com até duas casas decimais.')
     }
   }
 
@@ -261,15 +261,16 @@ export function validateCampaignProposalSet(campaign) {
   }
 }
 
-export function getRequiredProposalStep(target, validation, campaign, { descriptionNeedsConfirmation = false } = {}) {
+export function getRequiredProposalStep(target, validation, campaign, { descriptionNeedsConfirmation = false, processing = false, needsValidation = false } = {}) {
   if (target === 'dados') return 'dados'
   if (descriptionNeedsConfirmation && campaign.propostas.length) return 'dados'
-  if (validation.common.pending.some((item) => item.severidade === 'IMPEDITIVO')) return 'dados'
+  if (validation.common.pending.some((item) => ['TITULO_AUSENTE', 'DESCRICAO_AUSENTE'].includes(item.codigo))) return 'dados'
   if (target === 'propostas') return 'propostas'
+  if (processing || needsValidation) return 'propostas'
   if (!campaign.propostas.length) return 'propostas'
   if (validation.blockers.length) {
     const first = validation.blockers[0]
-    return first.clientId ? 'propostas' : 'dados'
+    return first.clientId || !['titulo', 'textoOriginal'].includes(first.campo) ? 'propostas' : 'dados'
   }
   return target
 }

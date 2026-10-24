@@ -62,6 +62,7 @@ export function createCampaignProposal(fields = {}) {
 export function createCampaignProposalForm() {
   return {
     titulo: '',
+    tituloSugerido: '',
     textoOriginal: '',
     dataInicio: '',
     dataFim: '',

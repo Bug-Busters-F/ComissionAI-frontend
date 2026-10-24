@@ -1,3 +1,5 @@
+> Atualização: este documento registra a entrega anterior da interface/modo demonstrativo. Para o modo API e a integração atual, consulte [o guia consolidado](GUIA-INTEGRACAO-MULTIRREGRAS.md).
+
 # Reinterpretação individual — interface da Sprint 2
 
 ## Experimentar

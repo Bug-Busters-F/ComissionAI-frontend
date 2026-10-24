@@ -16,3 +16,15 @@ export function formatCampaignValidity(campaign, includeInclusivity = false) {
 
   return includeInclusivity && (start || end) ? validity + ' (datas informadas inclusivas)' : validity
 }
+
+// Shared campaign issues stay visible inside each rule without being counted again.
+export function proposalDisplayPendings(validation, clientId) {
+  return [
+    ...(validation.byProposal[clientId] || []),
+    ...(validation.common?.pending || []).map((pending) => ({
+      ...pending,
+      id: 'campaign-display:' + pending.id + ':' + clientId,
+      mensagem: 'Campanha: ' + pending.mensagem
+    }))
+  ]
+}

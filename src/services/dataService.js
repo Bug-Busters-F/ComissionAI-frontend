@@ -1,5 +1,6 @@
 import api from './api'
-import { normalizeCompetence, extractCompetenceFromFileName } from './competenceUtils'
+import { importBatchService } from './importBatchService'
+import { normalizeCompetence, extractCompetenceFromFileName, getCompetenceDateRange } from './competenceUtils'
 
 /**
  * Mapeamento dos tipos de base e modalidades aceitos pela aplicação
@@ -362,83 +363,24 @@ export const dataService = {
       return gerarMockRelatorioCiclo(rhFile?.name, vendasFile?.name, competencia, simulacao)
     }
 
-    // ==========================================
-    // ==========================================
-    // FLUXO DE UPLOAD SEQUENCIAL (RH primeiro, depois Vendas)
-    // ==========================================
-    const pollImportUntilDone = async (initialData, { stage, startPct, endPct, label }) => {
-      if (!initialData?.reportId) return initialData
-      let current = initialData
-      let attempts = 0
-      const maxAttempts = 300 // Até 5 minutos para processamento de planilhas extensas
-      while (
-        (current.status === 'PENDENTE' || current.status === 'PROCESSANDO') &&
-        attempts < maxAttempts
-      ) {
-        await new Promise((r) => setTimeout(r, 1000))
-        attempts += 1
-        const pct = Math.min(endPct, startPct + Math.round((attempts / maxAttempts) * (endPct - startPct)))
-        onProgress?.({
-          stage,
-          progress: pct,
-          message: `Processando ${label} no servidor (lote #${current.reportId})...`
-        })
-        const res = await api.get(`/imports/${current.reportId}`, { signal })
-        current = res.data
-      }
-      return current
-    }
-
-    // 1. Etapa 1: Envio da base de RH
-    onProgress?.({
-      stage: 'RH',
-      progress: 15,
-      message: `Enviando e processando base de RH (${rhFile.name})...`
+    // Mantém a detecção e o relatório da dev, com confirmação estrita do lote.
+    const normalizedComp = normalizeCompetence(competencia) ||
+      normalizeCompetence(extractCompetenceFromFileName(vendasFile?.name)) ||
+      normalizeCompetence(extractCompetenceFromFileName(rhFile?.name))
+    if (!normalizedComp) throw new Error('Informe uma competência válida no formato MM/AAAA.')
+    if (!rhFile || !vendasFile) throw new Error('Anexe as duas planilhas: RH e Vendas.')
+    const process = (file, importType, stage, progress) => importBatchService.upload({
+      file, importType, competencia: normalizedComp, signal, allowFailedReport: true,
+      onStatus: (report) => onProgress?.({ stage, progress, message: `${stage}: ${report.status.toLowerCase()} (lote #${report.reportId}). ${report.mensagem || ''}` })
     })
-
-    const formRh = new FormData()
-    formRh.append('file', rhFile)
-    formRh.append('importType', 'HR')
-
-    let respRh = null
-    try {
-      const httpRespRh = await api.post('/imports/upload', formRh, {
-        params: { importType: 'HR' },
-        signal
-      })
-      respRh = await pollImportUntilDone(httpRespRh.data, {
-        stage: 'RH',
-        startPct: 20,
-        endPct: 50,
-        label: `base de RH (${rhFile.name})`
-      })
-    } catch (errRh) {
-      // Se já houver lote ativo de RH (ex: tentativa anterior onde RH concluiu e vendas falhou)
-      const conflictMsg = errRh.response?.data?.message || ''
-      const matchReport = conflictMsg.match(/reportId=(\d+)/i)
-      if (errRh.response?.status === 409 && matchReport) {
-        const existingReportId = matchReport[1]
-        const existingRh = await api.get(`/imports/${existingReportId}`, { signal })
-        if (existingRh.data?.status === 'CONCLUIDO') {
-          respRh = existingRh.data
-        } else {
-          respRh = await pollImportUntilDone(existingRh.data, {
-            stage: 'RH',
-            startPct: 20,
-            endPct: 50,
-            label: `base de RH existente (#${existingReportId})`
-          })
-        }
-      } else {
-        throw errRh
-      }
-    }
+    onProgress?.({ stage: 'RH', progress: 15, message: `Enviando e processando base de RH (${rhFile.name})...` })
+    const respRh = await process(rhFile, 'HR', 'RH', 30)
 
     if (respRh?.status === 'FALHOU') {
       const motivoRh = respRh.mensagem || 'A importação da base de RH falhou (possível matrícula duplicada ou erro estrutural).'
       return {
         isCiclo: true,
-        competencia,
+        competencia: normalizedComp,
         nomeArquivo: `${rhFile.name} & ${vendasFile.name}`,
         tipoBase: 'CICLO_MENSAL',
         status: 'REJEITADO',
@@ -446,6 +388,7 @@ export const dataService = {
         linhasValidas: 0,
         rejeicaoIntegral: true,
         rh: {
+          reportId: respRh.reportId,
           nomeArquivo: rhFile.name,
           totalLinhas: 0,
           linhasValidas: 0,
@@ -478,70 +421,36 @@ export const dataService = {
       message: `RH processado (${rhLinhas} registros). Enviando base de Vendas (${vendasFile.name})...`
     })
 
-    // O backend exige obrigatoriamente a competência no formato YYYY-MM para o upload de vendas
-    const normalizedComp =
-      normalizeCompetence(competencia) ||
-      normalizeCompetence(extractCompetenceFromFileName(vendasFile?.name)) ||
-      normalizeCompetence(extractCompetenceFromFileName(rhFile?.name))
-
-    if (!normalizedComp) {
-      throw new Error(
-        'A competência é obrigatória para a importação da base de vendas. Informe a competência no formato MM/AAAA (ex: 07/2025).'
-      )
-    }
-
-    const formVendas = new FormData()
-    formVendas.append('file', vendasFile)
-    formVendas.append('importType', 'SALES')
-
-    const salesParams = {
-      importType: 'SALES',
-      competencia: normalizedComp
-    }
-
-    let httpRespVendas = null
+    let respVendas
     try {
-      httpRespVendas = await api.post('/imports/upload', formVendas, {
-        params: salesParams,
-        signal
-      })
-    } catch (errVendas) {
-      const conflictMsg = errVendas.response?.data?.message || ''
-      const matchReport = conflictMsg.match(/reportId=(\d+)/i)
-      if (errVendas.response?.status === 409 && matchReport) {
-        const existingReportId = matchReport[1]
-        const existingSales = await api.get(`/imports/${existingReportId}`, { signal })
-        httpRespVendas = existingSales
-      } else {
-        throw errVendas
-      }
+      respVendas = await process(vendasFile, 'SALES', 'VENDAS', 70)
+    } catch (error) {
+      const partial = new Error(`RH confirmado (relatório ${respRh.reportId}). Vendas não confirmadas: ${error.message} O RH permanece no banco; tente novamente após corrigir o problema.`)
+      partial.cause = error; partial.reportId = error.reportId; partial.code = error.code
+      partial.completedImports = [respRh]
+      throw partial
     }
-
-    const respVendas = await pollImportUntilDone(httpRespVendas.data, {
-      stage: 'VENDAS',
-      startPct: 60,
-      endPct: 95,
-      label: `base de Vendas (${vendasFile.name})`
-    })
 
     if (respVendas?.status === 'FALHOU') {
       const motivoVendas = respVendas.mensagem || 'A importação da base de Vendas falhou na validação relacional.'
       return {
         isCiclo: true,
-        competencia,
+        competencia: normalizedComp,
         nomeArquivo: `${rhFile.name} & ${vendasFile.name}`,
         tipoBase: 'CICLO_MENSAL',
         status: 'REJEITADO',
         totalLinhas: rhLinhas,
         linhasValidas: 0,
-        rejeicaoIntegral: true,
+        rejeicaoIntegral: false,
         rh: {
+          reportId: respRh.reportId,
           nomeArquivo: rhFile.name,
           totalLinhas: rhLinhas,
           linhasValidas: rhLinhas,
           status: 'SUCESSO'
         },
         vendas: {
+          reportId: respVendas.reportId,
           nomeArquivo: vendasFile.name,
           totalLinhas: 0,
           linhasValidas: 0,
@@ -572,20 +481,24 @@ export const dataService = {
 
     return {
       isCiclo: true,
-      competencia,
+      competencia: normalizedComp,
       nomeArquivo: `${respRh?.nomeArquivo || rhFile.name} & ${respVendas?.nomeArquivo || vendasFile.name}`,
       tipoBase: 'CICLO_MENSAL',
       status: 'SUCESSO',
       totalLinhas: totalGeral,
       linhasValidas: totalGeral,
       rejeicaoIntegral: false,
+      reportIds: [respRh.reportId, respVendas.reportId],
+      mensagens: [respRh.mensagem, respVendas.mensagem].filter(Boolean),
       rh: {
+        reportId: respRh.reportId,
         nomeArquivo: respRh?.nomeArquivo || rhFile.name,
         totalLinhas: rhLinhas,
         linhasValidas: rhLinhas,
         status: 'SUCESSO'
       },
       vendas: {
+        reportId: respVendas.reportId,
         nomeArquivo: respVendas?.nomeArquivo || vendasFile.name,
         totalLinhas: vendasLinhas,
         linhasValidas: vendasLinhas,
@@ -636,6 +549,12 @@ export const dataService = {
       normalizeCompetence(String(dataInicio || '').slice(0, 7)) ||
       normalizeCompetence(extractCompetenceFromFileName(file?.name))
 
+    if (importType !== 'HR' && !normalizedComp) throw new Error('Informe uma competência válida para a importação.')
+
+    if (importType === 'COMISSIONS' && dataInicio && dataFim && dataInicio.slice(0, 7) !== dataFim.slice(0, 7)) {
+      throw new Error('Importe as taxas de uma competência por vez; selecione datas do mesmo mês.')
+    }
+
     // Se solicitado a substituição da base existente para COMISSIONS, remove lotes concluídos anteriores da mesma competência
     if (substituirBase && normalizedComp && importType === 'COMISSIONS') {
       try {
@@ -655,77 +574,25 @@ export const dataService = {
               progress: 25,
               message: `Removendo base anterior da competência ${normalizedComp} (lote #${lote.reportId})...`
             })
-            await this.excluirLote(lote.reportId, 'Substituição pelo usuário').catch(() => {})
+            await this.excluirLote(lote.reportId, 'Substituição pelo usuário')
           }
         }
-      } catch {
-        // Ignora silenciosamente caso não haja lotes anteriores
+      } catch (error) {
+        throw new Error(`Não foi possível substituir a base anterior: ${error.response?.data?.message || error.message}`)
       }
     }
 
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('importType', importType)
-
-    onProgress?.({
-      stage: 'ENVIO',
-      progress: 35,
-      message: `Enviando planilha ${file.name} (${importType})...`
+    onProgress?.({ stage: 'ENVIO', progress: 35, message: `Enviando planilha ${file.name} (${importType})...` })
+    const data = await importBatchService.upload({
+      file, importType, competencia: normalizedComp, signal, allowFailedReport: true,
+      onStatus: (report) => onProgress?.({ stage: 'ENVIO', progress: 60, message: `Importação: ${report.status.toLowerCase()} (lote #${report.reportId}). ${report.mensagem || ''}` })
     })
-
-    const params = { importType }
-    if (normalizedComp && (importType === 'COMISSIONS' || importType === 'SALES')) {
-      params.competencia = normalizedComp
-    }
-
-    let response = null
-    try {
-      response = await api.post('/imports/upload', formData, {
-        params,
-        signal
-      })
-    } catch (uploadErr) {
-      const conflictMsg = uploadErr.response?.data?.message || ''
-      const matchReport = conflictMsg.match(/reportId=(\d+)/i)
-
-      if (uploadErr.response?.status === 409 && matchReport) {
-        const existingReportId = matchReport[1]
-        if (substituirBase && importType === 'COMISSIONS') {
-          await this.excluirLote(existingReportId, 'Substituição automática solicitada pelo usuário').catch(() => {})
-          response = await api.post('/imports/upload', formData, {
-            params,
-            signal
-          })
-        } else {
-          response = await api.get(`/imports/${existingReportId}`, { signal })
-        }
-      } else {
-        throw uploadErr
-      }
-    }
-
-    let data = response.data
-    let attempts = 0
-    const maxAttempts = 300
-    while (
-      data?.reportId &&
-      (data.status === 'PENDENTE' || data.status === 'PROCESSANDO') &&
-      attempts < maxAttempts
-    ) {
-      await new Promise((r) => setTimeout(r, 1000))
-      attempts += 1
-      onProgress?.({
-        stage: 'ENVIO',
-        progress: Math.min(95, 35 + Math.round((attempts / maxAttempts) * 60)),
-        message: `Processando planilha ${file.name} no servidor (lote #${data.reportId})...`
-      })
-      const pollRes = await api.get(`/imports/${data.reportId}`, { signal })
-      data = pollRes.data
-    }
 
     if (data?.status === 'FALHOU') {
       const motivo = data.mensagem || 'Não foi possível concluir a importação da planilha.'
       return {
+        reportId: data.reportId,
+        competencia: normalizedComp,
         nomeArquivo: data.nomeArquivo || file.name,
         tipoBase: data.tipoBase || importType,
         status: 'REJEITADO',
@@ -754,6 +621,9 @@ export const dataService = {
     })
 
     return {
+      reportId: data.reportId,
+      competencia: normalizedComp,
+      mensagens: [data.mensagem].filter(Boolean),
       nomeArquivo: data?.nomeArquivo || file.name,
       tipoBase: data?.tipoBase || importType,
       status: 'SUCESSO',
@@ -785,9 +655,11 @@ export const dataService = {
   async fetchCompetenciasReferencia() {
     try {
       const response = await api.get('/referencias/competencias')
-      return Array.isArray(response.data) ? response.data : null
-    } catch {
-      return null
+      if (!Array.isArray(response.data)) throw new Error('Resposta inválida ao consultar competências.')
+      return response.data
+    } catch (error) {
+      if ([404, 501].includes(error.response?.status)) return null
+      throw error
     }
   },
 
@@ -795,44 +667,15 @@ export const dataService = {
    * Consulta a base efetivada de Matrículas (RH) com paginação do Spring Boot
    */
   async fetchMatriculas({ page = 0, size = 20 }) {
-    try {
-      const response = await api.get('/matriculas', {
-        params: { page, size }
-      })
-      return response.data
-    } catch (err) {
-      console.error('Falha ao consultar matrículas:', err)
-      throw err
-    }
+    return (await api.get('/matriculas', { params: { page, size } })).data
   },
 
-  /**
-   * Exclui uma matrícula efetivada pelo ID (UUID)
-   * Trata 409 caso existam vendas vinculadas
-   */
-  async fetchMatriculas({ page = 0, size = 20 }) {
-    try {
-      const response = await api.get('/matriculas', {
-        params: { page, size }
-      })
-      return response.data
-    } catch (err) {
-      console.warn('Falha ao consultar matrículas do backend; retornando vazio:', err)
-      return { content: [], totalElements: 0, totalPages: 0 }
-    }
-  },
-
-  /**
-   * Exclui uma matrícula efetivada pelo ID (UUID)
-   * Trata 409 caso existam vendas vinculadas
-   */
   async deleteMatricula(id) {
     try {
       await api.delete(`/matriculas/${id}`)
       return true
     } catch (err) {
-      console.warn(`Simulando exclusão de matrícula ${id}:`, err)
-      return true
+      throw err
     }
   },
 
@@ -844,8 +687,7 @@ export const dataService = {
       const response = await api.delete('/matriculas/todas')
       return response.data
     } catch (err) {
-      console.warn('Endpoint /matriculas/todas não disponível, simulando exclusão:', err)
-      return { totalExcluido: 0 }
+      throw err
     }
   },
 
@@ -861,8 +703,7 @@ export const dataService = {
       const response = await api.get('/vendas', { params })
       return response.data
     } catch (err) {
-      console.warn('Falha ao consultar vendas do backend; retornando vazio:', err)
-      return { content: [], totalElements: 0, totalPages: 0 }
+      throw err
     }
   },
 
@@ -874,8 +715,7 @@ export const dataService = {
       await api.delete(`/vendas/${id}`)
       return true
     } catch (err) {
-      console.warn(`Simulando exclusão de venda ${id}:`, err)
-      return true
+      throw err
     }
   },
 
@@ -895,8 +735,7 @@ export const dataService = {
       const response = await api.delete(`/vendas/competencia/${mes}/${ano}`)
       return response.data
     } catch (err) {
-      console.warn(`Endpoint /vendas/competencia/${mes}/${ano} não disponível, simulando exclusão:`, err)
-      return { totalExcluido: 0 }
+      throw err
     }
   },
 
@@ -908,8 +747,7 @@ export const dataService = {
       const response = await api.delete('/vendas/todas')
       return response.data
     } catch (err) {
-      console.warn('Endpoint /vendas/todas não disponível, simulando exclusão:', err)
-      return { totalExcluido: 0 }
+      throw err
     }
   },
 
@@ -917,94 +755,15 @@ export const dataService = {
    * Consulta as taxas de comissão ativas (COMISS) com fallback elegante e seguro para dados do sistema
    */
   async fetchComissoes({ page = 0, size = 20 } = {}) {
-    const mockComissoes = [
-      { id: 'com-1', cargo: 'VENDEDOR LOJA', codCargo: 100, marca: 'PRETO', codMarca: 10, percentual: 0.025, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-2', cargo: 'GERENTE QUIOSQUE', codCargo: 150, marca: 'PRETO', codMarca: 10, percentual: 0.010, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-3', cargo: 'VENDEDOR BALCAO', codCargo: 200, marca: 'PRETO', codMarca: 10, percentual: 0.020, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-4', cargo: 'ASSISTENTE DE VENDAS', codCargo: 300, marca: 'PRETO', codMarca: 10, percentual: 0.015, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-5', cargo: 'VENDEDOR LOJA', codCargo: 100, marca: 'BRANCO', codMarca: 20, percentual: 0.030, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-6', cargo: 'GERENTE QUIOSQUE', codCargo: 150, marca: 'BRANCO', codMarca: 20, percentual: 0.015, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-7', cargo: 'VENDEDOR BALCAO', codCargo: 200, marca: 'BRANCO', codMarca: 20, percentual: 0.025, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-8', cargo: 'ASSISTENTE DE VENDAS', codCargo: 300, marca: 'BRANCO', codMarca: 20, percentual: 0.020, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-9', cargo: 'VENDEDOR LOJA', codCargo: 100, marca: 'AZUL', codMarca: 30, percentual: 0.020, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-10', cargo: 'GERENTE QUIOSQUE', codCargo: 150, marca: 'AZUL', codMarca: 30, percentual: 0.005, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-11', cargo: 'VENDEDOR BALCAO', codCargo: 200, marca: 'AZUL', codMarca: 30, percentual: 0.015, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-12', cargo: 'ASSISTENTE DE VENDAS', codCargo: 300, marca: 'AZUL', codMarca: 30, percentual: 0.010, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-13', cargo: 'VENDEDOR LOJA', codCargo: 100, marca: 'VERMELHO', codMarca: 40, percentual: 0.035, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-14', cargo: 'GERENTE QUIOSQUE', codCargo: 150, marca: 'VERMELHO', codMarca: 40, percentual: 0.020, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-15', cargo: 'VENDEDOR BALCAO', codCargo: 200, marca: 'VERMELHO', codMarca: 40, percentual: 0.030, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' },
-      { id: 'com-16', cargo: 'ASSISTENTE DE VENDAS', codCargo: 300, marca: 'VERMELHO', codMarca: 40, percentual: 0.025, vigenciaInicio: '2025-01-01', vigenciaFim: '2025-12-31' }
-    ]
-
-    try {
-      const response = await api.get('/bases-comissao', {
-        params: { page, size }
-      })
-      const data = response.data
-      const content = (data.content || []).map((it) => ({
-        id: it.id,
-        cargo: it.descriCargo || it.position?.description || 'Cargo Geral',
-        codCargo: it.codCargo ?? it.position?.code ?? 0,
-        marca: it.descrMarca || it.brand?.description || 'Marca Geral',
-        codMarca: it.codMarca ?? it.brand?.code ?? 0,
-        percentual:
-          it.percentual != null
-            ? Number(it.percentual)
-            : it.taxaComissao != null
-              ? Number(it.taxaComissao)
-              : it.percentage != null
-                ? Number(it.percentage)
-                : 0.0,
-        vigenciaInicio: it.mesReferencia || it.referenceMonth || '2025-01-01',
-        vigenciaFim: it.mesReferencia || it.referenceMonth || '2025-12-31'
-      }))
-
-      return {
-        ...data,
-        content
-      }
-    } catch {
-      try {
-        const response = await api.get('/comissoes', {
-          params: { page, size }
-        })
-        const data = response.data
-        const content = (data.content || []).map((it) => ({
-          id: it.id,
-          cargo: it.position?.description || 'Cargo Geral',
-          codCargo: it.position?.code || 0,
-          marca: it.brand?.description || 'Marca Geral',
-          codMarca: it.brand?.code || 0,
-          percentual:
-            it.percentual != null
-              ? Number(it.percentual)
-              : it.percentage != null
-                ? Number(it.percentage)
-                : 0.0,
-          vigenciaInicio: it.referenceMonth || '2025-01-01',
-          vigenciaFim: it.referenceMonth || '2025-12-31'
-        }))
-
-        return {
-          ...data,
-          content
-        }
-      } catch (err) {
-        console.warn('Backend sem endpoint /bases-comissao ou /comissoes; utilizando taxas base configuradas no sistema:', err)
-      }
-    }
-
-    const start = page * size
-    const pagedContent = mockComissoes.slice(start, start + size)
+    const { data } = await api.get('/bases-comissao', { params: { page, size } })
     return {
-      content: pagedContent,
-      totalElements: mockComissoes.length,
-      totalPages: Math.ceil(mockComissoes.length / size),
-      size,
-      number: page,
-      first: page === 0,
-      last: start + size >= mockComissoes.length,
-      empty: false
+      ...data,
+      content: (data.content || []).map((item) => ({
+        ...item, cargo: item.descriCargo, marca: item.descrMarca,
+        percentual: item.percentual,
+        vigenciaInicio: item.mesReferencia,
+        vigenciaFim: getCompetenceDateRange(item.mesReferencia?.slice(0, 7)).dataFim
+      }))
     }
   },
 
@@ -1016,8 +775,7 @@ export const dataService = {
       await api.delete(`/bases-comissao/${id}`)
       return true
     } catch (err) {
-      console.warn(`Simulando exclusão de taxa de comissão ${id}:`, err)
-      return true
+      throw err
     }
   },
 
@@ -1025,18 +783,7 @@ export const dataService = {
    * Exclui todas as taxas de comissão
    */
   async deleteTodasComissoes() {
-    try {
-      const response = await api.delete('/bases-comissao/todas')
-      return response.data
-    } catch (err) {
-      try {
-        const fallback = await api.delete('/comissoes/todas')
-        return fallback.data
-      } catch (fallbackErr) {
-        console.warn('Simulando exclusão de todas as comissões:', fallbackErr)
-        return { totalExcluido: 0 }
-      }
-    }
+    const response = await api.delete('/bases-comissao/todas')
+    return response.data
   }
 }
-

@@ -31,10 +31,8 @@
         </template>
       </CampaignProposalCard>
     </fieldset>
-    <div v-if="state.loading" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-[22px] bg-white/80 p-5" role="status" aria-live="polite">
-      <LoaderCircle :size="30" class="text-brand-dark motion-safe:animate-spin" />
-      <p class="font-bold text-brand-dark motion-safe:animate-pulse">Reinterpretando regra {{ index + 1 }}…</p>
-      <button type="button" class="focus-ring rounded-full border border-sage-border-dark bg-white px-4 py-2 text-sm font-bold" @click="cancel">Cancelar interpretação</button>
+    <div v-if="state.loading" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-[22px] bg-white/80 p-5">
+      <CampaignRequestStatus class="w-full max-w-lg" :message="'Reinterpretando regra ' + (index + 1) + '…'" @cancel="cancel" />
     </div>
     <CampaignRuleReviewDialog :open="state.reviewing" :state="state" :index="index" :client-id="proposal.clientId" :demo="provider.mode === 'demo'" :can-apply="session.canApply()" :stale="state.reviewing && !session.isCurrent()" @cancel="cancel" @closed="restoreEditorFocus" @text="state.text = $event" @reinterpret="session.interpret" @correct="session.correct" @confirm="confirm" />
   </div>
@@ -42,8 +40,9 @@
 
 <script setup>
 import { nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { LoaderCircle, Pencil } from 'lucide-vue-next'
+import { Pencil } from 'lucide-vue-next'
 import CampaignProposalCard from './CampaignProposalCard.vue'
+import CampaignRequestStatus from './CampaignRequestStatus.vue'
 import CampaignRuleReviewDialog from './CampaignRuleReviewDialog.vue'
 import { createRuleReinterpretationSession } from '@/services/ruleReinterpretation'
 

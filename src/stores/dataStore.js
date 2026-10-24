@@ -122,7 +122,7 @@ export const useDataStore = defineStore('data', {
 
     podeEnviar: (state) => {
       if (state.uploadModal.modo === 'CICLO') {
-        return !!(state.uploadModal.rhFile && state.uploadModal.vendasFile && state.uploadModal.competencia)
+        return !!(state.uploadModal.rhFile && state.uploadModal.vendasFile && normalizeCompetence(state.uploadModal.competencia))
       }
       return !!(state.uploadModal.comissFile && state.uploadModal.dataInicio && state.uploadModal.dataFim)
     },
@@ -156,51 +156,38 @@ export const useDataStore = defineStore('data', {
       this.competenciasError = ''
 
       try {
-        const previous = new Map(this.competencias.map((competencia) => [competencia.competencia, competencia]))
-        const refCompetencias =
-          typeof dataService.fetchCompetenciasReferencia === 'function'
-            ? await dataService.fetchCompetenciasReferencia()
-            : null
-
-        let groups = []
-        if (Array.isArray(refCompetencias) && refCompetencias.length > 0) {
-          groups = refCompetencias
-            .filter((item) => Number(item.totalVendas) > 0)
-            .map((item) => ({
-              competence: normalizeCompetence(item.competencia) || item.competencia,
-              salesCount: Number(item.totalVendas)
-            }))
-        } else {
-          const sales = await dataService.listAllSales()
-          groups = groupSalesByCompetence(sales)
-        }
-
-        const fromSales = groups.map((group) => {
-          const existing = previous.get(group.competence)
-          const previousCommission = existing?.bases?.find((base) => base.tipo === 'COMISS')?.value
-          const previousRh = existing?.bases?.find((base) => base.tipo === 'RH')?.value
+        const references = await dataService.fetchCompetenciasReferencia()
+        const groups = references === null
+          ? groupSalesByCompetence(await dataService.listAllSales()).map((g) => ({ competencia: g.competence, totalVendas: g.salesCount }))
+          : references
+        const persisted = groups.map((reference) => {
+          const month = normalizeCompetence(reference.competencia)
+          if (!month) throw new Error('O backend retornou uma competência inválida.')
+          const salesCount = Number(reference.totalVendas)
+          if (!Number.isInteger(salesCount) || salesCount < 0) throw new Error('Contagem de vendas inválida.')
+          const available = reference.statusReferencia === 'DISPONIVEL'
           return {
-            ...(existing || {}),
-            name: formatCompetenceLabel(group.competence),
-            competencia: group.competence,
-            competenciaCodigo: formatCompetenceCode(group.competence),
-            status: 'Vendas disponíveis',
-            tone: 'success',
-            cicloFechado: true,
-            vendasCount: group.salesCount,
+            name: formatCompetenceLabel(month), competencia: month,
+            competenciaCodigo: formatCompetenceCode(month),
+            status: available ? 'Referência disponível' : salesCount > 0 ? 'Vendas disponíveis' : 'Sem vendas',
+            tone: available ? 'success' : 'warning',
+            cicloFechado: salesCount > 0, vendasCount: salesCount,
+            statusReferencia: reference.statusReferencia, mensagens: reference.mensagens || [],
             bases: [
-              { tipo: 'RH', label: 'RH', value: previousRh || 'Vínculos verificados no cálculo' },
-              { tipo: 'VENDAS', label: 'Vendas', value: `${group.salesCount.toLocaleString('pt-BR')} registros persistidos` },
-              { tipo: 'COMISS', label: 'Comissão', value: previousCommission || 'Resolvida no cálculo' }
+              { tipo: 'RH', label: 'RH', value: reference.totalVendasComVinculoValido == null ? 'Vínculos verificados no cálculo' : `${reference.totalVendasComVinculoValido} vendas com vínculo válido` },
+              { tipo: 'VENDAS', label: 'Vendas', value: `${salesCount} registros persistidos` },
+              { tipo: 'COMISS', label: 'Comissão', value: reference.possuiBaseComiss ? `${reference.totalTaxasBaseCadastradas} taxas cadastradas` : 'Pendente' }
             ]
           }
-        })
+        }).sort((a, b) => b.competencia.localeCompare(a.competencia))
+        const activeMonth = normalizeCompetence(this.activeJob.competencia)
+        const processing = this.activeJob.status === 'PROCESSING'
+          ? this.competencias.filter((item) => item.competencia === activeMonth && !persisted.some((saved) => saved.competencia === activeMonth))
+          : []
+        this.competencias = [...persisted, ...processing]
 
-        const salesCodes = new Set(fromSales.map((c) => c.competenciaCodigo))
-        const nonSales = this.competencias.filter((c) => !salesCodes.has(c.competenciaCodigo))
-        this.competencias = [...fromSales, ...nonSales]
       } catch (error) {
-        this.competenciasError = error?.response?.data?.message || 'Não foi possível consultar as vendas persistidas.'
+        this.competenciasError = error?.response?.data?.message || error.message || 'Não foi possível consultar as competências persistidas.'
       } finally {
         this.competenciasLoading = false
       }
@@ -503,7 +490,7 @@ export const useDataStore = defineStore('data', {
           return
         }
 
-        if (!this.uploadModal.competencia) {
+        if (!normalizeCompetence(this.uploadModal.competencia)) {
           this.uploadModal.errorMessage = 'Informe a competência no formato MM/AAAA (ex: 08/2025).'
           return
         }
@@ -617,7 +604,7 @@ export const useDataStore = defineStore('data', {
 
             notifStore.success(
               'Ciclo Fechado com Sucesso!',
-              `Competência ${compCodigo}: ${response.rh?.totalLinhas || 0} colaboradores e ${response.vendas?.totalLinhas || 0} vendas persistidos.`,
+              `Competência ${compCodigo}: ${response.rh?.totalLinhas ?? 0} linhas de RH processadas e ${response.vendas?.totalLinhas ?? 0} vendas confirmadas.`,
               {
                 duration: 9000,
                 actionLabel: 'Ver Relatório',
@@ -659,6 +646,7 @@ export const useDataStore = defineStore('data', {
             targetComp.tone = 'danger'
           }
 
+          if (cenario === 'real') await this.loadCompetenciasFromSales()
           notifStore.error(
             'Falha no Processamento',
             msg,
@@ -756,8 +744,8 @@ export const useDataStore = defineStore('data', {
             competencia: comissCompCodigo,
             competenciaNome: comissCompNome,
             nomeArquivo: comissFile.name,
-            totalLinhas: response.totalLinhas || 1,
-            linhasValidas: response.linhasValidas || 1,
+            totalLinhas: response.totalLinhas ?? 0,
+            linhasValidas: response.linhasValidas ?? 0,
             status: response.status,
             rejeicaoIntegral: response.rejeicaoIntegral === true,
             report: response
@@ -768,12 +756,12 @@ export const useDataStore = defineStore('data', {
             this.activeJob.progress = 100
             this.activeJob.message = 'Taxas de comissão salvas com sucesso!'
 
-            // Atualiza o indicador COMISS nas competências existentes sem criar um card avulso de Dezembro
-            this.competencias.forEach((c) => {
+            this.competencias.filter((c) => c.competencia === vigComp).forEach((c) => {
               const comissBase = c.bases.find((b) => b.tipo === 'COMISS')
-              if (comissBase) comissBase.value = `${response.totalLinhas || 1} taxas ativas`
+              if (comissBase) comissBase.value = `${response.totalLinhas ?? 0} taxas ativas`
             })
 
+            if (cenario === 'real') await this.loadCompetenciasFromSales()
             notifStore.success(
               'Taxas de Comissão Processadas',
               `${response.totalLinhas || 0} regras de comissão válidas cadastradas com sucesso.`,
@@ -805,6 +793,7 @@ export const useDataStore = defineStore('data', {
           this.activeJob.status = 'ERROR'
           this.activeJob.error = msg
 
+          if (cenario === 'real') await this.loadCompetenciasFromSales()
           notifStore.error('Falha no Envio', msg)
         } finally {
           this.uploadModal.isLoading = false
@@ -812,9 +801,16 @@ export const useDataStore = defineStore('data', {
       }
     },
 
-    concluirCarga() {
+    async concluirCarga() {
       const rep = this.uploadModal.report
-      if (!rep) return
+      if (!rep || !this.podeConcluir) return
+      if (this.uploadModal.cenarioTeste === 'real') {
+        this.limparJobConcluido()
+        this.closeUploadModal()
+        await this.loadCompetenciasFromSales()
+        await this.carregarDadosEfetivados()
+        return
+      }
 
       if (this.uploadModal.modo === 'CICLO') {
         const compCodigo = this.uploadModal.competencia?.trim()
@@ -852,7 +848,8 @@ export const useDataStore = defineStore('data', {
       const novo = {
         id: 'env-' + Date.now(),
         criadoEm: new Date().toISOString(),
-        ...envioData
+        ...envioData,
+        reportId: envioData.reportId || envioData.report?.reportId || null
       }
       this.enviosHistorico.unshift(novo)
     },
@@ -899,57 +896,10 @@ export const useDataStore = defineStore('data', {
      * Garante que após F5 ou exclusão, os cards reflitam com precisão o estado real do banco.
      */
     async sincronizarCompetenciasComBanco() {
-      try {
-        const resumo = await dataService.fetchResumoCompetencias()
-        if (!resumo) return
-
-        const totalRh = resumo.totalMatriculas || 0
-        const totalComiss = resumo.totalComissoes || 0
-        const vendasMap = resumo.vendasPorCompetencia || {}
-
-        this.competencias.forEach((comp) => {
-          const cod = comp.competenciaCodigo?.trim()
-          const vendasQtd = cod && vendasMap[cod] != null ? Number(vendasMap[cod]) : 0
-
-          const rhBase = comp.bases.find((b) => b.tipo === 'RH')
-          const vendasBase = comp.bases.find((b) => b.tipo === 'VENDAS')
-          const comissBase = comp.bases.find((b) => b.tipo === 'COMISS')
-
-          // VENDAS
-          if (vendasBase) {
-            vendasBase.value = vendasQtd > 0 ? `${vendasQtd.toLocaleString('pt-BR')} registros` : 'Pendente'
-          }
-
-          // RH (Quadro ativo)
-          if (rhBase) {
-            rhBase.value = totalRh > 0 ? `${totalRh.toLocaleString('pt-BR')} registros` : 'Pendente'
-          }
-
-          // COMISS (Taxas ativas)
-          if (comissBase) {
-            comissBase.value = totalComiss > 0 ? `${totalComiss} taxas` : 'Pendente'
-          }
-
-          // Status do Ciclo: Fechado se houver vendas daquela competência no banco
-          if (vendasQtd > 0) {
-            comp.status = 'Ciclo Fechado'
-            comp.tone = 'success'
-            comp.cicloFechado = true
-          } else {
-            comp.status = 'Ciclo com pendências'
-            comp.tone = 'warning'
-            comp.cicloFechado = false
-          }
-        })
-      } catch (err) {
-        console.error('Falha ao sincronizar competências com o banco:', err)
-      }
+      await this.loadCompetenciasFromSales()
     },
 
     async carregarDadosEfetivados() {
-      // Sincroniza os contadores das competências em paralelo
-      this.sincronizarCompetenciasComBanco()
-
       this.dadosEfetivados.loading = true
       this.dadosEfetivados.error = null
       const tipo = this.dadosEfetivados.tipoBaseAtiva
@@ -1130,7 +1080,9 @@ export const useDataStore = defineStore('data', {
             notifStore.success('Taxa Excluída', 'A taxa de comissão foi removida com sucesso.')
           }
 
+          invalidateCalculationCache()
           this.fecharModalExclusao()
+          await this.loadCompetenciasFromSales()
           await this.carregarDadosEfetivados()
         } else if (this.modalExclusao.tipo === 'BASE_COMPETENCIA') {
           const compCodigo = this.modalExclusao.item?.competenciaCodigo
@@ -1167,6 +1119,7 @@ export const useDataStore = defineStore('data', {
           await this.carregarDadosEfetivados()
         } else if (this.modalExclusao.tipo === 'TODAS_MATRICULAS') {
           const res = await dataService.deleteTodasMatriculas()
+          invalidateCalculationCache()
           this.competencias.forEach(comp => {
             const rh = comp.bases.find(b => b.tipo === 'RH')
             if (rh) rh.value = 'Pendente'
@@ -1178,6 +1131,7 @@ export const useDataStore = defineStore('data', {
             `Todas as matrículas (${totalExc} registros) foram excluídas com sucesso do banco de dados.`
           )
           this.fecharModalExclusao()
+          await this.loadCompetenciasFromSales()
           await this.carregarDadosEfetivados()
         } else if (this.modalExclusao.tipo === 'TODAS_COMISSOES') {
           const res = await dataService.deleteTodasComissoes()
@@ -1193,21 +1147,24 @@ export const useDataStore = defineStore('data', {
             `Todas as taxas de comissão base (${totalExc} registros) foram excluídas com sucesso do banco de dados.`
           )
           this.fecharModalExclusao()
+          await this.loadCompetenciasFromSales()
           await this.carregarDadosEfetivados()
         } else if (this.modalExclusao.tipo === 'ENVIO') {
           const item = this.modalExclusao.item
-          if (item?.reportId) {
-            await dataService.excluirLote(item.reportId, 'Exclusão solicitada pelo usuário').catch(() => {})
-          }
+          if (!item?.reportId) throw new Error('Este envio não possui um identificador único de lote. Use a exclusão da base ou dos registros correspondentes.')
+          await dataService.excluirLote(item.reportId, 'Exclusão solicitada pelo usuário')
+          invalidateCalculationCache()
+
           const id = item?.id
           this.enviosHistorico = this.enviosHistorico.filter(e => e.id !== id)
           notifStore.success('Envio Excluído', 'O registro de envio e seus dados correspondentes foram removidos com sucesso.')
           this.fecharModalExclusao()
+          await this.loadCompetenciasFromSales()
           await this.carregarDadosEfetivados()
         }
       } catch (err) {
         console.error('Falha na exclusão:', err)
-        const msg = err.message || 'Falha ao processar exclusão.'
+        const msg = err.response?.data?.message || err.message || 'Falha ao processar exclusão.'
         notifStore.error('Erro na Exclusão', msg)
       } finally {
         this.modalExclusao.loading = false

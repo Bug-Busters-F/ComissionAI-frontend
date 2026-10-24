@@ -6,7 +6,7 @@
         <p id="remove-proposal-description" class="mt-3 text-sm leading-6 text-sage-muted">Este bloco será removido desta campanha. As outras regras serão mantidas.</p>
         <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button ref="cancelButton" type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark" @click="$emit('cancel')">Manter regra</button>
-          <button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-white" @click="$emit('confirm')">Remover regra</button>
+          <button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-danger-dark" @click="$emit('confirm')">Remover regra</button>
         </div>
       </section>
     </div>

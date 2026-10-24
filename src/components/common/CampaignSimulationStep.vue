@@ -847,7 +847,7 @@
               Memória do Cálculo Individual
             </p>
             <h3 id="calculation-memory-title" class="mt-1 text-xl font-extrabold text-brand-dark">
-              Venda {{ selectedRow.memoriaCalculo.identificadorVenda }} · Matrícula {{ selectedRow.matricula }}
+              Venda {{ selectedRow.saleId }} · Matrícula {{ selectedRow.matricula }}
             </h3>
           </div>
           <button
@@ -859,6 +859,8 @@
           </button>
         </div>
 
+        <pre v-if="typeof selectedRow.memoriaCalculo === 'string'" class="mt-5 whitespace-pre-wrap break-words rounded-xl bg-sage-light p-4 text-sm text-brand-dark">{{ selectedRow.memoriaCalculo }}</pre>
+        <template v-else>
         <dl class="mt-5 grid gap-3 sm:grid-cols-2 text-sm">
           <div class="rounded-2xl bg-sage-light p-3.5">
             <dt class="text-xs font-bold uppercase tracking-[0.08em] text-sage-muted">1. Identificador e Data da Venda</dt>
@@ -948,6 +950,7 @@
             </div>
           </div>
         </div>
+        </template>
       </div>
     </div>
   </div>
@@ -980,7 +983,8 @@ import { checkProposalCoverage } from '@/services/coverageService'
 const showPremises = ref(false)
 
 const props = defineProps({
-  demo: { type: Object, required: true },
+  demo: { type: Object, default: () => ({}) },
+  serverPagination: { type: Object, default: null },
   form: { type: Object, default: () => ({}) },
   interpretation: { type: Object, default: () => ({}) },
   simulation: {
@@ -1033,8 +1037,8 @@ const durationInfo = computed(() =>
   calculateCampaignDuration(props.form?.dataInicio, props.form?.dataFim)
 )
 
-const durationDays = computed(() => durationInfo.value.dias)
-const durationFactorText = computed(() => durationInfo.value.fatorTexto)
+const durationDays = computed(() => props.simulation.result?.diasInclusivos ?? durationInfo.value.dias)
+const durationFactorText = computed(() => props.simulation.result?.fatorProjecao ?? durationInfo.value.fatorTexto)
 
 const periodSummary = computed(() =>
   formatPeriodArrow(props.form?.dataInicio, props.form?.dataFim)
@@ -1125,7 +1129,7 @@ const projectedVariationCards = computed(() => {
 })
 
 const paginationInfo = computed(() =>
-  paginateSimulationItems(
+  props.serverPagination || paginateSimulationItems(
     simulationResult.value?.rows || [],
     props.simulation?.page || 1,
     props.simulation?.pageSize || 10
@@ -1171,16 +1175,17 @@ function closeMemoryModal() {
 }
 
 function currency(value) {
-  return formatSimulationCurrency(value)
+  return value == null ? 'Não informado' : formatSimulationCurrency(value)
 }
 
 function signedCurrency(value) {
-  const numeric = Number(value || 0)
+  if (value == null) return 'Não informado'
+  const numeric = Number(value)
   const formatted = formatSimulationCurrency(Math.abs(numeric))
   return numeric >= 0 ? `+${formatted}` : `-${formatted}`
 }
 
 function percent(value) {
-  return formatSimulationPercent(value)
+  return value == null ? 'Não informado' : formatSimulationPercent(value)
 }
 </script>

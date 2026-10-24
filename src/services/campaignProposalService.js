@@ -26,6 +26,7 @@ export function createCampaignProposalProvider({ mode = defaultMode(), client = 
         interpret: typeof client.interpretCampaign === 'function',
         reinterpret: typeof client.reinterpretRule === 'function',
         validate: typeof client.validateCampaign === 'function',
+        artifacts: typeof client.updateArtifacts === 'function',
         persist: typeof client.saveDraft === 'function',
         simulate: typeof client.simulateCampaign === 'function',
         examples: false
@@ -34,6 +35,7 @@ export function createCampaignProposalProvider({ mode = defaultMode(), client = 
         interpret: false,
         reinterpret: safeMode === 'demo',
         validate: false,
+        artifacts: false,
         persist: false,
         simulate: false,
         examples: safeMode === 'demo'
@@ -53,6 +55,10 @@ export function createCampaignProposalProvider({ mode = defaultMode(), client = 
     reinterpretRule(input, options = {}) {
       if (!capabilities.reinterpret) return unavailable('reinterpretRule')
       return safeMode === 'demo' ? reinterpretRuleDemo(input, options) : client.reinterpretRule(input, options)
+    },
+    updateArtifacts(input, options = {}) {
+      if (!capabilities.artifacts) return unavailable('updateArtifacts')
+      return client.updateArtifacts(input, options)
     },
     validateCampaign(input, options = {}) {
       if (!capabilities.validate) return unavailable('validateCampaign')

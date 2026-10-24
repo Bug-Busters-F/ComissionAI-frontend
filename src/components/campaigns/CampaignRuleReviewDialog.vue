@@ -1,11 +1,11 @@
 <template>
   <Teleport to="body">
     <dialog ref="dialog" class="rule-review w-[calc(100%-2rem)] max-w-2xl rounded-[22px] bg-white p-0 text-brand-dark shadow-2xl" :aria-labelledby="titleId" @cancel.prevent="$emit('cancel')" @close="$emit('closed')" @keydown="trapFocus">
-      <div class="max-h-[85dvh] overflow-y-auto p-5 sm:p-7">
+      <div class="max-h-[85dvh] overflow-y-auto px-5 pt-5 sm:px-7 sm:pt-7">
         <header class="flex items-start justify-between gap-4">
           <div>
             <h2 :id="titleId" class="text-xl font-extrabold">Revisar regra {{ index + 1 }}</h2>
-            <p class="mt-2 text-sm leading-6 text-sage-muted">Confira os valores antes de substituir. Os demais campos serão preservados.</p>
+            <p class="mt-2 text-sm leading-6 text-sage-muted">{{ description }}</p>
           </div>
           <button type="button" class="focus-ring rounded-full p-2" aria-label="Cancelar revisão" @click="$emit('cancel')"><X :size="20" /></button>
         </header>
@@ -20,6 +20,8 @@
         <p v-if="state.error" class="mt-4 rounded-xl bg-danger-bg p-3 text-sm text-danger-dark" role="alert">{{ state.error }}</p>
         <p v-if="stale" class="mt-4 rounded-xl bg-warning-bg p-3 text-sm text-warning-text" role="alert">A regra ou o contexto mudou. Cancele e abra novamente a edição.</p>
         <div v-if="state.result" class="mt-5 space-y-3" :aria-busy="state.loading">
+          <slot name="before-comparison" />
+          <slot name="comparison">
           <p class="text-xs font-bold uppercase tracking-wide text-sage-muted">Atual → Proposto</p>
           <div v-for="field in Object.keys(state.result.campos)" :key="field" class="rounded-xl border border-sage-border p-3">
             <label :for="titleId + '-' + field" class="block text-sm font-bold">{{ labels[field] }}</label>
@@ -38,11 +40,13 @@
               <span v-if="state.corrected.includes(field)" class="font-bold text-brand-dark">Corrigido nesta revisão</span>
             </div>
           </div>
-          <p v-for="item in state.result.pendencias" :key="item.id" class="rounded-xl bg-warning-bg p-3 text-sm text-warning-text">{{ item.mensagem }}</p>
+          </slot>
+          <p v-for="item in state.result.pendencias" :key="item.id" class="rounded-xl p-3 text-sm" :class="item.severidade === 'IMPEDITIVO' ? 'bg-danger-bg text-danger-dark' : 'bg-warning-bg text-warning-text'"><strong v-if="item.severidade">{{ item.severidade === 'IMPEDITIVO' ? 'Impeditiva: ' : 'Aviso: ' }}</strong>{{ item.mensagem }}</p>
+          <slot name="after-comparison" />
         </div>
-        <footer class="mt-6 flex justify-end gap-3">
+        <footer class="sticky bottom-0 mt-6 flex justify-end gap-3 border-t border-sage-border bg-white py-3">
           <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold" @click="$emit('cancel')">Cancelar</button>
-          <button type="button" class="focus-ring rounded-full bg-brand px-6 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50" :disabled="!canApply" @click="$emit('confirm')">OK</button>
+          <button type="button" class="focus-ring rounded-full bg-brand px-6 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50" :disabled="!canApply" @click="$emit('confirm')">{{ confirmLabel }}</button>
         </footer>
       </div>
     </dialog>
@@ -50,14 +54,16 @@
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 import { RULE_BOOLEAN_FIELDS as booleanFields, RULE_FIELD_LABELS as labels } from '@/services/ruleReinterpretation'
 
-const props = defineProps({ open: Boolean, state: { type: Object, required: true }, index: Number, clientId: String, demo: Boolean, canApply: Boolean, stale: Boolean })
+const props = defineProps({ open: Boolean, state: { type: Object, required: true }, index: Number, clientId: String, demo: Boolean, canApply: Boolean, stale: Boolean,
+  description: { type: String, default: 'Confira os valores antes de substituir. Os demais campos serão preservados.' },
+  confirmLabel: { type: String, default: 'OK' } })
 defineEmits(['cancel', 'closed', 'text', 'reinterpret', 'correct', 'confirm'])
 const dialog = ref(null)
-const titleId = 'review-rule-' + encodeURIComponent(props.clientId)
+const titleId = 'review-rule-' + useId()
 watch(() => props.open, async (open) => {
   await nextTick()
   if (open && !dialog.value.open) {

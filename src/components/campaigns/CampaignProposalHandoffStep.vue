@@ -2,7 +2,7 @@
   <div class="space-y-5">
     <section class="rounded-[22px] border border-warning-border bg-warning-bg p-5 sm:p-6" aria-labelledby="simulation-unavailable-heading">
       <h2 id="simulation-unavailable-heading" class="text-xl font-extrabold text-warning-text">Simulação ainda não disponível para esta campanha</h2>
-      <p class="mt-2 text-sm leading-6 text-warning-text">Os campos passaram pela verificação local. Cadastros, conflitos e resultados financeiros ainda não foram validados pelo serviço.</p>
+      <p class="mt-2 text-sm leading-6 text-warning-text">Os campos passaram pela verificação local. As verificações disponíveis são apresentadas por regra. Esta etapa não executa cálculo financeiro nem confirma resultados.</p>
       <p class="mt-3 text-sm font-bold text-warning-text">{{ snapshot.propostas.length }} regras mantidas no resumo desta campanha.</p>
     </section>
     <CampaignProposalReviewSummary :campaign="campaign" :validation="validation" />

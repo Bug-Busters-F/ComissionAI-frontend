@@ -5,7 +5,7 @@
     </button>
     <Teleport to="body">
       <div v-if="opened" :id="tooltipId" ref="panel" role="tooltip" class="fixed z-[70] rounded-xl border border-sage-border bg-white px-4 py-3 text-xs leading-5 text-brand-dark shadow-lg" :style="position" @mouseenter="hold" @mouseleave="scheduleClose">
-        Aqui será apresentada a origem deste valor, como texto informado, cadastro consultado, base de comissão ou edição manual.
+        {{ origin }}
       </div>
     </Teleport>
   </span>
@@ -15,7 +15,7 @@
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import { CircleHelp } from 'lucide-vue-next'
 
-defineProps({ fieldLabel: { type: String, required: true } })
+defineProps({ fieldLabel: { type: String, required: true }, origin: { type: String, default: 'Origem não informada.' } })
 const tooltipId = 'field-origin-' + useId()
 const trigger = ref(null)
 const panel = ref(null)
