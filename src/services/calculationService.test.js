@@ -6,6 +6,7 @@ import {
   normalizeCalculationError,
   normalizeCalculationResult
 } from './calculationService'
+import { ASYNC_EXECUTION_STATES } from './asyncExecutionService'
 
 vi.mock('./api', () => ({
   default: {
@@ -14,8 +15,22 @@ vi.mock('./api', () => ({
   }
 }))
 
+function createStorage() {
+  const values = new Map()
+  return {
+    get length() { return values.size },
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) { values.set(key, String(value)) },
+    removeItem(key) { values.delete(key) },
+    key(index) { return [...values.keys()][index] || null }
+  }
+}
+
 describe('calculationService', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    globalThis.window = { sessionStorage: createStorage() }
+  })
 
   it('sends one competence calculation request with the normalized backend contract', async () => {
     const signal = new AbortController().signal
@@ -82,5 +97,63 @@ describe('calculationService', () => {
   it('explains timeout and network failures without retrying', () => {
     expect(normalizeCalculationError({ code: 'ECONNABORTED' }).kind).toBe('timeout')
     expect(normalizeCalculationError(new Error('offline')).kind).toBe('network')
+  })
+
+  it('executes async calculation emitting AGUARDANDO, PROCESSANDO and CONCLUIDA with executionId APUR', async () => {
+    const onProgress = vi.fn()
+    api.post.mockResolvedValueOnce({
+      data: {
+        competencia: '2026-10',
+        totalVendasProcessadas: 5,
+        totalCalculados: 5,
+        totalImpedimentos: 0,
+        resultados: []
+      }
+    })
+
+    const result = await calculationService.executeAsyncCalculation('10/2026', {
+      recalcular: true,
+      onProgress
+    })
+
+    expect(result.competencia).toBe('2026-10')
+    expect(result.recalculoExecutado).toBe(true)
+    expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({
+      executionId: expect.stringMatching(/^APUR-202610-/),
+      status: ASYNC_EXECUTION_STATES.AGUARDANDO
+    }))
+    expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({
+      status: ASYNC_EXECUTION_STATES.PROCESSANDO
+    }))
+    expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({
+      status: ASYNC_EXECUTION_STATES.CONCLUIDA,
+      progress: 100
+    }))
+
+    // Recuperação de sessão pós-F5
+    const recovered = calculationService.recoverActiveCalculation('2026-10')
+    expect(recovered).toMatchObject({
+      competencia: '2026-10',
+      status: ASYNC_EXECUTION_STATES.CONCLUIDA
+    })
+
+    calculationService.clearActiveCalculation('2026-10')
+    expect(calculationService.recoverActiveCalculation('2026-10')).toBeNull()
+  })
+
+  it('emits FALHOU and persists error in session storage when calculation fails', async () => {
+    const onProgress = vi.fn()
+    api.post.mockRejectedValueOnce({
+      response: { status: 400, data: { message: 'Erro na apuração' } }
+    })
+
+    await expect(calculationService.executeAsyncCalculation('2026-10', { onProgress }))
+      .rejects
+      .toMatchObject({ message: 'Erro na apuração' })
+
+    expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({
+      status: ASYNC_EXECUTION_STATES.FALHOU,
+      progress: 100
+    }))
   })
 })

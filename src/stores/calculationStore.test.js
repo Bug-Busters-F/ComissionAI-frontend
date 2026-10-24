@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { calculationService } from '@/services/calculationService'
 import { saveCalculationCache } from '@/services/calculationCache'
+import { ASYNC_EXECUTION_STATES } from '@/services/asyncExecutionService'
 import { CALCULATION_OPERATION } from '@/services/calculationFlow'
 import { CALCULATION_STATUS, useCalculationStore } from './calculationStore'
 
@@ -13,7 +14,10 @@ const notificationMock = vi.hoisted(() => ({
 
 vi.mock('@/services/calculationService', () => ({
   calculationService: {
-    calculateByCompetence: vi.fn()
+    calculateByCompetence: vi.fn(),
+    executeAsyncCalculation: vi.fn(),
+    recoverActiveCalculation: vi.fn(),
+    clearActiveCalculation: vi.fn()
   },
   normalizeCalculationError: vi.fn((error) => ({
     kind: error?.code === 'ECONNABORTED' ? 'timeout' : 'network',
@@ -55,19 +59,38 @@ describe('calculationStore', () => {
     }
   })
 
-  it('mantém a execução global e envia o modo normal como booleano', async () => {
-    calculationService.calculateByCompetence.mockResolvedValueOnce(successfulResponse())
+  it('mantém a execução global e emite estados assíncronos', async () => {
+    calculationService.executeAsyncCalculation.mockImplementationOnce(async (comp, { onProgress }) => {
+      onProgress({
+        executionId: 'APUR-202507-ABC12',
+        status: ASYNC_EXECUTION_STATES.AGUARDANDO,
+        progress: 15,
+        stage: 'Aguardando fila e validação de cobertura...'
+      })
+      onProgress({
+        executionId: 'APUR-202507-ABC12',
+        status: ASYNC_EXECUTION_STATES.PROCESSANDO,
+        progress: 50,
+        stage: 'Calculando comissões no servidor...'
+      })
+      return successfulResponse()
+    })
+
     const store = useCalculationStore()
     const onViewResult = vi.fn()
 
     const execution = await store.execute({ competencia: '07/2025', onViewResult })
 
-    expect(calculationService.calculateByCompetence).toHaveBeenCalledWith('2025-07', {
+    expect(calculationService.executeAsyncCalculation).toHaveBeenCalledWith('2025-07', {
       recalcular: false,
-      signal: expect.any(AbortSignal)
+      signal: null,
+      onProgress: expect.any(Function)
     })
     expect(execution.started).toBe(true)
     expect(store.status).toBe(CALCULATION_STATUS.COMPLETED)
+    expect(store.asyncStatus).toBe(ASYNC_EXECUTION_STATES.CONCLUIDA)
+    expect(store.executionId).toBe('APUR-202507-ABC12')
+    expect(store.progress).toBe(100)
     expect(store.tipoOperacao).toBe(CALCULATION_OPERATION.NORMAL)
     expect(store.resultado.recalculoExecutado).toBe(false)
     expect(saveCalculationCache).toHaveBeenCalledWith(expect.objectContaining({
@@ -83,7 +106,7 @@ describe('calculationStore', () => {
 
   it('preserva o recálculo e bloqueia uma segunda competência durante o processamento', async () => {
     let resolveRequest
-    calculationService.calculateByCompetence.mockImplementationOnce(() => new Promise((resolve) => {
+    calculationService.executeAsyncCalculation.mockImplementationOnce(() => new Promise((resolve) => {
       resolveRequest = resolve
     }))
 
@@ -92,7 +115,7 @@ describe('calculationStore', () => {
 
     expect(store.isProcessing).toBe(true)
     expect(store.recalculando).toBe(true)
-    expect(calculationService.calculateByCompetence).toHaveBeenCalledTimes(1)
+    expect(calculationService.executeAsyncCalculation).toHaveBeenCalledTimes(1)
 
     const blockedExecution = await store.execute({ competencia: '2025-08' })
     expect(blockedExecution).toEqual({ started: false, reason: 'OPERACAO_EM_ANDAMENTO' })
@@ -102,11 +125,13 @@ describe('calculationStore', () => {
     await pendingExecution
 
     expect(store.status).toBe(CALCULATION_STATUS.COMPLETED)
+    expect(store.asyncStatus).toBe(ASYNC_EXECUTION_STATES.CONCLUIDA)
     expect(store.tipoOperacao).toBe(CALCULATION_OPERATION.RECALCULO)
     expect(store.resultado.recalculoExecutado).toBe(true)
-    expect(calculationService.calculateByCompetence).toHaveBeenCalledWith('2025-07', {
+    expect(calculationService.executeAsyncCalculation).toHaveBeenCalledWith('2025-07', {
       recalcular: true,
-      signal: expect.any(AbortSignal)
+      signal: null,
+      onProgress: expect.any(Function)
     })
   })
 
@@ -114,17 +139,18 @@ describe('calculationStore', () => {
     [CALCULATION_STATUS.COMPLETED_WITH_ISSUES, { totalCalculados: 1, totalImpedimentos: 1 }, 'Cálculo concluído com impedimentos'],
     [CALCULATION_STATUS.COMPLETED_EMPTY, { totalCalculados: 0, totalImpedimentos: 2 }, 'Nenhuma venda calculada']
   ])('distingue respostas com impedimentos (%s)', async (expectedStatus, response, title) => {
-    calculationService.calculateByCompetence.mockResolvedValueOnce(successfulResponse(response))
+    calculationService.executeAsyncCalculation.mockResolvedValueOnce(successfulResponse(response))
     const store = useCalculationStore()
 
     await store.execute({ competencia: '2025-07' })
 
     expect(store.status).toBe(expectedStatus)
+    expect(store.asyncStatus).toBe(ASYNC_EXECUTION_STATES.CONCLUIDA)
     expect(notificationMock.warning).toHaveBeenCalledWith(title, expect.any(String), expect.any(Object))
   })
 
   it('mantém o erro sem repetir a requisição e orienta consultar o histórico', async () => {
-    calculationService.calculateByCompetence.mockRejectedValueOnce({ code: 'ECONNABORTED' })
+    calculationService.executeAsyncCalculation.mockRejectedValueOnce({ code: 'ECONNABORTED' })
     const store = useCalculationStore()
     const onViewHistory = vi.fn()
 
@@ -132,17 +158,18 @@ describe('calculationStore', () => {
 
     expect(execution.error.kind).toBe('timeout')
     expect(store.status).toBe(CALCULATION_STATUS.ERROR)
+    expect(store.asyncStatus).toBe(ASYNC_EXECUTION_STATES.FALHOU)
     expect(store.mensagemErro).toContain('O servidor pode ter continuado processando')
     expect(notificationMock.error).toHaveBeenCalledWith(
       'Falha no cálculo',
       expect.stringContaining('O servidor pode ter continuado processando'),
       expect.objectContaining({ actionLabel: 'Consultar histórico', onAction: onViewHistory })
     )
-    expect(calculationService.calculateByCompetence).toHaveBeenCalledTimes(1)
+    expect(calculationService.executeAsyncCalculation).toHaveBeenCalledTimes(1)
   })
 
   it('mantém o modo do recálculo para uma nova tentativa explícita', async () => {
-    calculationService.calculateByCompetence
+    calculationService.executeAsyncCalculation
       .mockRejectedValueOnce({ message: 'serviço indisponível' })
       .mockResolvedValueOnce(successfulResponse())
     const store = useCalculationStore()
@@ -156,29 +183,52 @@ describe('calculationStore', () => {
     await store.execute({ competencia: '2025-07', recalcular: true })
 
     expect(store.status).toBe(CALCULATION_STATUS.COMPLETED)
-    expect(calculationService.calculateByCompetence).toHaveBeenNthCalledWith(2, '2025-07', {
+    expect(calculationService.executeAsyncCalculation).toHaveBeenNthCalledWith(2, '2025-07', {
       recalcular: true,
-      signal: expect.any(AbortSignal)
+      signal: null,
+      onProgress: expect.any(Function)
     })
   })
 
-  it('registra o aviso de saída somente enquanto há processamento', async () => {
+  it('recupera acompanhamento após atualização de página (F5) sem duplicar a requisição', () => {
+    calculationService.recoverActiveCalculation.mockReturnValueOnce({
+      executionId: 'APUR-202507-REC01',
+      competencia: '2025-07',
+      tipoOperacao: 'CALCULO',
+      status: ASYNC_EXECUTION_STATES.PROCESSANDO,
+      progress: 60,
+      stage: 'Processando comissões no servidor...',
+      transientWarning: ''
+    })
+
+    const store = useCalculationStore()
+    const recovered = store.recoverExecution('2025-07')
+
+    expect(recovered).not.toBeNull()
+    expect(store.executionId).toBe('APUR-202507-REC01')
+    expect(store.competencia).toBe('2025-07')
+    expect(store.isProcessing).toBe(true)
+    expect(store.asyncStatus).toBe(ASYNC_EXECUTION_STATES.PROCESSANDO)
+    expect(store.progress).toBe(60)
+    expect(store.recuperadoDeSessao).toBe(true)
+    // Garante que não executou chamada HTTP duplicada
+    expect(calculationService.executeAsyncCalculation).not.toHaveBeenCalled()
+  })
+
+  it('permite saída e navegação segura da tela sem listener bloqueante de beforeunload', async () => {
     let resolveRequest
-    calculationService.calculateByCompetence.mockImplementationOnce(() => new Promise((resolve) => {
+    calculationService.executeAsyncCalculation.mockImplementationOnce(() => new Promise((resolve) => {
       resolveRequest = resolve
     }))
     const store = useCalculationStore()
     const pendingExecution = store.execute({ competencia: '2025-07' })
-    const beforeUnloadHandler = window.addEventListener.mock.calls[0][1]
-    const event = { preventDefault: vi.fn(), returnValue: undefined }
 
-    beforeUnloadHandler(event)
-    expect(event.preventDefault).toHaveBeenCalledOnce()
-    expect(event.returnValue).toBe('')
+    // FRONT-11: Beforeunload bloqueante foi removido para permitir navegação livre
+    expect(window.addEventListener).not.toHaveBeenCalledWith('beforeunload', expect.any(Function))
 
     resolveRequest(successfulResponse())
     await pendingExecution
 
-    expect(window.removeEventListener).toHaveBeenCalledWith('beforeunload', beforeUnloadHandler)
+    expect(store.status).toBe(CALCULATION_STATUS.COMPLETED)
   })
 })

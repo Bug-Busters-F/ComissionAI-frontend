@@ -76,14 +76,71 @@
       Algumas vendas não foram recalculadas; seus resultados anteriores foram preservados.
     </p>
 
-    <section v-if="isCalculating" class="rounded-[22px] border border-warning-border bg-warning-bg p-6" role="status" aria-live="polite">
-      <div class="flex items-center gap-3">
-        <RefreshCw class="h-5 w-5 animate-spin text-warning-dark" aria-hidden="true" />
-        <div>
-          <h2 class="font-extrabold text-brand-dark">{{ recalculationRequested ? 'Recalculando as comissões' : 'Calculando as comissões' }} de {{ formatCompetenceLabel(competenceKey) }}…</h2>
-          <p class="mt-1 text-sm text-sage-muted">O processamento está sendo executado no servidor.</p>
+    <!-- Acompanhamento Assíncrono da Apuração (FRONT-11) -->
+    <section
+      v-if="isCalculating || activeExecutionForThisCompetence"
+      class="rounded-[22px] border border-warning-border bg-warning-bg p-6 space-y-4"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <RefreshCw
+            v-if="isCalculating"
+            class="h-5 w-5 animate-spin text-warning-dark shrink-0"
+            aria-hidden="true"
+          />
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="font-extrabold text-brand-dark">
+                {{ recalculationRequested ? 'Recalculando apuração' : 'Acompanhando apuração' }} de {{ formatCompetenceLabel(competenceKey) }}
+              </h2>
+              <span
+                v-if="calculationStore.executionId"
+                class="rounded-md border border-warning-border bg-white/70 px-2 py-0.5 font-mono text-[11px] font-bold text-brand-dark"
+                title="Identificador determinístico da apuração"
+              >
+                {{ calculationStore.executionId }}
+              </span>
+            </div>
+            <p class="mt-1 text-sm text-sage-muted">
+              {{ calculationStore.stage || 'Processamento em andamento no servidor...' }}
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+          <StatusBadge
+            :label="currentAsyncStatusLabel"
+            :tone="currentAsyncStatusTone"
+          />
+          <span class="text-sm font-extrabold text-brand-dark tabular-nums">
+            {{ calculationStore.progress }}%
+          </span>
         </div>
       </div>
+
+      <!-- Barra de Progresso Percentual -->
+      <div class="h-2.5 w-full overflow-hidden rounded-full bg-white/80 border border-warning-border/50">
+        <div
+          class="h-full bg-brand transition-all duration-300"
+          :style="{ width: `${calculationStore.progress}%` }"
+        ></div>
+      </div>
+
+      <!-- Alerta Transitório de Conexão -->
+      <div
+        v-if="calculationStore.transientWarning"
+        class="rounded-xl border border-warning-border/80 bg-white/80 p-3 text-xs font-medium text-warning-dark"
+        role="alert"
+      >
+        {{ calculationStore.transientWarning }}
+      </div>
+
+      <!-- Orientação de Fechamento Seguro da Tela -->
+      <p class="text-xs text-sage-muted">
+        O cálculo prossegue no servidor. Você pode navegar livremente pelo sistema ou fechar esta tela; ao retornar, o acompanhamento será retomado automaticamente sem duplicar a execução.
+      </p>
     </section>
 
     <section v-else-if="anotherCalculationProcessing" class="rounded-[22px] border border-warning-border bg-warning-bg p-6" role="status" aria-live="polite">
@@ -331,6 +388,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { RefreshCw } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import { ASYNC_EXECUTION_STATES, formatExecutionStateLabel, executionStateTone } from '@/services/asyncExecutionService'
 import { dataService } from '@/services/dataService'
 import { calculationService } from '@/services/calculationService'
 import { readCalculationCache } from '@/services/calculationCache'
@@ -418,6 +476,20 @@ const canCalculate = computed(() => isCalculationReady({
   historicoComErro: Boolean(historyError.value),
   calculando: calculationStore.isProcessing
 }))
+const activeExecutionForThisCompetence = computed(() =>
+  calculationStore.competencia === competenceKey.value &&
+  (calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.AGUARDANDO ||
+   calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.PROCESSANDO)
+)
+
+const currentAsyncStatusLabel = computed(() =>
+  formatExecutionStateLabel(calculationStore.asyncStatus || (isCalculating.value ? ASYNC_EXECUTION_STATES.PROCESSANDO : ASYNC_EXECUTION_STATES.IDLE))
+)
+
+const currentAsyncStatusTone = computed(() =>
+  executionStateTone(calculationStore.asyncStatus || (isCalculating.value ? ASYNC_EXECUTION_STATES.PROCESSANDO : ASYNC_EXECUTION_STATES.IDLE))
+)
+
 const hasPreviousCalculation = computed(() => hasPreviousCalculationState())
 
 watch(competenceKey, () => {
@@ -429,6 +501,7 @@ watch([matriculaFilter, originFilter], () => {
 })
 
 async function loadCompetence() {
+  calculationStore.recoverExecution(competenceKey.value)
   const generation = competenceGeneration.value + 1
   competenceGeneration.value = generation
   salesQueryRequestId.value += 1
