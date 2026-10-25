@@ -2,6 +2,7 @@ const STORAGE_PREFIX = 'comissai:async-exec:v1:'
 
 export const ASYNC_EXECUTION_STATES = {
   IDLE: 'IDLE',
+  ACOMPANHAMENTO_PAUSADO: 'ACOMPANHAMENTO_PAUSADO',
   AGUARDANDO: 'AGUARDANDO',
   PROCESSANDO: 'PROCESSANDO',
   CONCLUIDA: 'CONCLUIDA',
@@ -12,6 +13,7 @@ export const ASYNC_EXECUTION_STATES = {
 export function formatExecutionStateLabel(status) {
   const map = {
     IDLE: 'Não iniciada',
+    ACOMPANHAMENTO_PAUSADO: 'Consulta pausada',
     AGUARDANDO: 'Aguardando fila',
     PROCESSANDO: 'Processando',
     CONCLUIDA: 'Concluída',
@@ -24,6 +26,7 @@ export function formatExecutionStateLabel(status) {
 export function executionStateTone(status) {
   const map = {
     IDLE: 'neutral',
+    ACOMPANHAMENTO_PAUSADO: 'warning',
     AGUARDANDO: 'warning',
     PROCESSANDO: 'warning',
     CONCLUIDA: 'success',

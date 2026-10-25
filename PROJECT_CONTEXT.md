@@ -47,12 +47,13 @@
     - **Cenários de Variação Uniforme 80%, 120% e 150% (FRONT-5)**: Recálculo venda a venda do valor, faixa atingida e comissão base vs proposta, contabilizando quantas vendas mudaram de faixa de valor em cada cenário.
     - **Aceite, Invalidação Reativa e Confirmação Explícita para Ativação (FRONT-6)**: Separação entre aceitar a simulação (`Aceitar simulação e continuar`) e ativar a campanha (`Aprovar e ativar campanha`). Qualquer alteração posterior em regras, taxas, competência, vigência ou base contratual (`tb_basecomiss`) retira o aceite automaticamente (`evaluateSimulationValidity`) e exige nova simulação. Na Revisão, exige confirmação humana explícita via checkbox antes de ativar.
   - **Acompanhamento Assíncrono da Apuração e Resiliência pós-Reload (FRONT-11)**:
-    - **Desacoplamento e Identificador Determinístico**: Substituição da espera síncrona bloqueante por execução assíncrona desacoplada com identificador padronizado `APUR-{competencia}-{hash}` gerado por `generateExecutionId('APUR', compNorm)`.
-    - **Quatro Estados Padronizados & Progresso**: Transição pelos estados `AGUARDANDO`, `PROCESSANDO`, `CONCLUIDA` e `FALHOU` com barra de progresso percentual (0 a 100%), etapas descritivas (`stage`) e badges semânticos.
-    - **Persistência de Sessão & Recuperação pós-Reload**: Persistência imediata no `sessionStorage` com escopo `'calculation'` via `saveExecutionRecord`, permitindo recuperação instantânea (`recoverExecution`) após F5 ou reabertura da tela, sem duplicar a requisição no backend e sem violar a `TravaCompetencia`.
-    - **Resiliência a Falhas Transitórias**: Tolerância a oscilações temporárias de rede com exibição de alerta transitório (`transientWarning`), sem disparar nova execução no servidor.
-    - **Conclusão Atômica e Atualização de Caches**: Atualização automática de `saveCalculationCache`, sincronização da store de cálculo, recarga do histórico de logs imutáveis e notificação toast com link para visualização dos resultados.
-    - **Saída Segura e Topbar Reativa**: Remoção de listener intrusivo de `beforeunload`. Usuário pode navegar livremente ou fechar a aba; widget reativo na `Topbar` exibe progresso e etapa em tempo real com link para retornar à apuração.
+    - **Contrato real do BACK-10 / PR #26**: envio por `POST /execucoes/calculo`, consulta por `GET /execucoes/calculo/{uuid}` e nova tentativa explícita por `POST /execucoes/calculo/{uuid}/retomar`.
+    - **Identidade e progresso confirmados**: UUID, estado e percentual recebidos do backend, sem IDs de execução inventados nem progresso por temporizador.
+    - **Recuperação idempotente**: chave armazenada antes do envio e reutilizada se a resposta inicial for perdida; depois de receber o UUID, recuperação consulta somente essa execução. Escopo `calculation-v2` no sessionStorage.
+    - **Consulta pausada**: perda de comunicação preserva o acompanhamento e oferece retomada, sem declarar falha ou sucesso do cálculo. Resultados só entram no cache após CONCLUIDA com resumo válido.
+    - **Competências isoladas**: navegar para outra competência não altera a identidade da execução em curso; respostas antigas não substituem o acompanhamento atual.
+    - **Limite do resultado disponível**: o backend atual devolve contagens no campo `resultado`, não totais financeiros ou listas completas. O resumo mostra apenas dados confirmados e mantém o histórico acessível, sem fabricar R$ 0,00.
+    - **Recuperação global**: Topbar e tela de apuração compartilham um monitor; navegação e F5 na mesma aba preservam a consulta. SessionStorage não garante recuperação depois de encerrar a sessão/aba.
 - Sprint 3:
   - Detecção estatística de anomalias/outliers em vendas (3 desvios padrão acima da média).
   - Explainable AI (XAI): sugestões automáticas de redução de percentuais para adequação orçamentária em caso de estouro de teto.

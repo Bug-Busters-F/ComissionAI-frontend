@@ -1,299 +1,118 @@
 import { defineStore } from 'pinia'
-import {
-  calculationService,
-  normalizeCalculationError
-} from '@/services/calculationService'
-import { ASYNC_EXECUTION_STATES } from '@/services/asyncExecutionService'
+import { markRaw } from 'vue'
+import { calculationService, normalizeCalculationError } from '@/services/calculationService'
+import { ASYNC_EXECUTION_STATES as S } from '@/services/asyncExecutionService'
 import { saveCalculationCache } from '@/services/calculationCache'
 import { CALCULATION_OPERATION } from '@/services/calculationFlow'
-import { getCompetenceDateRange, normalizeCompetence } from '@/services/competenceUtils'
+import { normalizeCompetence } from '@/services/competenceUtils'
 import { useNotificationStore } from './notificationStore'
 
-const CALCULATION_STATUS = Object.freeze({
-  IDLE: 'IDLE',
-  PROCESSING: 'PROCESSING',
-  COMPLETED: 'COMPLETED',
-  COMPLETED_WITH_ISSUES: 'COMPLETED_WITH_ISSUES',
-  COMPLETED_EMPTY: 'COMPLETED_EMPTY',
-  ERROR: 'ERROR'
-})
-
-function now() {
-  return new Date().toISOString()
-}
+const CALCULATION_STATUS = Object.freeze({ IDLE: 'IDLE', PROCESSING: 'PROCESSING', COMPLETED: 'COMPLETED',
+  COMPLETED_WITH_ISSUES: 'COMPLETED_WITH_ISSUES', COMPLETED_EMPTY: 'COMPLETED_EMPTY', ERROR: 'ERROR' })
+const now = () => new Date().toISOString()
+const pending = (record) => record && ![S.CONCLUIDA, S.FALHOU].includes(record.status)
 
 export const useCalculationStore = defineStore('calculation', {
-  state: () => ({
-    competencia: '',
-    tipoOperacao: CALCULATION_OPERATION.NORMAL,
-    status: CALCULATION_STATUS.IDLE,
-    asyncStatus: ASYNC_EXECUTION_STATES.IDLE,
-    executionId: '',
-    progress: 0,
-    stage: '',
-    transientWarning: '',
-    recuperadoDeSessao: false,
-    resultado: null,
-    mensagemErro: '',
-    iniciadoEm: null,
-    concluidoEm: null,
-    requestController: null,
-    monitoringPromise: null
-  }),
-
+  state: () => ({ competencia: '', tipoOperacao: CALCULATION_OPERATION.NORMAL, status: CALCULATION_STATUS.IDLE,
+    asyncStatus: S.IDLE, executionId: '', progress: null, stage: '', transientWarning: '', recuperadoDeSessao: false,
+    resultado: null, mensagemErro: '', iniciadoEm: null, concluidoEm: null, monitoringPromise: null, operationRevision: 0 }),
   getters: {
-    isProcessing: (state) =>
-      state.asyncStatus === ASYNC_EXECUTION_STATES.AGUARDANDO ||
-      state.asyncStatus === ASYNC_EXECUTION_STATES.PROCESSANDO ||
-      state.status === CALCULATION_STATUS.PROCESSING,
-    hasError: (state) =>
-      state.asyncStatus === ASYNC_EXECUTION_STATES.FALHOU ||
-      state.status === CALCULATION_STATUS.ERROR,
+    isProcessing: (state) => [S.AGUARDANDO, S.PROCESSANDO, S.ACOMPANHAMENTO_PAUSADO].includes(state.asyncStatus) || state.status === CALCULATION_STATUS.PROCESSING,
+    hasError: (state) => state.asyncStatus === S.FALHOU || state.status === CALCULATION_STATUS.ERROR,
     recalculando: (state) => state.tipoOperacao === CALCULATION_OPERATION.RECALCULO
   },
-
   actions: {
-    async execute({ competencia, recalcular = false, onViewResult = null, onViewHistory = null, signal = null } = {}) {
+    execute({ competencia, recalcular = false, onViewResult = null, onViewHistory = null, signal = null } = {}) {
       const normalized = normalizeCompetence(competencia)
-      const shouldRecalculate = recalcular === true
-
-      if (!normalized) return { started: false, reason: 'COMPETENCIA_INVALIDA' }
-
-      if (this.isProcessing) {
-        const notifications = useNotificationStore()
-        notifications.warning(
-          'Cálculo em andamento',
-          `A competência ${this.competencia} já está sendo processada. Aguarde a conclusão antes de iniciar outra operação.`
-        )
-        return { started: false, reason: 'OPERACAO_EM_ANDAMENTO' }
+      if (!normalized) return Promise.resolve({ started: false, reason: 'COMPETENCIA_INVALIDA' })
+      if (this.isProcessing || this.monitoringPromise) {
+        useNotificationStore().warning('Apuração em acompanhamento', `Retome ou aguarde a conclusão de ${this.competencia} antes de iniciar outra operação.`)
+        return Promise.resolve({ started: false, reason: 'OPERACAO_EM_ANDAMENTO' })
       }
-
-      const notifications = useNotificationStore()
-      this.competencia = normalized
-      this.tipoOperacao = shouldRecalculate ? CALCULATION_OPERATION.RECALCULO : CALCULATION_OPERATION.NORMAL
-      this.status = CALCULATION_STATUS.PROCESSING
-      this.asyncStatus = ASYNC_EXECUTION_STATES.AGUARDANDO
-      this.progress = 15
-      this.stage = 'Aguardando fila e validação de cobertura...'
-      this.transientWarning = ''
-      this.recuperadoDeSessao = false
-      this.resultado = null
-      this.mensagemErro = ''
-      this.iniciadoEm = now()
-      this.concluidoEm = null
-
-      try {
-        let resultado
-        if (typeof calculationService.executeAsyncCalculation === 'function') {
-          resultado = await calculationService.executeAsyncCalculation(normalized, {
-            recalcular: shouldRecalculate,
-            signal,
-            onProgress: (record) => {
-              if (this.competencia === normalized) {
-                this.executionId = record.executionId || this.executionId
-                this.asyncStatus = record.status || this.asyncStatus
-                this.progress = record.progress ?? this.progress
-                this.stage = record.stage || this.stage
-                this.transientWarning = record.transientWarning || ''
-              }
-            }
-          })
-        } else {
-          const resp = await calculationService.calculateByCompetence(normalized, {
-            recalcular: shouldRecalculate,
-            signal
-          })
-          resultado = { ...resp, recalculoExecutado: shouldRecalculate }
-        }
-
-        const resultadoConsolidado = { ...resultado, recalculoExecutado: shouldRecalculate }
-        this.resultado = resultadoConsolidado
-        this.asyncStatus = ASYNC_EXECUTION_STATES.CONCLUIDA
-        this.progress = 100
-        this.stage = 'Apuração concluída com sucesso.'
-        this.transientWarning = ''
-        this.concluidoEm = now()
-
-        saveCalculationCache({
-          competencia: normalized,
-          tipoOperacao: this.tipoOperacao,
-          resultado: resultadoConsolidado,
-          recebidoEm: this.concluidoEm
-        })
-
-        if (resultadoConsolidado.totalImpedimentos && resultadoConsolidado.totalCalculados) {
-          this.status = CALCULATION_STATUS.COMPLETED_WITH_ISSUES
-          notifications.warning(
-            'Cálculo concluído com impedimentos',
-            `${resultadoConsolidado.totalImpedimentos} venda(s) não puderam ser calculadas; os resultados anteriores foram preservados.`,
-            onViewResult ? { actionLabel: 'Ver resultado', onAction: onViewResult } : {}
-          )
-        } else if (resultadoConsolidado.totalImpedimentos && !resultadoConsolidado.totalCalculados) {
-          this.status = CALCULATION_STATUS.COMPLETED_EMPTY
-          notifications.warning(
-            'Nenhuma venda calculada',
-            'Todas as vendas da competência ficaram impedidas. Consulte os motivos no resultado.',
-            onViewResult ? { actionLabel: 'Ver resultado', onAction: onViewResult } : {}
-          )
-        } else {
-          this.status = CALCULATION_STATUS.COMPLETED
-          notifications.success(
-            'Cálculo concluído',
-            `A competência ${normalized} foi processada com sucesso.`,
-            onViewResult ? { actionLabel: 'Ver resultado', onAction: onViewResult } : {}
-          )
-        }
-
-        return { started: true, resultado: resultadoConsolidado }
-      } catch (error) {
-        const normalizedError = error?.kind ? error : normalizeCalculationError(error)
-        this.status = CALCULATION_STATUS.ERROR
-        this.asyncStatus = ASYNC_EXECUTION_STATES.FALHOU
-        this.progress = 100
-        this.stage = 'Falha no cálculo da competência'
-        this.mensagemErro = normalizedError.message
-        this.concluidoEm = now()
-
-        notifications.error(
-          'Falha no cálculo',
-          normalizedError.message,
-          (onViewHistory || onViewResult)
-            ? { actionLabel: 'Consultar histórico', onAction: onViewHistory || onViewResult }
-            : {}
-        )
-
-        return { started: true, error: normalizedError }
+      if (pending(calculationService.recoverActiveCalculation())) {
+        this.recoverExecution(normalized)
+        return Promise.resolve({ started: false, reason: 'OPERACAO_EM_ANDAMENTO' })
       }
+      return this.runTask(normalized, recalcular === true, calculationService.executeAsyncCalculation, { signal, onViewResult, onViewHistory })
     },
-
-    /**
-     * Recupera o acompanhamento de uma execução em andamento ou recém-concluída
-     * após atualização da página (F5) ou navegação, sem duplicar a requisição no backend.
-     */
+    runTask(competencia, recalcular, action, { signal, onViewResult, onViewHistory, recovered = false, notify = true } = {}) {
+      const revision = ++this.operationRevision
+      const matches = () => this.operationRevision === revision && this.competencia === competencia
+      this.competencia = competencia
+      this.tipoOperacao = recalcular ? CALCULATION_OPERATION.RECALCULO : CALCULATION_OPERATION.NORMAL
+      this.status = CALCULATION_STATUS.PROCESSING; this.asyncStatus = S.AGUARDANDO
+      this.progress = null; this.stage = recovered ? 'Consultando a execução salva.' : 'Solicitando apuração.'
+      this.transientWarning = ''; this.mensagemErro = ''; this.recuperadoDeSessao = recovered
+      if (!recovered) this.executionId = ''
+      this.resultado = null; this.iniciadoEm = now(); this.concluidoEm = null
+      const operation = (async () => {
+        await Promise.resolve()
+        try {
+          const result = await action(competencia, { recalcular, signal, onProgress: (record) => {
+            if (!matches()) return
+            this.executionId = record.executionId || this.executionId
+            this.asyncStatus = record.status
+            this.progress = record.progress
+            this.stage = record.stage
+            this.transientWarning = record.transientWarning || ''
+          } })
+          if (!matches()) return { started: true, ignored: true }
+          if (result?.competencia !== competencia) throw Object.assign(new Error('O resultado não corresponde à competência em acompanhamento.'), { kind: 'monitoring' })
+          this.resultado = { ...result, recalculoExecutado: recalcular }
+          this.asyncStatus = S.CONCLUIDA; this.progress = 100; this.stage = 'Apuração concluída.'
+          this.transientWarning = ''; this.concluidoEm = now()
+          saveCalculationCache({ competencia, tipoOperacao: this.tipoOperacao, resultado: this.resultado, recebidoEm: this.concluidoEm })
+          const notifications = useNotificationStore()
+          const actionOptions = onViewResult ? { actionLabel: 'Ver resultado', onAction: onViewResult } : {}
+          if (result.totalImpedimentos) {
+            this.status = result.totalCalculados ? CALCULATION_STATUS.COMPLETED_WITH_ISSUES : CALCULATION_STATUS.COMPLETED_EMPTY
+            if (notify) notifications.warning(result.totalCalculados ? 'Cálculo concluído com impedimentos' : 'Nenhuma venda calculada', `${result.totalImpedimentos} venda(s) com impedimentos. Consulte o histórico para conferir.`, actionOptions)
+          } else {
+            this.status = CALCULATION_STATUS.COMPLETED
+            if (notify) notifications.success('Cálculo concluído', `A competência ${competencia} foi processada.`, actionOptions)
+          }
+          return { started: true, resultado: this.resultado }
+        } catch (error) {
+          if (!matches()) return { started: true, ignored: true }
+          const normalized = error?.kind ? error : normalizeCalculationError(error)
+          if (normalized.kind === 'monitoring') {
+            this.status = CALCULATION_STATUS.PROCESSING; this.asyncStatus = S.ACOMPANHAMENTO_PAUSADO
+            this.stage = 'Acompanhamento pausado.'; this.transientWarning = normalized.message
+          } else {
+            this.status = CALCULATION_STATUS.ERROR; this.asyncStatus = S.FALHOU
+            this.stage = normalized.kind === 'rejected' ? 'Solicitação não aceita.' : 'A apuração falhou.'
+            this.mensagemErro = normalized.message; this.concluidoEm = now()
+            if (notify) useNotificationStore().error('Não foi possível concluir a apuração', normalized.message,
+              onViewHistory || onViewResult ? { actionLabel: 'Consultar histórico', onAction: onViewHistory || onViewResult } : {})
+          }
+          return { started: true, error: normalized }
+        } finally {
+          if (matches()) this.monitoringPromise = null
+        }
+      })()
+      this.monitoringPromise = markRaw(operation)
+      return operation
+    },
     recoverExecution(competencia) {
-      const normalized = normalizeCompetence(competencia)
-      if (!normalized) return null
-
-      if (typeof calculationService.recoverActiveCalculation !== 'function') return null
-      const record = calculationService.recoverActiveCalculation(normalized)
-      if (!record) return null
-
-      this.competencia = normalized
+      // Navigating to a cached month must never relabel an execution still being observed.
+      if (this.isProcessing || this.monitoringPromise) return calculationService.recoverActiveCalculation(this.competencia)
+      const running = calculationService.recoverActiveCalculation()
+      const record = pending(running) ? running : calculationService.recoverActiveCalculation(normalizeCompetence(competencia))
+      if (!record || !normalizeCompetence(record.competencia)) return null
       this.executionId = record.executionId || ''
-      this.tipoOperacao = record.tipoOperacao === 'RECALCULO' ? CALCULATION_OPERATION.RECALCULO : CALCULATION_OPERATION.NORMAL
-      this.asyncStatus = record.status || ASYNC_EXECUTION_STATES.IDLE
-      this.progress = record.progress ?? 0
-      this.stage = record.stage || ''
-      this.transientWarning = record.transientWarning || ''
-      this.recuperadoDeSessao = true
-
-      if (record.status === ASYNC_EXECUTION_STATES.AGUARDANDO || record.status === ASYNC_EXECUTION_STATES.PROCESSANDO) {
-        this.status = CALCULATION_STATUS.PROCESSING
-        // Inicia monitoramento em background para acompanhar até a conclusão do servidor
-        if (!this.monitoringPromise) {
-          this.monitoringPromise = this.monitorServerProcessing(normalized).finally(() => {
-            this.monitoringPromise = null
-          })
-        }
-      } else if (record.status === ASYNC_EXECUTION_STATES.CONCLUIDA) {
-        this.resultado = record.result || null
-        if (record.result?.totalImpedimentos && record.result?.totalCalculados) {
-          this.status = CALCULATION_STATUS.COMPLETED_WITH_ISSUES
-        } else if (record.result?.totalImpedimentos && !record.result?.totalCalculados) {
-          this.status = CALCULATION_STATUS.COMPLETED_EMPTY
-        } else {
-          this.status = CALCULATION_STATUS.COMPLETED
-        }
-      } else if (record.status === ASYNC_EXECUTION_STATES.FALHOU) {
-        this.status = CALCULATION_STATUS.ERROR
-        this.mensagemErro = record.errorMessage || record.error || 'A apuração anterior falhou.'
-      }
-
+      void this.runTask(record.competencia, record.recalcular === true, calculationService.resumeAsyncCalculation, { recovered: true, notify: pending(record) })
       return record
     },
-
-    /**
-     * Monitora periodicamente o término do processamento no servidor após F5
-     * consultando os logs gerados para a competência sem reenviar o POST de cálculo.
-     */
-    async monitorServerProcessing(competencia) {
-      const normalized = normalizeCompetence(competencia)
-      if (!normalized) return
-
-      let attempts = 0
-      const maxAttempts = 60
-      const range = getCompetenceDateRange(normalized)
-
-      while (attempts < maxAttempts && this.isProcessing && this.competencia === normalized) {
-        attempts += 1
-        await new Promise((r) => setTimeout(r, 2000))
-
-        if (!this.isProcessing || this.competencia !== normalized) break
-
-        try {
-          if (this.progress < 85) {
-            this.progress = Math.min(85, this.progress + 5)
-            this.stage = 'Acompanhando apuração em andamento no servidor...'
-          }
-          this.transientWarning = ''
-
-          if (typeof calculationService.listLogs === 'function') {
-            const logs = await calculationService.listLogs({ ...range, page: 0, size: 1 })
-            if (logs && Number(logs.totalElements || 0) > 0) {
-              // Concluiu no servidor! Busca a consolidação dos resultados já existentes
-              this.stage = 'Consolidando resultados concluídos...'
-              let resultadoConsolidado = null
-              if (typeof calculationService.calculateByCompetence === 'function') {
-                resultadoConsolidado = await calculationService.calculateByCompetence(normalized, { recalcular: false })
-              }
-
-              this.resultado = resultadoConsolidado
-              this.asyncStatus = ASYNC_EXECUTION_STATES.CONCLUIDA
-              this.status = CALCULATION_STATUS.COMPLETED
-              this.progress = 100
-              this.stage = 'Apuração concluída com sucesso.'
-              this.concluidoEm = now()
-
-              if (resultadoConsolidado) {
-                saveCalculationCache({
-                  competencia: normalized,
-                  tipoOperacao: this.tipoOperacao,
-                  resultado: resultadoConsolidado,
-                  recebidoEm: this.concluidoEm
-                })
-              }
-
-              const notifications = useNotificationStore()
-              notifications.success(
-                'Cálculo concluído',
-                `A apuração de ${normalized} foi concluída com sucesso no servidor.`
-              )
-              return
-            }
-          }
-        } catch (err) {
-          this.transientWarning = 'Oscilação temporária na consulta de status. A apuração segue no servidor.'
-        }
-      }
+    resumeExecution() {
+      if (this.monitoringPromise || this.asyncStatus !== S.ACOMPANHAMENTO_PAUSADO) return Promise.resolve({ started: false })
+      return this.runTask(this.competencia, this.recalculando, calculationService.resumeAsyncCalculation, { recovered: true })
     },
-
     dismissExecution(competencia) {
       const normalized = normalizeCompetence(competencia)
-      if (normalized) {
-        if (typeof calculationService.clearActiveCalculation === 'function') {
-          calculationService.clearActiveCalculation(normalized)
-        }
-        if (this.competencia === normalized && !this.isProcessing) {
-          this.executionId = ''
-          this.asyncStatus = ASYNC_EXECUTION_STATES.IDLE
-          this.progress = 0
-          this.stage = ''
-          this.transientWarning = ''
-          this.recuperadoDeSessao = false
-        }
-      }
+      if (!normalized || this.isProcessing || this.monitoringPromise) return
+      calculationService.clearActiveCalculation(normalized)
+      if (this.competencia === normalized) { this.executionId = ''; this.asyncStatus = S.IDLE; this.progress = null; this.stage = ''; this.transientWarning = '' }
     }
   }
 })
-
 export { CALCULATION_STATUS }

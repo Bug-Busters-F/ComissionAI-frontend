@@ -99,61 +99,14 @@ describe('calculationService', () => {
     expect(normalizeCalculationError(new Error('offline')).kind).toBe('network')
   })
 
-  it('executes async calculation emitting AGUARDANDO, PROCESSANDO and CONCLUIDA with executionId APUR', async () => {
-    const onProgress = vi.fn()
-    api.post.mockResolvedValueOnce({
-      data: {
-        competencia: '2026-10',
-        totalVendasProcessadas: 5,
-        totalCalculados: 5,
-        totalImpedimentos: 0,
-        resultados: []
-      }
-    })
-
-    const result = await calculationService.executeAsyncCalculation('10/2026', {
-      recalcular: true,
-      onProgress
-    })
-
-    expect(result.competencia).toBe('2026-10')
-    expect(result.recalculoExecutado).toBe(true)
-    expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({
-      executionId: expect.stringMatching(/^APUR-202610-/),
-      status: ASYNC_EXECUTION_STATES.AGUARDANDO
-    }))
-    expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({
-      status: ASYNC_EXECUTION_STATES.PROCESSANDO
-    }))
-    expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({
-      status: ASYNC_EXECUTION_STATES.CONCLUIDA,
-      progress: 100
-    }))
-
-    // Recuperação de sessão pós-F5
-    const recovered = calculationService.recoverActiveCalculation('2026-10')
-    expect(recovered).toMatchObject({
-      competencia: '2026-10',
-      status: ASYNC_EXECUTION_STATES.CONCLUIDA
-    })
-
+  it('delegates to the real async contract and retains a confirmed UUID', async () => {
+    const id = '11111111-1111-4111-8111-111111111111'
+    api.post.mockResolvedValueOnce({ data: { id, competencia: '2026-10', recalcular: true, status: 'CONCLUIDA', totalItens: 5, itensProcessados: 5, percentual: 100, resultado: 'vendas=5,sucessos=5,impedimentos=0' } })
+    const result = await calculationService.executeAsyncCalculation('10/2026', { recalcular: true })
+    expect(result).toMatchObject({ competencia: '2026-10', recalculoExecutado: true, totalCalculados: 5 })
+    expect(api.post.mock.calls[0][0]).toBe('/execucoes/calculo')
+    expect(calculationService.recoverActiveCalculation('2026-10').executionId).toBe(id)
     calculationService.clearActiveCalculation('2026-10')
     expect(calculationService.recoverActiveCalculation('2026-10')).toBeNull()
-  })
-
-  it('emits FALHOU and persists error in session storage when calculation fails', async () => {
-    const onProgress = vi.fn()
-    api.post.mockRejectedValueOnce({
-      response: { status: 400, data: { message: 'Erro na apuração' } }
-    })
-
-    await expect(calculationService.executeAsyncCalculation('2026-10', { onProgress }))
-      .rejects
-      .toMatchObject({ message: 'Erro na apuração' })
-
-    expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({
-      status: ASYNC_EXECUTION_STATES.FALHOU,
-      progress: 100
-    }))
   })
 })

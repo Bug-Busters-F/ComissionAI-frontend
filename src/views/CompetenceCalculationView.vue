@@ -115,7 +115,7 @@
             :tone="currentAsyncStatusTone"
           />
           <span class="text-sm font-extrabold text-brand-dark tabular-nums">
-            {{ calculationStore.progress }}%
+            {{ calculationStore.progress == null ? '—' : calculationStore.progress + '%' }}
           </span>
         </div>
       </div>
@@ -124,7 +124,7 @@
       <div class="h-2.5 w-full overflow-hidden rounded-full bg-white/80 border border-warning-border/50">
         <div
           class="h-full bg-brand transition-all duration-300"
-          :style="{ width: `${calculationStore.progress}%` }"
+          :style="{ width: `${calculationStore.progress ?? 0}%` }"
         ></div>
       </div>
 
@@ -137,9 +137,10 @@
         {{ calculationStore.transientWarning }}
       </div>
 
+      <button v-if="calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.ACOMPANHAMENTO_PAUSADO" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark disabled:opacity-50" :disabled="Boolean(calculationStore.monitoringPromise)" @click="calculationStore.resumeExecution()">Retomar acompanhamento</button>
       <!-- Orientação de Fechamento Seguro da Tela -->
       <p class="text-xs text-sage-muted">
-        O cálculo continua mesmo fora desta tela. Você pode navegar livremente pelo sistema ou fechar esta tela; ao retornar, o acompanhamento será retomado automaticamente sem duplicar a execução.
+        O cálculo continua mesmo fora desta tela. Ao navegar pelo sistema ou atualizar a página nesta aba, o acompanhamento será retomado sem iniciar outra execução.
       </p>
     </section>
 
@@ -175,7 +176,8 @@
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 id="calculation-summary-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Resultado da competência</h2>
-            <p class="mt-1 text-sm text-sage-muted">Os totais consideram o retorno integral do cálculo.</p>
+            <p class="mt-1 text-sm text-sage-muted">{{ result.resumoExecucao ? 'Contagens confirmadas desta execução. Os totais financeiros e os detalhes por venda não estão disponíveis neste resumo.' : 'Os totais consideram o retorno integral do cálculo.' }}</p>
+            <button v-if="result.resumoExecucao" type="button" class="focus-ring mt-3 rounded text-sm font-bold underline" @click="consultHistory">Consultar histórico de cálculos</button>
           </div>
           <StatusBadge :label="result.totalImpedimentos ? 'Concluído com impedimentos' : 'Concluído'" :tone="result.totalImpedimentos ? 'warning' : 'success'" />
         </div>
@@ -187,7 +189,7 @@
           </div>
         </dl>
 
-        <p v-if="result.totalImpedimentos" class="mt-5 rounded-xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-dark">
+        <p v-if="result.totalImpedimentos && !result.resumoExecucao" class="mt-5 rounded-xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-dark">
           O total de comissões considera somente as vendas calculadas com sucesso.
         </p>
       </section>
@@ -309,7 +311,7 @@
         </div>
       </details>
 
-      <section v-if="!result.resultados.length && !result.impedimentos.length" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
+      <section v-if="!result.resumoExecucao && !result.resultados.length && !result.impedimentos.length" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
         <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
         <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência.</p>
       </section>
@@ -479,7 +481,8 @@ const canCalculate = computed(() => isCalculationReady({
 const activeExecutionForThisCompetence = computed(() =>
   calculationStore.competencia === competenceKey.value &&
   (calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.AGUARDANDO ||
-   calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.PROCESSANDO)
+   calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.PROCESSANDO ||
+   calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.ACOMPANHAMENTO_PAUSADO)
 )
 
 const currentAsyncStatusLabel = computed(() =>
@@ -683,6 +686,7 @@ function consultHistory() {
 }
 
 function currency(value) {
+  if (value == null || value === '') return '—'
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0))
 }
 
