@@ -3,24 +3,60 @@
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
         <h2 id="interpretation-heading" class="text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">Confira a interpretação</h2>
-        <p class="mt-2 text-sm text-sage-muted">Revise os parâmetros da única regra vinculada antes de continuar.</p>
+        <p class="mt-2 text-sm text-sage-muted">Revise os parâmetros da regra vinculada antes de continuar.</p>
       </div>
       <span class="rounded-full px-3 py-1.5 text-xs font-bold" :class="interpretation.isProcessing ? 'bg-sage-light text-brand-dark' : interpretation.status === 'error' ? 'bg-danger-bg text-danger-dark' : 'bg-success-surface text-success-text'">{{ sourceLabel }}</span>
     </div>
 
     <div class="mt-6 rounded-2xl bg-sage-light px-4 py-3 text-sm leading-6 text-sage-subtle">
-      {{ interpretation.isProcessing ? 'Interpretando proposta… processando regras de campanha.' : stale ? 'O texto ou o contexto mudou desde a última interpretação. Interprete novamente para atualizar as sugestões.' : sourceMessage }}
+      {{ interpretation.isProcessing ? 'Interpretando campanha… processando regras.' : stale ? 'O texto ou o contexto mudou desde a última interpretação. Interprete novamente para atualizar as regras.' : sourceMessage }}
     </div>
 
     <div v-if="interpretation.isProcessing" class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-white px-4 py-3 text-sm text-brand-dark" role="status" aria-live="polite">
-      <span>Interpretando proposta…</span>
+      <span>Interpretando campanha…</span>
       <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-3 py-2 text-xs font-bold" @click="$emit('cancel-interpretation')">Cancelar</button>
     </div>
-    <div v-if="interpretation.error" class="mt-4 rounded-2xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm leading-6 text-danger-dark" role="alert">{{ interpretation.error }}</div>
+    <div v-if="interpretation.error" class="mt-4 rounded-2xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm leading-6 text-danger-dark" role="alert">{{ userFacingText(interpretation.error) }}</div>
 
-    <div v-if="interpretation.pending?.length" class="mt-4 rounded-2xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-text" role="status">
+    <!-- Alerta de bloqueio de cobertura por falta de base contratual -->
+    <div
+      v-if="coveragePendingMessages.length"
+      class="mt-4 rounded-[22px] border border-warning-border bg-warning-bg/50 p-5 shadow-sm"
+      role="alert"
+    >
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div class="flex items-start gap-3.5">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning-bg text-warning-dark">
+            <ShieldAlert class="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="text-base font-extrabold text-brand-dark">Impedimento de Base Contratual</h3>
+              <StatusBadge label="Bloqueio de Cobertura" tone="warning" />
+            </div>
+            <p class="mt-1 text-xs leading-5 text-sage-muted">
+              A proposta atinge público sem taxa padrão contratual aplicável em <span class="rounded bg-white px-1.5 py-0.5 text-xs font-semibold text-brand-dark">tabela de comissões</span>. A simulação financeira permanecerá bloqueada até a carga da tabela.
+            </p>
+            <ul class="mt-2.5 list-disc space-y-1 pl-4 text-xs font-semibold text-warning-dark">
+              <li v-for="msg in coveragePendingMessages" :key="msg">{{ msg }}</li>
+            </ul>
+          </div>
+        </div>
+
+        <RouterLink
+          to="/dados"
+          class="focus-ring inline-flex items-center gap-1.5 self-start rounded-full border border-sage-border-dark bg-white px-4 py-2 text-xs font-bold text-brand-dark transition hover:bg-sage-light"
+        >
+          <UploadCloud class="h-3.5 w-3.5" aria-hidden="true" />
+          <span>Importar base (COMISS)</span>
+        </RouterLink>
+      </div>
+    </div>
+
+    <!-- Outras pendências não relacionadas a falta de base -->
+    <div v-if="otherPendingMessages.length" class="mt-4 rounded-2xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-text" role="status">
       <p class="font-bold">Pendências para revisão</p>
-      <ul class="mt-2 list-disc space-y-1 pl-5"><li v-for="pending in interpretation.pending" :key="pending">{{ pending }}</li></ul>
+      <ul class="mt-2 list-disc space-y-1 pl-5"><li v-for="pending in otherPendingMessages" :key="pending">{{ pending }}</li></ul>
     </div>
     <p v-if="interpretation.confidence !== null && interpretation.confidence !== undefined && interpretation.confidence !== 0" class="mt-3 text-xs text-sage-muted">Confiança técnica recebida: {{ formatConfidence(interpretation.confidence) }}</p>
 
@@ -91,7 +127,10 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { computed } from 'vue'
+import { ShieldAlert, UploadCloud } from 'lucide-vue-next'
+import StatusBadge from '@/components/common/StatusBadge.vue'
 import { CAMPAIGN_CHANNEL_OPTIONS, formatPeriodArrow } from '@/services/campaignMappers'
 
 const props = defineProps({
@@ -100,6 +139,18 @@ const props = defineProps({
   interpretation: { type: Object, required: true },
   stale: { type: Boolean, default: false }
 })
+
+const coveragePendingMessages = computed(() =>
+  (props.interpretation.pending || []).filter((msg) =>
+    /base|cobertura|tb_basecomiss|taxa\s+padr[aã]o|contratual|tabela de comiss/i.test(msg)
+  )
+)
+
+const otherPendingMessages = computed(() =>
+  (props.interpretation.pending || []).filter((msg) =>
+    !/base|cobertura|tb_basecomiss|taxa\s+padr[aã]o|contratual|tabela de comiss/i.test(msg)
+  )
+)
 
 defineEmits(['update', 'cancel-interpretation'])
 const channelOptions = CAMPAIGN_CHANNEL_OPTIONS

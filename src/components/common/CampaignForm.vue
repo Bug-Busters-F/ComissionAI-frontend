@@ -3,7 +3,7 @@
     <section class="rounded-2xl bg-white p-6 sm:p-7" aria-labelledby="campaign-data-heading">
       <div>
         <h2 id="campaign-data-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Campanha</h2>
-        <p class="mt-1 text-sm text-sage-muted">Identifique a proposta e preserve o texto que originou a regra.</p>
+        <p class="mt-1 text-sm text-sage-muted">Identifique a campanha e preserve o texto que originou a regra.</p>
       </div>
 
       <div class="mt-6 grid gap-5">

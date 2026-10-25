@@ -32,6 +32,28 @@
 - Sprint 2:
   - Sandbox de Simulação: cálculo de impacto financeiro de regras em 'draft' contra massa histórica sem comitar comissões reais no banco.
   - Human-in-the-loop (HITL): interface de revisão comparativa antes de alterar o status da regra para 'Ativa'.
+  - **Gestão de Bases Ausentes e Bloqueio de Cobertura (FRONT-10)**:
+    - Apresentação de combinações de Marca, Cargo e Competência sem taxa base cadastrada em `tb_basecomiss`.
+    - Componente `MissingBasesCard.vue` com bloqueio financeiro e proteção contra taxas fictícias, totalizando volume de vendas impactadas e montante financeiro protegido.
+    - Orientação acionável e atalho direto para ingestão de taxas (`importType=COMISSIONS`) com competência e vigência pré-carregadas.
+    - Recálculo reativo da competência pós-upload ou via ação direta do usuário.
+    - Bloqueio na simulação e proposta de campanhas quando o público-alvo não possuir base contratual, ocultando estimativas fictícias e preservando a integridade contábil.
+  - **Simulação de Campanha por Competência, Memória do Cálculo, Cenários e Aceite (FRONT-4, FRONT-5, FRONT-6)**:
+    - **Seleção de Competência Única e Origem dos Dados (FRONT-4)**: Seleção de exatamente uma competência já cadastrada em Dados (`GET /api/v1/referencias/competencias` + fallback determinístico), sem upload exclusivo na simulação e sem exigir apuração prévia. Exibição clara da origem dos dados e do período inclusivo da campanha.
+    - **Recorte do Público e Validações Pré-Execução (FRONT-4)**: Consumo de `POST /api/v1/referencias/recortar-publico` e validação local determinística (`campaignSimulationService.js`), realizando a união das regras (`OU` entre regras, `E` dentro da regra, sem duplicar vendas por ID), validação de vínculos de RH, cobertura de `tb_basecomiss` e desempate por especificidade (`Marca + Loja + Cargo + Matrícula`).
+    - **Referência Insuficiente (FRONT-4)**: Quando a competência selecionada não possui vendas ou quando 0 vendas atendem ao público da campanha (`totalVendasRecortadas === 0`), o sistema bloqueia a execução como **"Referência insuficiente"** e jamais apresenta `R$ 0,00` como estimativa válida.
+    - **Acompanhamento Assíncrono (FRONT-4 / base para FRONT-11)**: Serviço compartilhado `asyncExecutionService.js` com persistência em `sessionStorage`, rastreando `executionId`, estados (`AGUARDANDO`, `PROCESSANDO`, `CONCLUIDA`, `FALHOU`), percentual de progresso e recuperação após atualização de página.
+    - **Tabela Paginada, Memória do Cálculo e Totais (FRONT-5)**: Tabela paginada do público (`Matrícula | Loja | Valor da venda | Comissão base | Comissão com campanha proposta | Detalhes`), modal de memória individual do cálculo (identificador/data, origem dos dados, taxa e documento base, regra aplicada ou manutenção da base, faixa satisfeita, arredondamento `HALF_UP` e diferença) e totais de todo o recorte (histórico 100% vs projetado pela duração no mês comercial de **30 dias**, fator `dias / 30` sem arredondamento antecipado).
+    - **Cenários de Variação Uniforme 80%, 120% e 150% (FRONT-5)**: Recálculo venda a venda do valor, faixa atingida e comissão base vs proposta, contabilizando quantas vendas mudaram de faixa de valor em cada cenário.
+    - **Aceite, Invalidação Reativa e Confirmação Explícita para Ativação (FRONT-6)**: Separação entre aceitar a simulação (`Aceitar simulação e continuar`) e ativar a campanha (`Aprovar e ativar campanha`). Qualquer alteração posterior em regras, taxas, competência, vigência ou base contratual (`tb_basecomiss`) retira o aceite automaticamente (`evaluateSimulationValidity`) e exige nova simulação. Na Revisão, exige confirmação humana explícita via checkbox antes de ativar.
+  - **Acompanhamento Assíncrono da Apuração e Resiliência pós-Reload (FRONT-11)**:
+    - **Contrato real do BACK-10 / PR #26**: envio por `POST /execucoes/calculo`, consulta por `GET /execucoes/calculo/{uuid}` e nova tentativa explícita por `POST /execucoes/calculo/{uuid}/retomar`.
+    - **Identidade e progresso confirmados**: UUID, estado e percentual recebidos do backend, sem IDs de execução inventados nem progresso por temporizador.
+    - **Recuperação idempotente**: chave armazenada antes do envio e reutilizada se a resposta inicial for perdida; depois de receber o UUID, recuperação consulta somente essa execução. Escopo `calculation-v2` no sessionStorage.
+    - **Consulta pausada**: perda de comunicação preserva o acompanhamento e oferece retomada, sem declarar falha ou sucesso do cálculo. Resultados só entram no cache após CONCLUIDA com resumo válido.
+    - **Competências isoladas**: navegar para outra competência não altera a identidade da execução em curso; respostas antigas não substituem o acompanhamento atual.
+    - **Limite do resultado disponível**: o backend atual devolve contagens no campo `resultado`, não totais financeiros ou listas completas. O resumo mostra apenas dados confirmados e mantém o histórico acessível, sem fabricar R$ 0,00.
+    - **Recuperação global**: Topbar e tela de apuração compartilham um monitor; navegação e F5 na mesma aba preservam a consulta. SessionStorage não garante recuperação depois de encerrar a sessão/aba.
 - Sprint 3:
   - Detecção estatística de anomalias/outliers em vendas (3 desvios padrão acima da média).
   - Explainable AI (XAI): sugestões automáticas de redução de percentuais para adequação orçamentária em caso de estouro de teto.
@@ -47,16 +69,16 @@ src/
 ├── assets/                  # Arquivos estáticos e estilos globais (Tailwind CSS, ícones, imagens)
 ├── components/              # Componentes Vue reutilizáveis organizados por domínio
 │   ├── audit/               # Componentes de auditoria, rastreabilidade e logs imutáveis de comissões
-│   ├── common/              # Componentes de UI genéricos e utilitários (PageHeader, StatusBadge, ToastContainer.vue)
-│   ├── data/                # Ingestão de dados (UploadBaseModal.vue, ValidationReport.vue)
+│   ├── common/              # Componentes de UI e etapas do fluxo de campanha (CampaignSimulationStep.vue, CampaignReviewStep.vue, StatusBadge.vue, ToastContainer.vue)
+│   ├── data/                # Ingestão de dados (UploadBaseModal.vue, ValidationReport.vue, MissingBasesCard.vue)
 │   ├── layout/              # Cascas de layout compartilhadas (AppShell, SidebarNav, Topbar)
 │   ├── rules/               # Componentes de gestão de regras (formulário de CRUD e input de regras via NLP)
 │   └── simulation/          # Componentes da sandbox de simulação de impacto financeiro e métricas de XAI
 ├── layouts/                 # Estruturas de layout complementares
 ├── router/                  # Definição e configuração de rotas via Vue Router (index.js)
-├── services/                # Camada de integração HTTP com Axios centralizando chamadas ao Spring Boot (api.js, dataService.js)
-├── stores/                  # Gerenciamento de estado global com Pinia (dataStore.js, notificationStore.js, regras, simulações)
-├── views/                   # Telas/páginas principais conectadas às rotas (HomeView, DataView, CampaignsView)
+├── services/                # Camada de serviços HTTP e domínio (api.js, dataService.js, coverageService.js, campaignSimulationService.js, asyncExecutionService.js, useCampaignFlow.js)
+├── stores/                  # Gerenciamento de estado global com Pinia (dataStore.js, notificationStore.js, calculationStore.js)
+├── views/                   # Telas/páginas principais conectadas às rotas (HomeView, DataView, CampaignsView, CampaignFlowView.vue, CompetenceCalculationView.vue)
 ├── App.vue                  # Componente raiz da aplicação
 └── main.js                  # Ponto de entrada da aplicação (instanciação do Vue, Pinia e plugins)
 ```
@@ -101,3 +123,12 @@ src/
   - **Exclusão de Registros e Bases**:
     - Exclusão pontual de vendas (`DELETE /api/v1/vendas/{id}`) e matrículas (`DELETE /api/v1/matriculas/{id}`) com modal de confirmação e tratamento de erro de integridade (HTTP 409 quando matrícula tem vendas associadas).
     - Exclusão e reinício de base lançada por competência no card do `DataView.vue`.
+- **Tratamento de Bases Ausentes e Bloqueio Financeiro (FRONT-10)**:
+  - **Identificação e Parsing Determinístico**: `coverageService.js` avalia os motivos de impedimento retornados pelo backend (`Taxa de comissão não encontrada: nenhuma regra ativa aplicável... nem taxa padrão cadastrada em tb_basecomiss`), isolando impedimentos de cobertura dos erros cadastrais (RH/vínculos).
+  - **Agrupamento Executivo**: Agrupamento por chave única `competencia_marca_cargo`, totalizando número de transações impactadas e montante financeiro protegido.
+  - **Ação e Automação Pós-Carga**: Card `MissingBasesCard.vue` com atalho direto para o modal de upload com competência e vigência pré-carregadas. Recálculo reativo engatilhado automaticamente após a conclusão com sucesso do job de upload de `COMISS`.
+  - **Governança Estrita na Simulação**: Bloqueio total de estimativas ou taxas fictícias na etapa de Simulação (`CampaignSimulationStep.vue`) quando o público da campanha não tiver cobertura contratual em `tb_basecomiss` ou houver pendência na interpretação NLP.
+- **Motor de Simulação, Memória do Cálculo e Governança de Aceite (FRONT-4, FRONT-5, FRONT-6)**:
+  - **Compatibilidade com o Contrato Multi-Regras do Backend**: `campaignMappers.js` e `campaignService.js` enviam `regras: List<RegraItemRequest>` compatível com o `CampanhaController` atualizado na `dev` do backend, mantendo retrocompatibilidade na leitura de `regras` e `regra`.
+  - **Fidelidade Matemática**: Cálculo monetário com arredondamento `HALF_UP` (2 casas decimais) por venda, projeção proporcional pelo mês comercial de **30 dias** (`(soma * dias) / 30` sem arredondamento precoce do fator) e recálculo individual de faixa de valor nos cenários de `80%`, `120%` e `150%`.
+  - **Rastreabilidade de Aceite (Fingerprint)**: `createSimulationFingerprint` gera assinatura canônica cobrindo competência, vigência, regras/filtros/taxas e hash de `tb_basecomiss`. Qualquer divergência invalida imediatamente o aceite e bloqueia a ativação até nova simulação e confirmação explícita do usuário.

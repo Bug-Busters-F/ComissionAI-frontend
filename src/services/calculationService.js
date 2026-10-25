@@ -1,8 +1,11 @@
 import api from './api'
+import { createCalculationExecutionClient } from './calculationExecution'
 
 // Competências grandes podem levar alguns minutos para recalcular no backend.
 // Mantemos esse prazo específico maior sem alongar o timeout das demais chamadas.
 export const CALCULATION_TIMEOUT = 900000
+
+const executions = createCalculationExecutionClient(api)
 
 export const calculationService = {
   async calculateByCompetence(competencia, { recalcular = false, signal } = {}) {
@@ -13,6 +16,11 @@ export const calculationService = {
     })
     return normalizeCalculationResult(response.data)
   },
+
+  executeAsyncCalculation(competencia, options) { return executions.start(competencia, options) },
+  resumeAsyncCalculation(competencia, options) { return executions.resume(competencia, options) },
+  recoverActiveCalculation(competencia) { return executions.recover(competencia) },
+  clearActiveCalculation(competencia) { return executions.clear(competencia) },
 
   async listLogs({ dataInicio, dataFim, matricula, idRegra, page = 0, size = 10, signal } = {}) {
     const params = { dataInicio, dataFim, page, size }

@@ -2,7 +2,7 @@
   <div class="space-y-7">
     <PageHeader
       :title="`Cálculo · ${formatCompetenceLabel(competenceKey)}`"
-      description="Calcule as comissões das vendas persistidas da competência."
+      description="Calcule as comissões das vendas cadastradas da competência."
     >
       <template #action>
         <RouterLink to="/dados" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-white">
@@ -16,8 +16,8 @@
         <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">Competência selecionada</p>
         <h2 class="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-brand-dark">{{ formatCompetenceCode(competenceKey) }}</h2>
         <p class="mt-2 text-sm text-sage-muted">
-          <template v-if="salesQueryState === SALES_QUERY_STATE.SUCCESS">{{ salesCount }} vendas persistidas no período.</template>
-          <template v-else-if="salesQueryState === SALES_QUERY_STATE.LOADING">Consultando as vendas persistidas…</template>
+          <template v-if="salesQueryState === SALES_QUERY_STATE.SUCCESS">{{ salesCount }} vendas cadastradas no período.</template>
+          <template v-else-if="salesQueryState === SALES_QUERY_STATE.LOADING">Consultando as vendas cadastradas…</template>
           <template v-else-if="salesQueryState === SALES_QUERY_STATE.ERROR">Não foi possível consultar as vendas.</template>
           <template v-else>Competência não validada.</template>
         </p>
@@ -60,11 +60,11 @@
 
     <section v-else-if="salesQueryState === SALES_QUERY_STATE.SUCCESS && salesCount === 0" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
       <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
-      <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas persistidas para essa competência. O cálculo permanece indisponível.</p>
+      <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência. O cálculo permanece indisponível.</p>
     </section>
 
     <p v-if="result" class="rounded-2xl border border-sage-border bg-sage-light px-5 py-4 text-sm leading-6 text-sage-muted">
-      {{ result.recalculoExecutado ? 'As regras atuais foram aplicadas ao recálculo desta competência.' : 'Resultados já registrados são reaproveitados pelo servidor quando a competência é executada novamente.' }}
+      {{ result.recalculoExecutado ? 'As regras atuais foram aplicadas ao recálculo desta competência.' : 'Resultados já registrados são reaproveitados pelo sistema quando a competência é executada novamente.' }}
     </p>
 
     <p v-if="restoredResult" class="rounded-2xl border border-sage-border bg-white px-5 py-4 text-sm leading-6 text-sage-muted" role="status">
@@ -76,14 +76,72 @@
       Algumas vendas não foram recalculadas; seus resultados anteriores foram preservados.
     </p>
 
-    <section v-if="isCalculating" class="rounded-[22px] border border-warning-border bg-warning-bg p-6" role="status" aria-live="polite">
-      <div class="flex items-center gap-3">
-        <RefreshCw class="h-5 w-5 animate-spin text-warning-dark" aria-hidden="true" />
-        <div>
-          <h2 class="font-extrabold text-brand-dark">{{ recalculationRequested ? 'Recalculando as comissões' : 'Calculando as comissões' }} de {{ formatCompetenceLabel(competenceKey) }}…</h2>
-          <p class="mt-1 text-sm text-sage-muted">O processamento está sendo executado no servidor.</p>
+    <!-- Acompanhamento Assíncrono da Apuração (FRONT-11) -->
+    <section
+      v-if="isCalculating || activeExecutionForThisCompetence"
+      class="rounded-[22px] border border-warning-border bg-warning-bg p-6 space-y-4"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <RefreshCw
+            v-if="isCalculating"
+            class="h-5 w-5 animate-spin text-warning-dark shrink-0"
+            aria-hidden="true"
+          />
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="font-extrabold text-brand-dark">
+                {{ recalculationRequested ? 'Recalculando apuração' : 'Acompanhando apuração' }} de {{ formatCompetenceLabel(competenceKey) }}
+              </h2>
+              <span
+                v-if="calculationStore.executionId"
+                class="rounded-md border border-warning-border bg-white/70 px-2 py-0.5 font-mono text-[11px] font-bold text-brand-dark"
+                title="Identificador da execução"
+              >
+                {{ calculationStore.executionId }}
+              </span>
+            </div>
+            <p class="mt-1 text-sm text-sage-muted">
+              {{ calculationStore.stage || 'Processamento em andamento...' }}
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+          <StatusBadge
+            :label="currentAsyncStatusLabel"
+            :tone="currentAsyncStatusTone"
+          />
+          <span class="text-sm font-extrabold text-brand-dark tabular-nums">
+            {{ calculationStore.progress == null ? '—' : calculationStore.progress + '%' }}
+          </span>
         </div>
       </div>
+
+      <!-- Barra de Progresso Percentual -->
+      <div class="h-2.5 w-full overflow-hidden rounded-full bg-white/80 border border-warning-border/50">
+        <div
+          class="h-full bg-brand transition-all duration-300"
+          :style="{ width: `${calculationStore.progress ?? 0}%` }"
+        ></div>
+      </div>
+
+      <!-- Alerta Transitório de Conexão -->
+      <div
+        v-if="calculationStore.transientWarning"
+        class="rounded-xl border border-warning-border/80 bg-white/80 p-3 text-xs font-medium text-warning-dark"
+        role="alert"
+      >
+        {{ calculationStore.transientWarning }}
+      </div>
+
+      <button v-if="calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.ACOMPANHAMENTO_PAUSADO" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark disabled:opacity-50" :disabled="Boolean(calculationStore.monitoringPromise)" @click="calculationStore.resumeExecution()">Retomar acompanhamento</button>
+      <!-- Orientação de Fechamento Seguro da Tela -->
+      <p class="text-xs text-sage-muted">
+        O cálculo continua mesmo fora desta tela. Ao navegar pelo sistema ou atualizar a página nesta aba, o acompanhamento será retomado sem iniciar outra execução.
+      </p>
     </section>
 
     <section v-else-if="anotherCalculationProcessing" class="rounded-[22px] border border-warning-border bg-warning-bg p-6" role="status" aria-live="polite">
@@ -118,7 +176,8 @@
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 id="calculation-summary-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Resultado da competência</h2>
-            <p class="mt-1 text-sm text-sage-muted">Os totais consideram o retorno integral do cálculo.</p>
+            <p class="mt-1 text-sm text-sage-muted">{{ result.resumoExecucao ? 'Contagens confirmadas desta execução. Os totais financeiros e os detalhes por venda não estão disponíveis neste resumo.' : 'Os totais consideram o retorno integral do cálculo.' }}</p>
+            <button v-if="result.resumoExecucao" type="button" class="focus-ring mt-3 rounded text-sm font-bold underline" @click="consultHistory">Consultar histórico de cálculos</button>
           </div>
           <StatusBadge :label="result.totalImpedimentos ? 'Concluído com impedimentos' : 'Concluído'" :tone="result.totalImpedimentos ? 'warning' : 'success'" />
         </div>
@@ -130,10 +189,18 @@
           </div>
         </dl>
 
-        <p v-if="result.totalImpedimentos" class="mt-5 rounded-xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-dark">
+        <p v-if="result.totalImpedimentos && !result.resumoExecucao" class="mt-5 rounded-xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-dark">
           O total de comissões considera somente as vendas calculadas com sucesso.
         </p>
       </section>
+
+      <MissingBasesCard
+        v-if="coverageGroups.length"
+        :groups="coverageGroups"
+        :competence-key="competenceKey"
+        :is-processing="isCalculating"
+        @recalculate="handleMissingBasesRecalculate"
+      />
 
       <section v-if="result.resultados.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="calculated-sales-heading">
         <div class="flex flex-wrap items-end justify-between gap-4">
@@ -199,10 +266,10 @@
         <PaginationControls :page="resultPage" :total-pages="resultTotalPages" @previous="resultPage -= 1" @next="resultPage += 1" />
       </section>
 
-      <section v-if="result.impedimentos.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="blocked-sales-heading">
+      <section v-if="cadastralImpediments.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="cadastral-blocked-sales-heading">
         <div>
-          <h2 id="blocked-sales-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Vendas com impedimento</h2>
-          <p class="mt-1 text-sm text-sage-muted">Consulte o motivo do impedimento identificado para cada venda.</p>
+          <h2 id="cadastral-blocked-sales-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Vendas com impedimento cadastral (RH)</h2>
+          <p class="mt-1 text-sm text-sage-muted">Inconsistências em vínculos com colaboradores, ausência de cargo ou datas fora da vigência contratual.</p>
         </div>
         <div class="mt-6 overflow-x-auto">
           <table class="w-full min-w-[720px] text-left text-sm">
@@ -210,7 +277,7 @@
               <tr><th class="rounded-l-xl px-3 py-3">Venda</th><th class="px-3 py-3">Matrícula</th><th class="px-3 py-3">Data</th><th class="px-3 py-3">Valor</th><th class="rounded-r-xl px-3 py-3">Motivo</th></tr>
             </thead>
             <tbody class="divide-y divide-sage-border-light">
-              <tr v-for="blocked in result.impedimentos" :key="blocked.idVenda || `${blocked.matricula}-${blocked.dataVenda}`">
+              <tr v-for="blocked in cadastralImpediments" :key="blocked.idVenda || `${blocked.matricula}-${blocked.dataVenda}`">
                 <td class="px-3 py-4 font-semibold text-brand-dark">{{ shortId(blocked.idVenda) }}</td>
                 <td class="px-3 py-4 text-sage-subtle">{{ blocked.matricula || 'Não informada' }}</td>
                 <td class="px-3 py-4 text-sage-subtle">{{ formatDate(blocked.dataVenda) }}</td>
@@ -222,9 +289,31 @@
         </div>
       </section>
 
-      <section v-if="!result.resultados.length && !result.impedimentos.length" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
+      <details v-if="coverageSales.length" class="group rounded-[22px] bg-white p-6 sm:p-7">
+        <summary class="cursor-pointer text-sm font-bold text-brand-dark transition hover:text-brand">
+          Ver listagem individual de vendas com bloqueio de cobertura ({{ coverageSales.length }} vendas protegidas)
+        </summary>
+        <div class="mt-5 overflow-x-auto">
+          <table class="w-full min-w-[720px] text-left text-sm">
+            <thead class="bg-sage-pill text-[10px] uppercase tracking-[0.12em] text-sage-muted">
+              <tr><th class="rounded-l-xl px-3 py-3">Venda</th><th class="px-3 py-3">Matrícula</th><th class="px-3 py-3">Data</th><th class="px-3 py-3">Valor</th><th class="rounded-r-xl px-3 py-3">Motivo</th></tr>
+            </thead>
+            <tbody class="divide-y divide-sage-border-light">
+              <tr v-for="blocked in coverageSales" :key="blocked.idVenda || `${blocked.matricula}-${blocked.dataVenda}`">
+                <td class="px-3 py-4 font-semibold text-brand-dark">{{ shortId(blocked.idVenda) }}</td>
+                <td class="px-3 py-4 text-sage-subtle">{{ blocked.matricula || 'Não informada' }}</td>
+                <td class="px-3 py-4 text-sage-subtle">{{ formatDate(blocked.dataVenda) }}</td>
+                <td class="px-3 py-4 font-semibold text-brand-dark">{{ currency(blocked.valorVenda) }}</td>
+                <td class="px-3 py-4 text-warning-dark">{{ blocked.motivo || 'Motivo não informado' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <section v-if="!result.resumoExecucao && !result.resultados.length && !result.impedimentos.length" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
         <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
-        <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas persistidas para essa competência.</p>
+        <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência.</p>
       </section>
     </template>
 
@@ -269,7 +358,7 @@
 
     <section v-else-if="!result && !historyLoading && salesCount === 0" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
       <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
-      <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas persistidas para essa competência.</p>
+      <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência.</p>
     </section>
 
     <p v-else-if="!result && !historyLoading" class="rounded-2xl border border-sage-border bg-sage-light px-5 py-4 text-sm leading-6 text-sage-muted">
@@ -301,12 +390,16 @@ import { useRoute, useRouter } from 'vue-router'
 import { RefreshCw } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import { ASYNC_EXECUTION_STATES, formatExecutionStateLabel, executionStateTone } from '@/services/asyncExecutionService'
 import { dataService } from '@/services/dataService'
 import { calculationService } from '@/services/calculationService'
 import { readCalculationCache } from '@/services/calculationCache'
 import { CALCULATION_OPERATION, SALES_QUERY_STATE, hasPreviousCalculation as hasPreviousCalculationValue, isCalculationReady, operationToRecalculate } from '@/services/calculationFlow'
 import { formatCompetenceCode, formatCompetenceLabel, getCompetenceDateRange, normalizeCompetence } from '@/services/competenceUtils'
+import { filterCadastralImpediments, groupCoverageImpediments, isCoverageImpediment } from '@/services/coverageService'
+import MissingBasesCard from '@/components/data/MissingBasesCard.vue'
 import { useCalculationStore } from '@/stores/calculationStore'
+import { useDataStore } from '@/stores/dataStore'
 
 const PaginationControls = defineComponent({
   props: { page: { type: Number, required: true }, totalPages: { type: Number, required: true } },
@@ -325,6 +418,7 @@ const PaginationControls = defineComponent({
 const route = useRoute()
 const router = useRouter()
 const calculationStore = useCalculationStore()
+const dataStore = useDataStore()
 const competenceKey = computed(() => normalizeCompetence(route.params.competencia))
 const salesCount = ref(null)
 const result = ref(null)
@@ -343,6 +437,16 @@ const resultPageSize = 10
 const competenceGeneration = ref(0)
 const salesQueryRequestId = ref(0)
 const historyRequestId = ref(0)
+
+const coverageGroups = computed(() =>
+  groupCoverageImpediments(result.value?.impedimentos || [], competenceKey.value)
+)
+const cadastralImpediments = computed(() =>
+  filterCadastralImpediments(result.value?.impedimentos || [])
+)
+const coverageSales = computed(() =>
+  (result.value?.impedimentos || []).filter((item) => isCoverageImpediment(item.motivo))
+)
 
 const summaryItems = computed(() => [
   { label: 'Vendas processadas', value: result.value?.totalVendasProcessadas ?? 0 },
@@ -374,6 +478,21 @@ const canCalculate = computed(() => isCalculationReady({
   historicoComErro: Boolean(historyError.value),
   calculando: calculationStore.isProcessing
 }))
+const activeExecutionForThisCompetence = computed(() =>
+  calculationStore.competencia === competenceKey.value &&
+  (calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.AGUARDANDO ||
+   calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.PROCESSANDO ||
+   calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.ACOMPANHAMENTO_PAUSADO)
+)
+
+const currentAsyncStatusLabel = computed(() =>
+  formatExecutionStateLabel(calculationStore.asyncStatus || (isCalculating.value ? ASYNC_EXECUTION_STATES.PROCESSANDO : ASYNC_EXECUTION_STATES.IDLE))
+)
+
+const currentAsyncStatusTone = computed(() =>
+  executionStateTone(calculationStore.asyncStatus || (isCalculating.value ? ASYNC_EXECUTION_STATES.PROCESSANDO : ASYNC_EXECUTION_STATES.IDLE))
+)
+
 const hasPreviousCalculation = computed(() => hasPreviousCalculationState())
 
 watch(competenceKey, () => {
@@ -385,6 +504,7 @@ watch([matriculaFilter, originFilter], () => {
 })
 
 async function loadCompetence() {
+  calculationStore.recoverExecution(competenceKey.value)
   const generation = competenceGeneration.value + 1
   competenceGeneration.value = generation
   salesQueryRequestId.value += 1
@@ -531,6 +651,22 @@ function retryLastOperation() {
   calculate(operationToRecalculate(lastOperation.value))
 }
 
+function handleMissingBasesRecalculate() {
+  if (!canCalculate.value) return
+  calculate(true)
+}
+
+watch(
+  () => [dataStore.activeJob.status, dataStore.activeJob.modo],
+  ([status, modo], [prevStatus]) => {
+    if (modo === 'COMISS' && status === 'SUCCESS' && prevStatus === 'PROCESSING') {
+      if (coverageGroups.value.length > 0 && canCalculate.value && !isCalculating.value) {
+        calculate(true)
+      }
+    }
+  }
+)
+
 function restoreSessionResult(expectedCompetence = competenceKey.value) {
   const cached = readCalculationCache(expectedCompetence)
   if (!cached) return
@@ -550,6 +686,7 @@ function consultHistory() {
 }
 
 function currency(value) {
+  if (value == null || value === '') return '—'
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0))
 }
 

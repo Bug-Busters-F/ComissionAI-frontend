@@ -15,11 +15,11 @@
       <article
         v-for="card in metrics"
         :key="card.label"
-        :class="['rounded-2xl p-6', card.highlight ? 'bg-brand-dark text-white' : 'bg-white']"
+        :class="['rounded-2xl p-6', card.highlight ? 'bg-success-bg ring-1 ring-inset ring-success/20' : 'bg-white']"
       >
-        <p class="text-sm font-medium" :class="card.highlight ? 'text-sage-border' : 'text-sage-muted'">{{ card.label }}</p>
-        <p class="mt-6 text-4xl font-extrabold tracking-[-0.05em]" :class="card.highlight ? 'text-brand' : 'text-brand-dark'">{{ card.value }}</p>
-        <p class="mt-2 text-xs" :class="card.highlight ? 'text-sage-border' : 'text-sage-muted'">{{ card.detail }}</p>
+        <p class="text-sm font-medium" :class="card.highlight ? 'text-success-dark' : 'text-sage-muted'">{{ card.label }}</p>
+        <p class="mt-6 text-4xl font-extrabold tracking-[-0.05em]" :class="card.highlight ? 'text-success-dark' : 'text-brand-dark'">{{ card.value }}</p>
+        <p class="mt-2 text-xs" :class="card.highlight ? 'text-success-dark' : 'text-sage-muted'">{{ card.detail }}</p>
       </article>
     </section>
 
@@ -94,7 +94,7 @@ import { campaignStateTone, formatCampaignState, formatPeriod } from '@/services
 
 const metrics = [
   { label: 'Competências cadastradas', value: '3', detail: 'RH, Vendas e Comissão', highlight: true },
-  { label: 'Campanhas', value: '2', detail: 'Propostas e campanhas aprovadas' },
+  { label: 'Campanhas', value: '2', detail: 'Regras e campanhas aprovadas' },
   { label: 'Aguardando apuração', value: '1', detail: 'Campanhas com vigência encerrada' },
   { label: 'Pendências nos dados', value: '3', detail: 'Revisão antes dos cálculos' }
 ]
@@ -106,7 +106,7 @@ const campaignsError = ref('')
 const process = [
   { number: 1, title: 'Prepare as bases mensais', detail: 'Importe RH, Vendas e Comissão.' },
   { number: 2, title: 'Crie e simule a campanha', detail: 'Revise as regras e o orçamento.' },
-  { number: 3, title: 'Aprove a proposta', detail: 'Registre a decisão e a versão.' },
+  { number: 3, title: 'Aprove a regra', detail: 'Registre a decisão e a versão.' },
   { number: 4, title: 'Apure os resultados', detail: 'Compare a simulação com o realizado.' }
 ]
 

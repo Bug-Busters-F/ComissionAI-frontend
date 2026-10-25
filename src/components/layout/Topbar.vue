@@ -10,11 +10,17 @@
           v-if="calculationStore.isProcessing"
           type="button"
           class="focus-ring flex items-center gap-2 rounded-full border border-warning-border bg-warning-bg px-3.5 py-1.5 text-xs font-bold text-brand-dark shadow-sm transition hover:bg-warning-bg/80"
-          title="Abrir a competência em processamento"
+          title="Abrir a competência em apuração"
           @click="openCalculation"
         >
           <RefreshCw class="h-3.5 w-3.5 animate-spin text-warning-dark" aria-hidden="true" />
-          <span>{{ calculationStore.recalculando ? 'Recalculando comissões' : 'Calculando comissões' }} — {{ formatCompetenceLabel(calculationStore.competencia) }}</span>
+          <span>
+            {{ calculationStore.recalculando ? 'Recalculando' : 'Apurando' }} {{ formatCompetenceLabel(calculationStore.competencia) }}:
+            {{ calculationStore.progress == null ? 'aguardando confirmação' : calculationStore.progress + '%' }}
+          </span>
+          <span v-if="calculationStore.stage" class="hidden sm:inline text-[11px] font-normal text-sage-muted truncate max-w-[160px]">
+            • {{ calculationStore.stage }}
+          </span>
         </button>
 
         <!-- WIDGET DE PROCESSAMENTO EM SEGUNDO PLANO -->
@@ -103,7 +109,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { RefreshCw, CheckCircle2, AlertOctagon, X } from 'lucide-vue-next'
 import { useDataStore } from '@/stores/dataStore'
@@ -115,6 +121,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useDataStore()
 const calculationStore = useCalculationStore()
+onMounted(() => { calculationStore.recoverExecution() })
 
 const navigation = [
   { label: 'Home', to: '/home', section: 'home' },

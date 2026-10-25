@@ -1,11 +1,11 @@
 <template>
   <div class="space-y-7">
-    <PageHeader title="Base de dados" description="Organize e feche os ciclos mensais de dados de cada competência.">
+    <PageHeader title="Dados da empresa" description="Organize e feche os ciclos mensais de dados de cada competência.">
       <template #action>
         <div class="flex items-center gap-3">
           <button
             type="button"
-            @click="store.openComissModal('Dezembro')"
+            @click="store.openComissModal(store.competencias[0]?.competenciaCodigo || null)"
             class="focus-ring rounded-full border border-sage-border-dark bg-white px-4 py-3 text-sm font-semibold text-brand-dark hover:bg-sage-light"
           >
             Tabelas de Comissão
@@ -29,12 +29,12 @@
       </div>
       <h2 class="mt-2 text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Fechamento do ciclo mensal</h2>
       <p class="mt-2 max-w-3xl text-sm leading-6 text-sage-muted">
-        Para a correta apuração e simulação das regras de negócio, as bases de <strong>RH e Vendas devem ser enviadas conjuntamente</strong> para cada competência mensal. A validação sequencial garante que todos os colaboradores existam no quadro ativo antes de registrar as transações.
+        Para a correta apuração e simulação das regras de negócio, as bases de <strong>RH e Vendas devem ser enviadas conjuntamente</strong> para cada competência mensal. O RH é processado primeiro e permanece cadastrado se o envio de vendas falhar. A competência aparece após a confirmação dos dados.
       </p>
     </section>
 
     <section v-if="store.competenciasLoading" class="rounded-2xl bg-white px-6 py-12 text-center text-sm text-sage-muted" role="status">
-      Consultando as vendas persistidas para montar as competências…
+      Consultando as competências disponíveis…
     </section>
 
     <section v-else-if="store.competenciasError" class="rounded-2xl border border-danger/30 bg-danger-bg p-6" role="alert">
@@ -58,7 +58,7 @@
       >
         <!-- Borda superior animada quando em processamento de background -->
         <div
-          v-if="store.activeJob.isActive && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)"
+          v-if="store.activeJob.status === 'PROCESSING' && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)"
           class="absolute top-0 left-0 right-0 h-1 bg-brand animate-pulse"
         />
 
@@ -76,7 +76,7 @@
 
           <!-- Card de progresso ativo se esta competência estiver processando -->
           <div
-            v-if="store.activeJob.isActive && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)"
+            v-if="store.activeJob.status === 'PROCESSING' && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)"
             class="mt-4 rounded-xl border border-warning-border bg-warning-bg/50 p-3"
           >
             <div class="flex items-center justify-between text-xs font-bold text-brand-dark">
@@ -93,7 +93,7 @@
               />
             </div>
             <p class="mt-1.5 text-[11px] text-sage-muted truncate">
-              {{ store.activeJob.message }}
+              {{ userFacingText(store.activeJob.message) }}
             </p>
           </div>
 
@@ -118,13 +118,16 @@
           </div>
         </div>
 
+        <ul v-if="period.mensagens?.length" class="mt-4 space-y-1 text-xs text-sage-muted">
+          <li v-for="(message, index) in period.mensagens" :key="index">{{ userFacingText(message) }}</li>
+        </ul>
         <div class="mt-7 pt-4 border-t border-sage-border-light flex flex-col gap-2">
           <button
             type="button"
             @click="store.openCicloModal(period.competenciaCodigo)"
             class="focus-ring flex items-center justify-between rounded-xl bg-sage-light px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-sage-border transition"
           >
-            <template v-if="store.activeJob.isActive && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)">
+            <template v-if="store.activeJob.status === 'PROCESSING' && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)">
               <span>Acompanhar processamento</span>
               <span>⏳</span>
             </template>
@@ -143,13 +146,13 @@
             <span>→</span>
           </RouterLink>
           <span v-else class="rounded-xl bg-sage-light px-4 py-2.5 text-xs font-semibold text-sage-muted text-center">
-            Cálculo indisponível sem vendas persistidas
+            Cálculo indisponível sem vendas cadastradas
           </span>
 
           <div class="flex items-center justify-between pt-1 text-[11px]">
             <button
               type="button"
-              @click="store.openComissModal(period.name)"
+              @click="store.openComissModal(period.competenciaCodigo)"
               class="font-semibold text-sage-muted hover:text-brand-dark hover:underline"
             >
               Taxas de comissão
@@ -220,6 +223,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { onMounted } from 'vue'
 import { RefreshCw, Trash2, Database, FileSpreadsheet } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'

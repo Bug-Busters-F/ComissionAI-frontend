@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-7">
-    <PageHeader title="Campanhas" description="Crie propostas, revise regras e acompanhe a vigência das campanhas.">
+    <PageHeader title="Campanhas" description="Crie campanhas com regras, revise-as e acompanhe suas vigências.">
       <template #action>
         <RouterLink to="/campanhas/nova" class="focus-ring inline-flex rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover">
           + Nova campanha
@@ -12,7 +12,7 @@
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 id="campaign-list-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Campanhas cadastradas</h2>
-          <p class="mt-1 text-sm text-sage-muted">Consulte as propostas e regulamentos cadastrados no sistema.</p>
+          <p class="mt-1 text-sm text-sage-muted">Consulte as regras e os regulamentos cadastrados no sistema.</p>
         </div>
         <div class="flex flex-col gap-3 sm:flex-row">
           <label class="sr-only" for="campaign-search">Buscar campanha</label>

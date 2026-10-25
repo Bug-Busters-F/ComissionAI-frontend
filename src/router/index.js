@@ -4,7 +4,7 @@ import DataView from '@/views/DataView.vue'
 import CompetenceCalculationView from '@/views/CompetenceCalculationView.vue'
 import CampaignsView from '@/views/CampaignsPrototypeView.vue'
 import CampaignDetailsView from '@/views/CampaignDetailsPrototypeView.vue'
-import CampaignFlowView from '@/views/CampaignFlowView.vue'
+import CampaignCreationFlowView from '@/views/CampaignCreationFlowView.vue'
 
 const routes = [
   {
@@ -38,13 +38,13 @@ const routes = [
   {
     path: '/campanhas/nova',
     name: 'campanha-nova',
-    component: CampaignFlowView,
+    component: CampaignCreationFlowView,
     meta: { section: 'campanhas', label: 'Campanhas' }
   },
   {
     path: '/campanhas/:id/editar',
     name: 'campanha-editar',
-    component: CampaignFlowView,
+    component: CampaignCreationFlowView,
     meta: { section: 'campanhas', label: 'Campanhas' }
   },
   {

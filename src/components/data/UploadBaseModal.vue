@@ -65,13 +65,13 @@
             <RefreshCw class="h-7 w-7 animate-spin text-warning-dark" />
           </div>
           <span class="mt-4 inline-block rounded-md bg-warning-light px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-warning-dark">
-            Processamento Assíncrono • Servidor Ativo
+            Processamento em andamento
           </span>
           <h3 class="mt-2 text-xl font-extrabold text-brand-dark">
-            Validando integridade no backend...
+            Conferindo os arquivos enviados…
           </h3>
           <p class="mx-auto mt-1 max-w-md text-xs text-sage-muted">
-            {{ store.activeJob.message || 'Processando registros e validando integridade estrutural...' }}
+            {{ userFacingText(store.activeJob.message || 'Conferindo os dados e os vínculos dos arquivos…') }}
           </p>
 
           <!-- Barra de Progresso com Porcentagem -->
@@ -410,7 +410,7 @@
               </div>
             </div>
             <p class="mt-2 text-xs text-sage-muted">
-              Taxas sem vigência determinada geram inconsistências operacionais e sobreposição de regras.
+              As taxas valem para o mês inteiro da data de início. Selecione datas do mesmo mês; para outra competência, faça um novo envio.
             </p>
           </div>
 
@@ -436,22 +436,30 @@
                 @change="onComissFileSelected"
               />
 
-              <div v-if="store.uploadModal.comissFile" class="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 text-center sm:text-left w-full max-w-full">
-                <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-sage-pill text-brand-dark">
-                  <FileSpreadsheet class="h-6 w-6 text-success" />
+              <div v-if="store.uploadModal.comissFile" class="flex flex-col items-center gap-3 text-center sm:text-left w-full max-w-full">
+                <div class="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full">
+                  <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-sage-pill text-brand-dark">
+                    <FileSpreadsheet class="h-6 w-6 text-success" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="break-all text-sm font-extrabold text-brand-dark">{{ store.uploadModal.comissFile.name }}</p>
+                    <p class="mt-0.5 text-xs text-sage-muted">{{ formatFileSize(store.uploadModal.comissFile.size) }} • XLSX</p>
+                  </div>
+                  <button
+                    type="button"
+                    @click="removerComissFile"
+                    class="focus-ring rounded-lg p-2 text-sage-muted hover:bg-danger-bg hover:text-danger"
+                    title="Remover arquivo"
+                  >
+                    <Trash2 class="h-4 w-4" />
+                  </button>
                 </div>
-                <div class="min-w-0 flex-1">
-                  <p class="break-all text-sm font-extrabold text-brand-dark">{{ store.uploadModal.comissFile.name }}</p>
-                  <p class="mt-0.5 text-xs text-sage-muted">{{ formatFileSize(store.uploadModal.comissFile.size) }} • XLSX</p>
+
+                <!-- Aviso de higienização de planilha -->
+                <div v-if="sanitizationNote" class="w-full flex items-center gap-2 rounded-xl bg-success-surface px-3 py-2 text-xs font-bold text-success-dark border border-success/30">
+                  <CheckCircle2 class="h-4 w-4 shrink-0 text-success" />
+                  <span>{{ sanitizationNote }}</span>
                 </div>
-                <button
-                  type="button"
-                  @click="store.setComissFile(null)"
-                  class="focus-ring rounded-lg p-2 text-sage-muted hover:bg-danger-bg hover:text-danger"
-                  title="Remover arquivo"
-                >
-                  <Trash2 class="h-4 w-4" />
-                </button>
               </div>
 
               <div v-else class="cursor-pointer" @click="triggerComissInput">
@@ -462,12 +470,29 @@
                 <p class="mt-1 text-xs text-sage-muted">Formatos suportados: .xlsx, .xls</p>
               </div>
             </div>
+
+            <!-- OPÇÃO DE SUBSTITUIÇÃO DE BASE EXISTENTE -->
+            <label class="mt-3.5 flex items-start gap-2.5 rounded-xl border border-sage-border-light bg-sage-light/60 p-3 hover:bg-sage-light cursor-pointer transition">
+              <input
+                type="checkbox"
+                v-model="store.uploadModal.substituirBaseExistente"
+                class="mt-0.5 h-4 w-4 rounded border-sage-border text-brand focus:ring-brand"
+              />
+              <div>
+                <span class="block text-xs font-bold text-brand-dark">
+                  Substituir base existente se a competência já possuir taxas
+                </span>
+                <span class="block text-[11px] text-sage-muted">
+                  Remove comissões anteriores da mesma competência para evitar conflito de duplicidade.
+                </span>
+              </div>
+            </label>
           </div>
         </template>
 
         <!-- MENSAGEM DE ERRO DO FORMULÁRIO (SE HOUVER) -->
         <div v-if="store.uploadModal.errorMessage" class="rounded-xl border border-danger bg-danger-bg p-3.5 text-xs font-semibold text-danger-dark">
-          {{ store.uploadModal.errorMessage }}
+          {{ userFacingText(store.uploadModal.errorMessage) }}
         </div>
 
 
@@ -501,10 +526,20 @@
         </div>
       </div>
     </div>
+
+    <!-- MODAL DE RESOLUÇÃO DE CONFLITO DE TAXAS -->
+    <RateConflictModal
+      :open="isRateConflictModalOpen"
+      :conflicts="pendingInspection?.rateConflicts || []"
+      :identical-count="pendingInspection?.identicalDuplicates?.length || 0"
+      @cancel="cancelConflictResolution"
+      @resolve="onResolveConflicts"
+    />
   </div>
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { ref } from 'vue'
 import {
   X,
@@ -523,6 +558,11 @@ import {
 } from 'lucide-vue-next'
 import { useDataStore } from '@/stores/dataStore'
 import ValidationReport from './ValidationReport.vue'
+import RateConflictModal from './RateConflictModal.vue'
+import {
+  inspectCommissionsSpreadsheet,
+  buildSanitizedCommissionsFile
+} from '@/services/spreadsheetSanitizer'
 
 const store = useDataStore()
 
@@ -533,6 +573,71 @@ const comissInputRef = ref(null)
 const isDraggingRh = ref(false)
 const isDraggingVendas = ref(false)
 const isDraggingComiss = ref(false)
+
+const isRateConflictModalOpen = ref(false)
+const pendingInspection = ref(null)
+const sanitizationNote = ref('')
+const isSanitizing = ref(false)
+
+async function handleComissFile(file) {
+  if (!file) {
+    store.setComissFile(null)
+    sanitizationNote.value = ''
+    return
+  }
+
+  isSanitizing.value = true
+  try {
+    const inspection = await inspectCommissionsSpreadsheet(file)
+    if (inspection.rateConflicts.length > 0) {
+      pendingInspection.value = { file, ...inspection }
+      isRateConflictModalOpen.value = true
+    } else if (inspection.identicalDuplicates.length > 0) {
+      const clean = buildSanitizedCommissionsFile({
+        originalFile: file,
+        rawRows: inspection.rawRows
+      })
+      store.setComissFile(clean)
+      sanitizationNote.value = `${inspection.identicalDuplicates.length} linha(s) repetidas idênticas foram removidas automaticamente da planilha.`
+    } else {
+      store.setComissFile(file)
+      sanitizationNote.value = ''
+    }
+  } catch (err) {
+    console.warn('Falha na pré-validação da planilha:', err)
+    store.setComissFile(file)
+    sanitizationNote.value = ''
+  } finally {
+    isSanitizing.value = false
+  }
+}
+
+function cancelConflictResolution() {
+  isRateConflictModalOpen.value = false
+  pendingInspection.value = null
+  store.setComissFile(null)
+  sanitizationNote.value = ''
+}
+
+function onResolveConflicts(resolutions) {
+  if (!pendingInspection.value) return
+  const clean = buildSanitizedCommissionsFile({
+    originalFile: pendingInspection.value.file,
+    rawRows: pendingInspection.value.rawRows,
+    rateConflicts: pendingInspection.value.rateConflicts,
+    conflictResolutions: resolutions
+  })
+  store.setComissFile(clean)
+  isRateConflictModalOpen.value = false
+  sanitizationNote.value = `Planilha higienizada: ${pendingInspection.value.rateConflicts.length} conflito(s) resolvido(s) e linhas duplicadas eliminadas.`
+  pendingInspection.value = null
+}
+
+function removerComissFile() {
+  store.setComissFile(null)
+  sanitizationNote.value = ''
+  pendingInspection.value = null
+}
 
 function triggerRhInput() {
   rhInputRef.value?.click()
@@ -560,10 +665,10 @@ function onVendasFileSelected(e) {
   }
 }
 
-function onComissFileSelected(e) {
+async function onComissFileSelected(e) {
   const files = e.target.files
   if (files && files.length > 0) {
-    store.setComissFile(files[0])
+    await handleComissFile(files[0])
   }
 }
 
@@ -583,11 +688,11 @@ function onDropVendas(e) {
   }
 }
 
-function onDropComiss(e) {
+async function onDropComiss(e) {
   isDraggingComiss.value = false
   const files = e.dataTransfer.files
   if (files && files.length > 0) {
-    store.setComissFile(files[0])
+    await handleComissFile(files[0])
   }
 }
 

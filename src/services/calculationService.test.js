@@ -6,6 +6,7 @@ import {
   normalizeCalculationError,
   normalizeCalculationResult
 } from './calculationService'
+import { ASYNC_EXECUTION_STATES } from './asyncExecutionService'
 
 vi.mock('./api', () => ({
   default: {
@@ -14,8 +15,22 @@ vi.mock('./api', () => ({
   }
 }))
 
+function createStorage() {
+  const values = new Map()
+  return {
+    get length() { return values.size },
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) { values.set(key, String(value)) },
+    removeItem(key) { values.delete(key) },
+    key(index) { return [...values.keys()][index] || null }
+  }
+}
+
 describe('calculationService', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    globalThis.window = { sessionStorage: createStorage() }
+  })
 
   it('sends one competence calculation request with the normalized backend contract', async () => {
     const signal = new AbortController().signal
@@ -82,5 +97,16 @@ describe('calculationService', () => {
   it('explains timeout and network failures without retrying', () => {
     expect(normalizeCalculationError({ code: 'ECONNABORTED' }).kind).toBe('timeout')
     expect(normalizeCalculationError(new Error('offline')).kind).toBe('network')
+  })
+
+  it('delegates to the real async contract and retains a confirmed UUID', async () => {
+    const id = '11111111-1111-4111-8111-111111111111'
+    api.post.mockResolvedValueOnce({ data: { id, competencia: '2026-10', recalcular: true, status: 'CONCLUIDA', totalItens: 5, itensProcessados: 5, percentual: 100, resultado: 'vendas=5,sucessos=5,impedimentos=0' } })
+    const result = await calculationService.executeAsyncCalculation('10/2026', { recalcular: true })
+    expect(result).toMatchObject({ competencia: '2026-10', recalculoExecutado: true, totalCalculados: 5 })
+    expect(api.post.mock.calls[0][0]).toBe('/execucoes/calculo')
+    expect(calculationService.recoverActiveCalculation('2026-10').executionId).toBe(id)
+    calculationService.clearActiveCalculation('2026-10')
+    expect(calculationService.recoverActiveCalculation('2026-10')).toBeNull()
   })
 })
