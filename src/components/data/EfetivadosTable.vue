@@ -174,7 +174,7 @@
       v-if="store.dadosEfetivados.error"
       class="rounded-xl border border-danger bg-danger-bg p-4 text-xs text-danger font-semibold flex items-center justify-between"
     >
-      <span>{{ store.dadosEfetivados.error }}</span>
+      <span>{{ userFacingText(store.dadosEfetivados.error) }}</span>
       <button
         type="button"
         @click="store.carregarDadosEfetivados"
@@ -422,6 +422,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { onMounted } from 'vue'
 import {
   Users,

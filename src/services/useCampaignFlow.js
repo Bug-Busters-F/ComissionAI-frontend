@@ -1,3 +1,4 @@
+import { focusCampaignStepStart } from './campaignStepNavigation'
 import { computed, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { useNotificationStore } from '@/stores/notificationStore'
@@ -239,40 +240,44 @@ export function useCampaignFlow() {
   }
 
   async function goToStep(step) {
-    const normalized = normalizeCampaignStep(step)
-    if (state.interpretation.isProcessing && normalized !== 'proposta' && normalized !== 'interpretacao') {
-      state.interpretation.error = 'Aguarde a interpretação terminar antes de continuar.'
-      return false
-    }
+    try {
+      const normalized = normalizeCampaignStep(step)
+      if (state.interpretation.isProcessing && normalized !== 'proposta' && normalized !== 'interpretacao') {
+        state.interpretation.error = 'Aguarde a interpretação terminar antes de continuar.'
+        return false
+      }
 
-    if (normalized === 'interpretacao' && !form.textoOriginal.trim()) {
-      state.fieldErrors = { ...state.fieldErrors, textoOriginal: 'Informe o texto da proposta para abrir a interpretação.' }
-      await router.push({ query: { ...route.query, etapa: 'proposta' } })
-      await nextTick()
-      document.querySelector('#campaign-original-text')?.focus()
-      return false
-    }
+      if (normalized === 'interpretacao' && !form.textoOriginal.trim()) {
+        state.fieldErrors = { ...state.fieldErrors, textoOriginal: 'Informe a descrição da campanha para abrir a interpretação.' }
+        await router.push({ query: { ...route.query, etapa: 'proposta' } })
+        await nextTick()
+        document.querySelector('#campaign-original-text')?.focus({ preventScroll: true })
+        return false
+      }
 
-    if ((normalized === 'simulacao' || normalized === 'revisao') && (!form.titulo.trim() || !form.textoOriginal.trim())) {
-      state.fieldErrors = validateCampaignForm(form)
-      await router.push({ query: { ...route.query, etapa: 'proposta' } })
-      await nextTick()
-      focusFirstError()
-      return false
-    }
+      if ((normalized === 'simulacao' || normalized === 'revisao') && (!form.titulo.trim() || !form.textoOriginal.trim())) {
+        state.fieldErrors = validateCampaignForm(form)
+        await router.push({ query: { ...route.query, etapa: 'proposta' } })
+        await nextTick()
+        focusFirstError({ preventScroll: true })
+        return false
+      }
 
-    if ((normalized === 'simulacao' || normalized === 'revisao') && !form.taxaPercentual) {
-      state.generalError = 'Revise a taxa da regra antes de continuar.'
-      await router.push({ query: { ...route.query, etapa: 'interpretacao' } })
-      await nextTick()
-      document.querySelector('#campaign-rate')?.focus()
-      return false
-    }
+      if ((normalized === 'simulacao' || normalized === 'revisao') && !form.taxaPercentual) {
+        state.generalError = 'Revise a taxa da regra antes de continuar.'
+        await router.push({ query: { ...route.query, etapa: 'interpretacao' } })
+        await nextTick()
+        document.querySelector('#campaign-rate')?.focus({ preventScroll: true })
+        return false
+      }
 
-    state.generalError = ''
-    state.interpretation.error = ''
-    await router.push({ query: { ...route.query, etapa: normalized } })
-    return true
+      state.generalError = ''
+      state.interpretation.error = ''
+      await router.push({ query: { ...route.query, etapa: normalized } })
+      return true
+    } finally {
+      await focusCampaignStepStart()
+    }
   }
 
   async function interpretProposal() {
@@ -280,10 +285,9 @@ export function useCampaignFlow() {
 
     const originalText = String(form.textoOriginal ?? '')
     if (!originalText.trim()) {
-      state.fieldErrors = { ...state.fieldErrors, textoOriginal: 'Informe o texto da proposta para interpretar.' }
+      state.fieldErrors = { ...state.fieldErrors, textoOriginal: 'Informe a descrição da campanha para interpretar.' }
       await router.push({ query: { ...route.query, etapa: 'proposta' } })
-      await nextTick()
-      document.querySelector('#campaign-original-text')?.focus()
+      await focusCampaignStepStart()
       return false
     }
 
@@ -359,7 +363,8 @@ export function useCampaignFlow() {
       }
       invalidateSimulationIfChanged()
       await router.push({ query: { ...route.query, etapa: 'interpretacao' } })
-      notifications.success(isDemo.value ? 'Interpretação demonstrativa aplicada' : 'Proposta interpretada', isDemo.value ? 'Revise os campos fictícios antes de continuar.' : 'Revise os campos sugeridos antes de salvar a campanha.')
+      await focusCampaignStepStart()
+      notifications.success(isDemo.value ? 'Interpretação demonstrativa aplicada' : 'Regra interpretada', isDemo.value ? 'Revise os campos fictícios antes de continuar.' : 'Revise os campos sugeridos antes de salvar a campanha.')
       return true
     } catch (error) {
       if (!isCurrentInterpretationRequest(requestId, originalText, context)) {
@@ -901,13 +906,13 @@ export function useCampaignFlow() {
   }
 
   function focusMainStart() {
-    nextTick(() => document.querySelector('[data-campaign-main]')?.focus())
+    return focusCampaignStepStart()
   }
 
-  function focusFirstError() {
+  function focusFirstError(options = {}) {
     const firstError = Object.keys(state.fieldErrors).find((field) => state.fieldErrors[field])
     const target = ERROR_TARGETS[firstError]
-    if (target) document.querySelector(target.selector)?.focus()
+    if (target) document.querySelector(target.selector)?.focus(options)
   }
 
   function createSnapshot() {

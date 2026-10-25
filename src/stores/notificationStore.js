@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { userFacingText } from '@/services/userFacingText'
 
 export const useNotificationStore = defineStore('notification', {
   state: () => ({
@@ -10,8 +11,8 @@ export const useNotificationStore = defineStore('notification', {
       const id = Date.now().toString() + Math.random().toString(36).substring(2, 6)
       const notification = {
         id,
-        title,
-        message,
+        title: userFacingText(title),
+        message: userFacingText(message),
         type,
         actionLabel,
         onAction

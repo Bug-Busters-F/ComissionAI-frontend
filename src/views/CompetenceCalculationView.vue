@@ -2,7 +2,7 @@
   <div class="space-y-7">
     <PageHeader
       :title="`Cálculo · ${formatCompetenceLabel(competenceKey)}`"
-      description="Calcule as comissões das vendas persistidas da competência."
+      description="Calcule as comissões das vendas cadastradas da competência."
     >
       <template #action>
         <RouterLink to="/dados" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-white">
@@ -16,8 +16,8 @@
         <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">Competência selecionada</p>
         <h2 class="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-brand-dark">{{ formatCompetenceCode(competenceKey) }}</h2>
         <p class="mt-2 text-sm text-sage-muted">
-          <template v-if="salesQueryState === SALES_QUERY_STATE.SUCCESS">{{ salesCount }} vendas persistidas no período.</template>
-          <template v-else-if="salesQueryState === SALES_QUERY_STATE.LOADING">Consultando as vendas persistidas…</template>
+          <template v-if="salesQueryState === SALES_QUERY_STATE.SUCCESS">{{ salesCount }} vendas cadastradas no período.</template>
+          <template v-else-if="salesQueryState === SALES_QUERY_STATE.LOADING">Consultando as vendas cadastradas…</template>
           <template v-else-if="salesQueryState === SALES_QUERY_STATE.ERROR">Não foi possível consultar as vendas.</template>
           <template v-else>Competência não validada.</template>
         </p>
@@ -60,11 +60,11 @@
 
     <section v-else-if="salesQueryState === SALES_QUERY_STATE.SUCCESS && salesCount === 0" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
       <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
-      <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas persistidas para essa competência. O cálculo permanece indisponível.</p>
+      <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência. O cálculo permanece indisponível.</p>
     </section>
 
     <p v-if="result" class="rounded-2xl border border-sage-border bg-sage-light px-5 py-4 text-sm leading-6 text-sage-muted">
-      {{ result.recalculoExecutado ? 'As regras atuais foram aplicadas ao recálculo desta competência.' : 'Resultados já registrados são reaproveitados pelo servidor quando a competência é executada novamente.' }}
+      {{ result.recalculoExecutado ? 'As regras atuais foram aplicadas ao recálculo desta competência.' : 'Resultados já registrados são reaproveitados pelo sistema quando a competência é executada novamente.' }}
     </p>
 
     <p v-if="restoredResult" class="rounded-2xl border border-sage-border bg-white px-5 py-4 text-sm leading-6 text-sage-muted" role="status">
@@ -98,13 +98,13 @@
               <span
                 v-if="calculationStore.executionId"
                 class="rounded-md border border-warning-border bg-white/70 px-2 py-0.5 font-mono text-[11px] font-bold text-brand-dark"
-                title="Identificador determinístico da apuração"
+                title="Identificador da execução"
               >
                 {{ calculationStore.executionId }}
               </span>
             </div>
             <p class="mt-1 text-sm text-sage-muted">
-              {{ calculationStore.stage || 'Processamento em andamento no servidor...' }}
+              {{ calculationStore.stage || 'Processamento em andamento...' }}
             </p>
           </div>
         </div>
@@ -139,7 +139,7 @@
 
       <!-- Orientação de Fechamento Seguro da Tela -->
       <p class="text-xs text-sage-muted">
-        O cálculo prossegue no servidor. Você pode navegar livremente pelo sistema ou fechar esta tela; ao retornar, o acompanhamento será retomado automaticamente sem duplicar a execução.
+        O cálculo continua mesmo fora desta tela. Você pode navegar livremente pelo sistema ou fechar esta tela; ao retornar, o acompanhamento será retomado automaticamente sem duplicar a execução.
       </p>
     </section>
 
@@ -311,7 +311,7 @@
 
       <section v-if="!result.resultados.length && !result.impedimentos.length" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
         <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
-        <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas persistidas para essa competência.</p>
+        <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência.</p>
       </section>
     </template>
 
@@ -356,7 +356,7 @@
 
     <section v-else-if="!result && !historyLoading && salesCount === 0" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
       <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
-      <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas persistidas para essa competência.</p>
+      <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência.</p>
     </section>
 
     <p v-else-if="!result && !historyLoading" class="rounded-2xl border border-sage-border bg-sage-light px-5 py-4 text-sm leading-6 text-sage-muted">

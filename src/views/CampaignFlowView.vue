@@ -4,7 +4,7 @@
     <header>
       <button type="button" class="focus-ring rounded font-semibold text-brand-dark" @click="handleBack">← Voltar às campanhas</button>
       <div class="mt-7 flex flex-wrap items-end justify-between gap-4">
-        <div><h1 class="text-4xl font-extrabold tracking-[-0.05em] sm:text-[42px]">{{ campaignTitle }}</h1><p class="mt-2 text-sm text-sage-muted">Transforme a proposta em uma campanha pronta para revisão.</p></div>
+        <div><h1 class="text-4xl font-extrabold tracking-[-0.05em] sm:text-[42px]">{{ campaignTitle }}</h1><p class="mt-2 text-sm text-sage-muted">Configure as regras da campanha e revise os dados antes de concluir.</p></div>
         <StatusBadge :label="isPersisted ? formatCampaignState(state.persistedState) : 'Não salva'" :tone="isPersisted ? campaignStateTone(state.persistedState) : 'neutral'" />
       </div>
     </header>
@@ -73,7 +73,7 @@
       <button v-if="activeStep !== 'proposta'" type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark" @click="goToStep(CAMPAIGN_STEPS[currentStepIndex - 1].key)">← Voltar</button>
       <span v-else></span>
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <button v-if="activeStep === 'proposta'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="state.interpretation.isProcessing" @click="interpretProposal">{{ state.interpretation.isProcessing ? 'Interpretando…' : 'Interpretar proposta →' }}</button>
+        <button v-if="activeStep === 'proposta'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="state.interpretation.isProcessing" @click="interpretProposal">{{ state.interpretation.isProcessing ? 'Interpretando…' : 'Interpretar regras →' }}</button>
         <button v-else-if="activeStep === 'interpretacao'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover" @click="goToStep('simulacao')">Ir para simulação →</button>
         <button
           v-else-if="activeStep === 'simulacao'"

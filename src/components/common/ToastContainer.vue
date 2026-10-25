@@ -32,7 +32,7 @@
             {{ item.title }}
           </h4>
           <p class="mt-1 text-xs text-brand-dark/85 leading-relaxed">
-            {{ item.message }}
+            {{ userFacingText(item.message) }}
           </p>
 
           <div v-if="item.actionLabel && item.onAction" class="mt-2.5">
@@ -61,6 +61,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { CheckCircle2, AlertOctagon, AlertTriangle, Info, X } from 'lucide-vue-next'
 import { useNotificationStore } from '@/stores/notificationStore'
 
