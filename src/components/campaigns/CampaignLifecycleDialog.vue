@@ -2,7 +2,7 @@
   <Teleport to="body">
     <dialog ref="dialog" class="lifecycle-dialog w-[calc(100%-2rem)] max-w-xl rounded-[24px] bg-white p-6 text-brand-dark shadow-2xl sm:p-7" :aria-labelledby="titleId" @cancel.prevent="!busy && $emit('cancel')" @keydown="trapFocus">
       <h2 :id="titleId" class="text-xl font-extrabold">{{ title }}</h2>
-      <div class="mt-4 max-h-[60dvh] overflow-y-auto text-sm leading-6"><slot /></div>
+      <div class="-mx-1 mt-4 max-h-[60dvh] overflow-y-auto px-1 py-1 text-sm leading-6"><slot /></div>
       <footer class="mt-6 flex flex-wrap justify-end gap-3">
         <button ref="cancelButton" type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold disabled:opacity-50" :disabled="busy" @click="$emit('cancel')">Cancelar</button>
         <button type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold transition hover:bg-brand-hover disabled:opacity-50" :disabled="busy || disabled" @click="$emit('confirm')">{{ busy ? 'Aguarde…' : confirmLabel }}</button>

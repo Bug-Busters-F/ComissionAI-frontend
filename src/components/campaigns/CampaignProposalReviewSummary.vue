@@ -34,7 +34,7 @@
         <div class="sm:col-span-2"><dt class="text-xs font-bold text-sage-muted">Faixa por valor da venda</dt><dd class="mt-1 text-sm font-semibold text-brand-dark">{{ rangeText(proposal.campos) }}</dd></div>
       </dl>
       <div class="mt-4 rounded-xl bg-sage-light p-4 text-sm">
-        <p v-if="!ruleArtifactsCurrent(proposal, campaign)" class="font-bold text-warning-text">Explicação recebida desatualizada. O resumo acima acompanha os campos atuais.</p>
+        <p v-if="!historical && !ruleArtifactsCurrent(proposal, campaign)" class="font-bold text-warning-text">Explicação recebida desatualizada. O resumo acima acompanha os campos atuais.</p>
         <p v-else-if="proposal.metadadosRecebidos.explicacao" class="whitespace-pre-wrap">{{ userFacingText(proposal.metadadosRecebidos.explicacao) }}</p>
         <p v-else class="text-sage-muted">Explicação do serviço não recebida. Confira o resumo dos campos atuais.</p>
         <p v-if="proposal.metadadosRecebidos.vigenciaRecebida" class="mt-3 text-xs">Período recebido neste bloco: {{ proposal.metadadosRecebidos.vigenciaRecebida.dataInicio || 'Pendente' }} → {{ proposal.metadadosRecebidos.vigenciaRecebida.dataFim || 'Pendente' }}</p>
@@ -55,10 +55,10 @@
           {{ item.severidade === 'IMPEDITIVO' ? 'Impeditiva:' : 'Aviso:' }} {{ userFacingText(item.mensagem) }}
         </li>
       </ul>
-      <CampaignRulePython v-if="showPython" :rule-number="index + 1" :code="proposal.metadadosRecebidos.pythonAtualizado || ''" :current="ruleArtifactsCurrent(proposal, campaign) && !proposal.metadadosRecebidos.artefatosLegados" />
+      <CampaignRulePython v-if="showPython" :historical="historical" :rule-number="index + 1" :code="proposal.metadadosRecebidos.pythonAtualizado || ''" :current="historical || (ruleArtifactsCurrent(proposal, campaign) && !proposal.metadadosRecebidos.artefatosLegados)" />
       </div>
     </component>
-    <CampaignImpactSummary v-if="showPython && campaign.propostas.length" :impact="impact" />
+    <CampaignImpactSummary v-if="showPython && !hideImpact && campaign.propostas.length" :impact="impact" />
   </section>
 </template>
 
@@ -87,6 +87,8 @@ const props = defineProps({
   validation: { type: Object, required: true },
   showPython: { type: Boolean, default: false },
   collapsible: Boolean,
+  hideImpact: Boolean,
+  historical: Boolean,
   hideCampaignSummary: Boolean
 })
 

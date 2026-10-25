@@ -15,11 +15,11 @@
       <article
         v-for="card in metrics"
         :key="card.label"
-        :class="['rounded-2xl p-6', card.highlight ? 'bg-brand-dark text-white' : 'bg-white']"
+        :class="['rounded-2xl p-6', card.highlight ? 'bg-success-bg ring-1 ring-inset ring-success/20' : 'bg-white']"
       >
-        <p class="text-sm font-medium" :class="card.highlight ? 'text-sage-border' : 'text-sage-muted'">{{ card.label }}</p>
-        <p class="mt-6 text-4xl font-extrabold tracking-[-0.05em]" :class="card.highlight ? 'text-brand' : 'text-brand-dark'">{{ card.value }}</p>
-        <p class="mt-2 text-xs" :class="card.highlight ? 'text-sage-border' : 'text-sage-muted'">{{ card.detail }}</p>
+        <p class="text-sm font-medium" :class="card.highlight ? 'text-success-dark' : 'text-sage-muted'">{{ card.label }}</p>
+        <p class="mt-6 text-4xl font-extrabold tracking-[-0.05em]" :class="card.highlight ? 'text-success-dark' : 'text-brand-dark'">{{ card.value }}</p>
+        <p class="mt-2 text-xs" :class="card.highlight ? 'text-success-dark' : 'text-sage-muted'">{{ card.detail }}</p>
       </article>
     </section>
 

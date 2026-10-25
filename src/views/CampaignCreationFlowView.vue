@@ -21,16 +21,23 @@
       <button type="button" class="focus-ring rounded-full border border-warning-border bg-white px-4 py-3 text-sm font-bold" @click="loadDemoExample">Carregar exemplo</button>
     </section>
 
+    <section v-if="persistence.versaoVigente" class="rounded-2xl border border-sage-border bg-white p-5 text-sm">
+      <p class="font-bold">Versão vigente {{ persistence.versaoVigente }}<span v-if="persistence.editingPublished"> · Proposta {{ persistence.versaoProposta }} baseada na versão {{ persistence.versaoOrigem }}</span></p>
+      <p class="mt-2 text-sage-muted">As alterações ficam separadas da versão vigente e dos seus resultados até a publicação. Toda alteração exige nova simulação.</p>
+      <button v-if="persistence.editingPublished && !persistence.remoteChanged" type="button" class="focus-ring mt-3 rounded-full border border-danger/30 px-4 py-2 font-bold text-danger-dark hover:bg-danger-bg disabled:opacity-50" :disabled="persistenceBusy" @click="cancelProposalOpen = true">Descartar proposta de alteração</button>
+    </section>
     <CampaignStepNav :steps="steps" :current-step="activeStep" :current-step-number="activeStepIndex + 1" :reached-step="reachedStep" @select="navigateTo" />
 
     <p v-if="persistence.loading" role="status" class="rounded-2xl bg-white p-5 text-sm">Carregando campanha e todas as regras…</p>
     <div v-if="persistence.error" role="alert" class="rounded-2xl bg-danger-bg p-4 text-sm text-danger-dark">
       <p>{{ userFacingText(persistence.error) }}</p>
+      <button v-if="persistence.remoteChanged" type="button" class="focus-ring mt-3 rounded font-bold underline" @click="reloadProposalOpen = true">Recarregar proposta atual</button>
       <button v-if="route.params.id && (!persistence.id || persistence.remoteChanged) && !isDirty" type="button" class="mt-3 font-bold underline" @click="lifecycle.load(route.params.id)">Tentar carregar novamente</button>
       <RouterLink v-if="persistence.uncertainCreate" to="/campanhas" class="mt-3 block font-bold underline">Consultar campanhas cadastradas</RouterLink>
     </div>
     <p v-if="persistence.progressError" role="status" class="rounded-2xl bg-warning-bg p-4 text-sm text-warning-text">{{ userFacingText(persistence.progressError) }} <button type="button" class="font-bold underline" @click="lifecycle.recordProgress(activeStepIndex + 1)">Tentar novamente</button></p>
-    <p v-if="lifecycle.readOnly.value" class="rounded-xl bg-warning-bg p-4 text-sm text-warning-text">Esta campanha está {{ persistence.estado }} e está disponível somente para consulta. A edição de versões não faz parte deste fluxo.</p>
+    <p v-if="lifecycle.readOnly.value" class="rounded-xl bg-warning-bg p-4 text-sm text-warning-text">{{ userFacingText(persistence.motivoBloqueioEdicao || (persistence.remoteChanged ? 'A proposta está desatualizada. Consulte a versão atual antes de continuar.' : 'Campanha disponível somente para consulta.')) }}</p>
+    <CampaignVersionComparison v-if="activeStep === 'conferencia' && persistence.editingPublished" :published="persistence.published" :campaign="campaign" :proposed-number="persistence.versaoProposta" :source-number="persistence.versaoOrigem" />
     <main data-campaign-main tabindex="-1" class="outline-none">
       <CampaignProposalReviewSummary v-if="lifecycle.readOnly.value" :campaign="campaign" :validation="validation" :show-python="true" :impact="lifecycle.currentSimulation.value && simulation.accepted ? simulation.result : null" />
       <fieldset v-else :disabled="persistenceBusy || Boolean(route.params.id && !persistence.id)" class="min-w-0 border-0 p-0">
@@ -89,7 +96,7 @@
     </main>
 
     <p v-if="activeStep === 'dados' && integrationState.error" role="alert" class="rounded-xl bg-danger-bg p-3 text-sm text-danger-dark">{{ userFacingText(integrationState.error) }}</p>
-    <p class="text-sm text-sage-muted">{{ persistence.id ? `${isDirty ? 'Existem alterações ainda não salvas.' : 'Rascunho salvo.'}` : 'Os dados estão somente nesta página e ainda não foram salvos.' }}</p>
+    <p class="text-sm text-sage-muted">{{ persistence.id ? `${isDirty ? 'Existem alterações ainda não salvas.' : persistence.editingPublished ? 'Proposta de alteração salva.' : 'Rascunho salvo.'}` : 'Os dados estão somente nesta página e ainda não foram salvos.' }}</p>
     <p v-if="message" class="rounded-2xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-text" role="alert">{{ userFacingText(message) }}</p>
 
     <footer v-if="!lifecycle.readOnly.value" class="flex flex-col gap-4 border-t border-sage-border pt-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
@@ -99,7 +106,7 @@
         <button type="button" class="focus-ring rounded-full px-5 py-3 text-sm font-semibold text-sage-subtle transition hover:bg-white" @click="requestLeave('/campanhas')">Cancelar</button>
       </div>
       <div class="order-1 grid gap-3 sm:order-2 sm:flex sm:items-center sm:justify-end">
-        <button v-if="provider.mode === 'api'" type="button" class="focus-ring rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-sage-light disabled:opacity-50" :disabled="persistenceBusy || integrationState.busy || Boolean(integrationState.review) || persistence.uncertainCreate || Boolean(route.params.id && !persistence.id)" @click="saveDraft">{{ persistence.saving ? 'Salvando…' : 'Salvar rascunho' }}</button>
+        <button v-if="provider.mode === 'api'" type="button" class="focus-ring rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-sage-light disabled:opacity-50" :disabled="persistenceBusy || integrationState.busy || Boolean(integrationState.review) || persistence.uncertainCreate || Boolean(route.params.id && !persistence.id)" @click="saveDraft">{{ persistence.saving ? 'Salvando…' : persistence.editingPublished ? 'Salvar proposta' : 'Salvar rascunho' }}</button>
         <template v-if="activeStep === 'dados'">
           <button type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50" :disabled="persistenceBusy || Boolean(route.params.id && !persistence.id) || !provider.capabilities.interpret || integrationState.busy || Boolean(integrationState.review)" @click="interpretDescription">{{ integrationState.busy ? 'Interpretando…' : 'Interpretar e continuar →' }}</button>
         </template>
@@ -111,7 +118,7 @@
           <button v-else type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:opacity-50" :disabled="provider.mode === 'api' && !lifecycle.canReview.value" @click="navigateTo('conferencia')">Conferir regras →</button>
         </template>
         <template v-else>
-          <button v-if="provider.mode === 'api'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold transition hover:bg-brand-hover disabled:opacity-50" :disabled="!lifecycle.canActivate.value" @click="persistence.activationOpen = true">Aprovar e ativar campanha</button>
+          <button v-if="provider.mode === 'api'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold transition hover:bg-brand-hover disabled:opacity-50" :disabled="!lifecycle.canActivate.value" @click="persistence.activationOpen = true">{{ persistence.editingPublished ? 'Publicar nova versão' : 'Aprovar e ativar campanha' }}</button>
         </template>
       </div>
       <p v-if="activeStep === 'propostas' && !canAdvanceLocally" id="advance-blocked-reason" class="order-3 w-full text-sm font-semibold text-danger-dark">
@@ -131,7 +138,8 @@
       <textarea id="simulation-accept-reason" v-model="simulation.motivo" rows="2" class="focus-ring mt-2 w-full rounded-xl border border-sage-border p-3" :disabled="persistence.working" />
       <p v-if="simulation.error" role="alert" class="mt-3 text-danger-dark">{{ userFacingText(simulation.error) }}</p>
     </CampaignLifecycleDialog>
-    <CampaignLifecycleDialog :open="persistence.activationOpen" title="Aprovar e ativar esta campanha?" confirm-label="Confirmar ativação" :busy="persistence.working" @cancel="persistence.activationOpen = false" @confirm="activateCampaign">
+    <CampaignLifecycleDialog :open="persistence.activationOpen" :title="persistence.editingPublished ? 'Publicar esta nova versão?' : 'Aprovar e ativar esta campanha?'" :confirm-label="persistence.editingPublished ? 'Confirmar publicação' : 'Confirmar ativação'" :busy="persistence.working" @cancel="persistence.activationOpen = false" @confirm="activateCampaign">
+      <p v-if="persistence.editingPublished" class="mb-3 font-bold">A nova versão substituirá a vigente para todo o período da campanha. As versões anteriores continuarão disponíveis no histórico.</p>
       <p>Serão ativadas as {{ campaign.propostas.length }} regras da versão salva, com a vigência {{ campaign.dataInicio }} a {{ campaign.dataFim }} e o aceite registrado no protocolo {{ simulation.result?.protocolo }}.</p>
     </CampaignLifecycleDialog>
     <CampaignReinterpretConfirmDialog :open="campaignReinterpretationOpen" @cancel="cancelCampaignReinterpretation" @confirm="confirmCampaignReinterpretation" />
@@ -143,7 +151,14 @@
       @cancel="cancelRemoveProposal"
       @confirm="confirmRemove"
     />
-    <CampaignDiscardDialog :open="discardDialogOpen" :is-new="true" @continue="discardDialogOpen = false" @discard="confirmDiscard" />
+    <CampaignVersionHistory v-if="persistence.versaoVigente" :campaign-id="persistence.id" />
+    <CampaignLifecycleDialog :open="reloadProposalOpen" title="Recarregar a proposta atual?" confirm-label="Recarregar" :busy="persistence.loading" @cancel="reloadProposalOpen = false" @confirm="reloadProposal">
+      <p>O preenchimento local será substituído pela proposta salva mais recente. Copie as alterações que deseja preservar antes de continuar.</p>
+    </CampaignLifecycleDialog>
+    <CampaignLifecycleDialog :open="cancelProposalOpen" title="Descartar a proposta de alteração?" confirm-label="Descartar proposta" :busy="persistence.working" @cancel="cancelProposalOpen = false" @confirm="cancelSavedProposal">
+      <p>As alterações desta proposta, incluindo as já salvas, serão descartadas. A campanha vigente e seus resultados serão preservados.</p>
+    </CampaignLifecycleDialog>
+    <CampaignDiscardDialog :open="discardDialogOpen" :is-new="!persistence.id" @continue="discardDialogOpen = false" @discard="confirmDiscard" />
   </div>
 </template>
 
@@ -151,6 +166,8 @@
 import { userFacingText } from '@/services/userFacingText'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRouter, useRoute } from 'vue-router'
+import CampaignVersionComparison from '@/components/campaigns/CampaignVersionComparison.vue'
+import CampaignVersionHistory from '@/components/campaigns/CampaignVersionHistory.vue'
 import CampaignDiscardDialog from '@/components/common/CampaignDiscardDialog.vue'
 import CampaignStepNav from '@/components/common/CampaignStepNav.vue'
 import CampaignCommonFieldsStep from '@/components/campaigns/CampaignCommonFieldsStep.vue'
@@ -196,7 +213,7 @@ async function runSimulation() {
 }
 async function saveDraft(confirmDefaults = false) {
   const confirmed = confirmDefaults === true
-  const saved = await feedback('save', () => persistDraft({ confirmDefaults: confirmed }), {
+  const saved = await feedback(persistence.editingPublished ? 'saveProposal' : 'save', () => persistDraft({ confirmDefaults: confirmed }), {
     error: () => persistence.defaultsOpen ? '' : persistence.error || message.value,
     successMessage: () => persistence.notice
   })
@@ -212,11 +229,26 @@ async function acceptSimulation() {
   if (await feedback('accept', () => lifecycle.accept(), { error: () => simulation.error || persistence.error })) await navigateTo('conferencia')
 }
 async function activateCampaign() {
-  if (await feedback('activate', () => lifecycle.activate(), { error: () => persistence.error })) await router.push('/campanhas/' + persistence.id)
+  if (await feedback(persistence.editingPublished ? 'publish' : 'activate', () => lifecycle.activate(), { error: () => persistence.error })) await router.push('/campanhas/' + persistence.id)
 }
 const demoExample = ref('threeComplete')
 async function loadDemoExample() { if (loadExample(demoExample.value)) await navigateTo('propostas') }
 const discardDialogOpen = ref(false)
+const cancelProposalOpen = ref(false)
+const reloadProposalOpen = ref(false)
+async function reloadProposal() {
+  if (await lifecycle.load(persistence.id)) {
+    reloadProposalOpen.value = false
+    await navigateTo('dados')
+  }
+}
+async function cancelSavedProposal() {
+  if (await feedback('discardProposal', () => lifecycle.cancelProposal(), { error: () => persistence.error })) {
+    cancelProposalOpen.value = false
+    allowLeave = true
+    try { await router.push('/campanhas/' + persistence.id) } finally { allowLeave = false }
+  }
+}
 const pendingRoute = ref('/campanhas')
 const pendingRemovalIndex = computed(() => campaign.propostas.findIndex((item) => item.clientId === pendingRemovalId.value) + 1)
 let allowLeave = false
