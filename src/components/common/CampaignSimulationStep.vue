@@ -837,8 +837,8 @@
       @click.self="closeMemoryModal"
       @keydown.esc.prevent.stop="closeMemoryModal" @keydown.tab="trapMemoryFocus"
     >
-      <div ref="memoryPanel" class="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[22px] bg-white p-6 shadow-xl sm:p-7">
-        <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-sage-border-light bg-white pb-4">
+      <div ref="memoryPanel" class="flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-[22px] bg-white shadow-xl">
+        <div class="flex shrink-0 items-start justify-between gap-4 border-b border-sage-border-light bg-white px-6 py-5 sm:px-7">
           <div>
             <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">
               Memória do Cálculo Individual
@@ -856,7 +856,9 @@
           </button>
         </div>
 
-        <CampaignSimulationMemory :row="selectedRow" :simulation="simulationResult" class="mt-5" />
+        <div class="min-h-0 overflow-y-auto overscroll-contain p-6 sm:p-7">
+          <CampaignSimulationMemory :row="selectedRow" :simulation="simulationResult" />
+        </div>
       </div>
     </div>
   </div>

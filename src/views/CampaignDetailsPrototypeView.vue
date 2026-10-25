@@ -11,14 +11,14 @@
 
     <template v-if="campaign && !loadError">
       <p v-if="campaign.motivoBloqueioEdicao" class="rounded-xl bg-warning-bg p-4 text-sm text-warning-text">{{ campaign.motivoBloqueioEdicao }}</p>
-      <p v-if="campaign.versaoProposta && campaign.versaoVigente" class="rounded-xl bg-sage-light p-4 text-sm">Existe uma proposta de alteração separada (versão {{ campaign.versaoProposta }}). Os dados abaixo pertencem à versão vigente {{ campaign.versaoVigente }}.</p>
-      <CampaignVersionHistory v-if="!isDemo" :campaign-id="campaign.id" :current-version="campaign.versaoVigente" />
+      <p v-if="campaign.versaoProposta && campaign.versaoVigente" class="rounded-xl bg-sage-light p-4 text-sm">Existe uma proposta de alteração separada (versão {{ campaign.versaoProposta }}). A versão vigente é {{ campaign.versaoVigente }}. Use o seletor abaixo para consultar as versões publicadas.</p>
+      <CampaignVersionHistory v-if="!isDemo && campaign.versaoVigente != null" :campaign-id="campaign.id" :current-version="campaign.versaoVigente" />
       <div v-if="isDemo" class="rounded-[22px] border border-success/20 bg-success-bg p-5"><p class="font-bold text-success-dark">Campanha pronta para consulta</p><p class="mt-1 text-sm leading-6 text-success-dark/80">Confira os dados da regra vinculada.</p></div>
-      <div v-else class="rounded-[22px] border border-success/20 bg-success-bg p-5"><p class="font-bold text-success-dark">Campanha salva como {{ formatCampaignState(campaign.estado).toLocaleLowerCase() }}</p><p class="mt-1 text-sm leading-6 text-success-dark/80">Texto original, vigência e todas as regras abaixo são os dados salvos.</p></div>
+      <div v-else-if="campaign.versaoVigente == null" class="rounded-[22px] border border-success/20 bg-success-bg p-5"><p class="font-bold text-success-dark">Campanha salva como {{ formatCampaignState(campaign.estado).toLocaleLowerCase() }}</p><p class="mt-1 text-sm leading-6 text-success-dark/80">Texto original, vigência e todas as regras abaixo são os dados salvos.</p></div>
 
       <CampaignSummary v-if="isDemo" :title="'Revisão consolidada'" :subtitle="isDemo ? 'Regra vinculada à campanha.' : 'Dados salvos da regra vinculada à campanha.'" :badge="formatCampaignState(campaign.estado)" :summary-items="summaryItems" :original-text="campaign.textoOriginal" />
 
-      <CampaignProposalReviewSummary v-if="!isDemo && proposalCampaign" :campaign="proposalCampaign" :validation="proposalValidation" :show-python="true" hide-impact />
+      <CampaignProposalReviewSummary v-if="!isDemo && campaign.versaoVigente == null && proposalCampaign" :campaign="proposalCampaign" :validation="proposalValidation" :show-python="true" hide-impact />
       <section class="rounded-[22px] bg-white p-6 sm:p-7 text-sm">
         <h2 class="text-xl font-extrabold">Registro da campanha</h2>
         <p class="mt-3">Criada em: {{ dateTime(campaign.criadoEm) }}</p>
