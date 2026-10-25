@@ -20,7 +20,7 @@
               {{ store.modalExclusao.titulo || 'Confirmar Exclusão' }}
             </h3>
             <p class="mt-2 text-sm leading-6 text-sage-muted">
-              {{ store.modalExclusao.mensagem }}
+              {{ userFacingText(store.modalExclusao.mensagem) }}
             </p>
             <div
               v-if="store.modalExclusao.detalhes"
@@ -59,6 +59,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { AlertTriangle, Loader2 } from 'lucide-vue-next'
 import { useDataStore } from '@/stores/dataStore'
 

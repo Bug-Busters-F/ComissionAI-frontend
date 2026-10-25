@@ -5,6 +5,7 @@ export function createCampaignLifecycleApi(http = api) {
   return {
     async load(id) { return (await http.get(`/campanhas/${id}`, config)).data },
     async save(id, payload) { return (await (id ? http.put(`/campanhas/${id}`, payload, config) : http.post('/campanhas', payload, config))).data },
+    async progress(id, payload) { return (await http.patch(`/campanhas/${id}/progresso`, payload, config)).data },
     async competences() { return (await http.get('/referencias/competencias', config)).data },
     async cut(campanhaId, competencia) { return (await http.post('/referencias/recortar-publico', { campanhaId, competencia, limite: 1, pagina: 0 }, config)).data },
     async simulate(campanhaId, competencia) { return (await http.post('/simulacoes', { campanhaId, competencia, limite: 10, pagina: 0 }, { timeout: 300000 })).data },

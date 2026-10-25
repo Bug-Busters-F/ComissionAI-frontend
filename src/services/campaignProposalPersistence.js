@@ -1,5 +1,6 @@
 import { createCampaignProposal, createCampaignProposalForm, createPending, clonePlain } from './campaignProposalModel'
-import { proposalToBackend } from './campaignProposalMappers'
+import { proposalToBackend, normalizeExternalPending } from './campaignProposalMappers'
+import { ruleArtifactsCurrent, ruleArtifactSignature } from './campaignRuleArtifacts'
 import { decimalFractionToPercent, parseDecimalToMinor, validateCampaignCommon, validateCampaignProposalSet } from './campaignProposalValidation'
 
 const codes = ['codMarca', 'codCargo', 'codLoja']
@@ -37,17 +38,22 @@ export function campaignToDraftRequest(campaign) {
       const m = p.metadadosRecebidos
       const operation = dto.operacaoBase || {}
       const base = operation.referenciaBase || {}
-      const currentArtifacts = !p.artefatosDesatualizados && m.validacaoPendente === false
+      const currentArtifacts = ruleArtifactsCurrent(p, campaign)
       return {
         blocoId: p.clientId, trechoOrigem: p.textoOrigem || null, nome: m.nomePersistido || `Regra ${index + 1}`,
         ...dto.filtros, ...dto.condicaoValor,
         tipoOperacao: operation.tipoOperacao || 'DEFINIR_TAXA', valorAjuste: operation.valorAjuste ?? null,
         tipoBaseReferencia: base.tipoBase ?? null, taxaBaseConsultada: base.taxaBaseConsultada ?? null, descricaoReferencia: base.descricao ?? null,
         taxa: dto.taxaFinal, explicacao: currentArtifacts ? m.explicacao || null : null,
-        // The review's demonstration Python is intentionally never sent to persistence.
+        // Only artifacts matching the current fields may be persisted.
         pythonEquivalente: currentArtifacts ? m.pythonAtualizado || null : null,
         pendencias: [...p.pendenciasRemotas.map((item) => pendingMessage(item)), ...campaign.pendenciasCampanha.filter((item) => !(item.codigo === 'VIGENCIA_NAO_CONSOLIDADA' && (!campaign.dataInicio || !campaign.dataFim))).map((item) => pendingMessage(item, true))],
         completa: currentArtifacts && dto.taxaFinal !== null && !validation.blockers.some((item) => !item.clientId || item.clientId === p.clientId),
+        rastreabilidade: { origensPorCampo: m.origensDesatualizadas ? {} : m.origensPorCampo || {},
+          referenciasConsultadas: m.origensDesatualizadas ? [] : m.referenciasConsultadas || [],
+          camposManuais: p.camposManuais, publicoTodasVendas: p.campos.publicoTodasVendas, artefatosAtualizados: currentArtifacts,
+          pendencias: p.pendenciasRemotas.map((item) => ({ ...item, severidade: item.severidade === 'AVISO' ? 'AVISO' : 'IMPEDIMENTO' })),
+          pendenciasCampanha: campaign.pendenciasCampanha.map((item) => ({ ...item, severidade: item.severidade === 'AVISO' ? 'AVISO' : 'IMPEDIMENTO' })) },
         status: 'DRAFT', bonusPercentual: dto.bonusPercentual, bonusValorFixo: dto.bonusValorFixo
       }
     })
@@ -70,14 +76,16 @@ export function persistedCampaignToProposal(raw, previous = null) {
   result.propostas = raw.regras.map((r) => {
     if (!r.id) throw new Error('Uma regra persistida veio sem identificador. Consulte a campanha antes de repetir o salvamento.')
     const prior = previous?.propostas.find((p) => p.clientId === r.blocoId)
+    const evidence = r.rastreabilidade
     let clientId = prior?.clientId || r.blocoId || `persisted-${r.id}`
     if (clientIds.has(clientId)) clientId = `persisted-${r.id}`
     clientIds.add(clientId)
     const changedDates = previous && (previous.dataInicio !== result.dataInicio || previous.dataFim !== result.dataFim)
     const fields = Object.fromEntries(['codMarca', 'descrMarca', 'codCargo', 'descriCargo', 'codLoja', 'canal', 'matricula'].map((key) => [key, text(r[key])]))
-    Object.assign(fields, { taxaPercentual: r.taxa == null ? '' : decimalFractionToPercent(r.taxa).replace('.', ','), valorMinimo: text(r.valorMinimo), minimoInclusivo: r.minInclusivo ?? null, valorMaximo: text(r.valorMaximo), maximoInclusivo: r.maxInclusivo ?? null, publicoTodasVendas: prior?.campos.publicoTodasVendas || false })
-    const pending = prior ? clonePlain(prior.pendenciasRemotas) : []
-    if (!prior && r.pendencias) {
+    Object.assign(fields, { taxaPercentual: r.taxa == null ? '' : decimalFractionToPercent(r.taxa).replace('.', ','), valorMinimo: text(r.valorMinimo), minimoInclusivo: r.minInclusivo ?? null, valorMaximo: text(r.valorMaximo), maximoInclusivo: r.maxInclusivo ?? null, publicoTodasVendas: evidence?.publicoTodasVendas ?? prior?.campos.publicoTodasVendas ?? false })
+    const pending = evidence ? evidence.pendencias.map((p) => normalizeExternalPending({ ...p, origem: 'BACKEND' }, clientId)) : prior ? clonePlain(prior.pendenciasRemotas) : []
+    for (const p of evidence?.pendenciasCampanha || []) general.set(p.codigo + ':' + p.mensagem, normalizeExternalPending({ ...p, origem: 'BACKEND' }))
+    if (!evidence && !prior && r.pendencias) {
       const messages = Array.isArray(r.pendencias) ? r.pendencias : String(r.pendencias).split(/; (?=\[(?:Campanha )?(?:Aviso|Impeditiva)\])/)
       for (const [index, value] of messages.entries()) {
         const match = value.match(/^\[(Campanha )?(Aviso|Impeditiva)\]\s*([\s\S]*)$/)
@@ -86,15 +94,21 @@ export function persistedCampaignToProposal(raw, previous = null) {
         else pending.push(p)
       }
     }
-    return createCampaignProposal({ ...(prior ? clonePlain(prior) : {}), clientId, serverId: r.id, origem: prior?.origem || 'interpretacao', textoOrigem: r.trechoOrigem || '', campos: fields,
-      pendenciasRemotas: pending, artefatosDesatualizados: Boolean(changedDates || prior?.artefatosDesatualizados),
+    const proposal = createCampaignProposal({ ...(prior ? clonePlain(prior) : {}), clientId, serverId: r.id, origem: prior?.origem || 'interpretacao', textoOrigem: r.trechoOrigem || '', campos: fields,
+      camposManuais: evidence?.camposManuais || prior?.camposManuais || [],
+      pendenciasRemotas: pending, artefatosDesatualizados: Boolean(changedDates || prior?.artefatosDesatualizados || (evidence && !evidence.artefatosAtualizados)),
       metadadosRecebidos: { ...(prior ? clonePlain(prior.metadadosRecebidos) : {}), nomePersistido: r.nome,
+        origensPorCampo: evidence?.origensPorCampo || prior?.metadadosRecebidos.origensPorCampo || {},
+        referenciasConsultadas: evidence?.referenciasConsultadas || prior?.metadadosRecebidos.referenciasConsultadas || [],
+        origensDesatualizadas: false, artefatosLegados: !evidence,
         explicacao: r.explicacao || '', pythonAtualizado: r.pythonEquivalente || null, completa: r.completa,
-        validacaoPendente: changedDates ? true : prior ? prior.metadadosRecebidos.validacaoPendente : !r.completa,
+        validacaoPendente: changedDates ? true : evidence ? !evidence.artefatosAtualizados : prior ? prior.metadadosRecebidos.validacaoPendente : true,
         bonusPercentual: r.bonusPercentual ?? null, bonusValorFixo: r.bonusValorFixo ?? null,
         operacaoBase: { tipoOperacao: r.tipoOperacao || 'DEFINIR_TAXA', valorAjuste: r.valorAjuste ?? r.taxa, referenciaBase: r.tipoBaseReferencia || r.taxaBaseConsultada != null || r.descricaoReferencia ? { tipoBase: r.tipoBaseReferencia, taxaBaseConsultada: r.taxaBaseConsultada, descricao: r.descricaoReferencia } : null }
       }
     })
+    if (evidence?.artefatosAtualizados) proposal.metadadosRecebidos.assinaturaArtefatos = ruleArtifactSignature(proposal, result)
+    return proposal
   })
   result.pendenciasCampanha = previous ? clonePlain(previous.pendenciasCampanha) : [...general.values()]
   if (previous && (!previous.dataInicio || !previous.dataFim) && result.dataInicio && result.dataFim) {

@@ -22,10 +22,10 @@
               A importação de vendas foi rejeitada. O RH confirmado permanece no banco; corrija as pendências de vendas e envie novamente.
             </template>
             <template v-else-if="report.isCiclo">
-              O ciclo da competência <strong>{{ report.competencia }}</strong> foi <strong>integralmente rejeitado</strong> devido a inconsistências impeditivas em RH, Vendas ou violação de integridade relacional entre as bases. Nenhuma linha foi gravada no banco de dados.
+              O ciclo da competência <strong>{{ report.competencia }}</strong> foi <strong>integralmente rejeitado</strong> devido a inconsistências impeditivas em RH, Vendas ou violação de consistência dos vínculos entre as bases. Nenhuma linha foi gravada no sistema.
             </template>
             <template v-else>
-              A carga foi <strong>integralmente rejeitada</strong> devido a apontamentos impeditivos ou violação de regras de integridade (como duplicidade ou sobreposição). Nenhuma linha foi gravada no banco de dados.
+              A carga foi <strong>integralmente rejeitada</strong> devido a apontamentos impeditivos ou inconsistências (como duplicidade ou sobreposição). Nenhuma linha foi gravada no sistema.
             </template>
           </p>
           <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-danger-dark">
@@ -74,7 +74,7 @@
           </h3>
           <p class="mt-1 text-sm leading-6 text-success-dark">
             <template v-if="report.isCiclo">
-              O backend confirmou o processamento de <strong>RH e Vendas</strong> para a competência <strong>{{ report.competencia }}</strong>. A disponibilidade para simulação depende também dos vínculos e das taxas de comissão cadastradas.
+              Foi confirmado o envio de <strong>RH e Vendas</strong> para a competência <strong>{{ report.competencia }}</strong>. A disponibilidade para simulação depende também dos vínculos e das taxas de comissão cadastradas.
             </template>
             <template v-else>
               Todos os registros foram validados com sucesso e integrados ao sistema.
@@ -86,7 +86,7 @@
 
     <div v-if="report.mensagens?.length" class="rounded-xl border border-sage-border bg-white p-4 text-sm text-sage-muted">
       <p class="font-bold text-brand-dark">Mensagens do processamento</p>
-      <ul class="mt-2 list-disc space-y-1 pl-5"><li v-for="(message, index) in report.mensagens" :key="index">{{ message }}</li></ul>
+      <ul class="mt-2 list-disc space-y-1 pl-5"><li v-for="(message, index) in report.mensagens" :key="index">{{ userFacingText(message) }}</li></ul>
     </div>
 
     <!-- RESUMO NUMÉRICO DA VALIDAÇÃO -->
@@ -324,6 +324,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { ref, computed } from 'vue'
 import { AlertCircle, AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-vue-next'
 import StatusBadge from '@/components/common/StatusBadge.vue'

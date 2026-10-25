@@ -1,4 +1,5 @@
 import api from './api'
+import { BACKEND_EDIT_FIELDS } from './campaignRuleArtifacts'
 import { normalizeInterpretationError } from './campaignInterpretationService'
 import { createCampaignLifecycleApi } from './campaignLifecycleApi'
 import { proposalToBackend } from './campaignProposalMappers'
@@ -34,7 +35,7 @@ export function createCampaignProposalApiClient(http = api) {
       return post('extrair-propostas', { texto: input.texto, contexto }, signal, PROPOSAL_INTERPRETATION_TIMEOUT)
     },
     updateArtifacts({ proposal, campaign }, { signal } = {}) {
-      return post('atualizar-artefatos', { proposta: proposalToBackend(proposal, campaign) }, signal, PROPOSAL_VALIDATION_TIMEOUT)
+      return post('atualizar-artefatos', { proposta: proposalToBackend(proposal, campaign), camposEditados: proposal.camposManuais.map((field) => BACKEND_EDIT_FIELDS[field] || field) }, signal, PROPOSAL_VALIDATION_TIMEOUT)
     },
     validateCampaign({ proposal, campaign, rate }, { signal } = {}) {
       const dto = proposalToBackend(proposal, campaign)

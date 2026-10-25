@@ -12,7 +12,7 @@
       <li v-for="item in pendencias" :key="item.id" class="flex flex-wrap items-start justify-between gap-3 rounded-xl px-3 py-3" :class="item.severidade === 'IMPEDITIVO' ? 'bg-danger-bg/60' : 'bg-warning-bg/70'">
         <div>
           <p class="text-xs font-bold" :class="item.severidade === 'IMPEDITIVO' ? 'text-danger-dark' : 'text-warning-text'">{{ item.severidade === 'IMPEDITIVO' ? 'Impeditiva' : 'Aviso' }}</p>
-          <p class="mt-1 text-sm leading-5 text-brand-dark">{{ proposalLabel(item) }}{{ item.mensagem }}</p>
+          <p class="mt-1 text-sm leading-5 text-brand-dark">{{ proposalLabel(item) }}{{ userFacingText(item.mensagem) }}</p>
         </div>
         <button v-if="item.clientId || item.campo" type="button" class="focus-ring rounded-full border border-sage-border-dark bg-white px-3 py-2 text-xs font-bold text-brand-dark" @click="$emit('focus-pending', { clientId: item.clientId, campo: item.campo })">Ir para correção</button>
       </li>
@@ -21,6 +21,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { computed } from 'vue'
 
 const props = defineProps({

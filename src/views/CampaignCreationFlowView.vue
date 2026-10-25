@@ -21,18 +21,18 @@
       <button type="button" class="focus-ring rounded-full border border-warning-border bg-white px-4 py-3 text-sm font-bold" @click="loadDemoExample">Carregar exemplo</button>
     </section>
 
-    <CampaignStepNav :steps="steps" :current-step="activeStep" :current-step-number="activeStepIndex + 1" @select="navigateTo" />
+    <CampaignStepNav :steps="steps" :current-step="activeStep" :current-step-number="activeStepIndex + 1" :reached-step="reachedStep" @select="navigateTo" />
 
     <p v-if="persistence.loading" role="status" class="rounded-2xl bg-white p-5 text-sm">Carregando campanha e todas as regras…</p>
     <div v-if="persistence.error" role="alert" class="rounded-2xl bg-danger-bg p-4 text-sm text-danger-dark">
-      <p>{{ persistence.error }}</p>
+      <p>{{ userFacingText(persistence.error) }}</p>
       <button v-if="route.params.id && (!persistence.id || persistence.remoteChanged) && !isDirty" type="button" class="mt-3 font-bold underline" @click="lifecycle.load(route.params.id)">Tentar carregar novamente</button>
       <RouterLink v-if="persistence.uncertainCreate" to="/campanhas" class="mt-3 block font-bold underline">Consultar campanhas cadastradas</RouterLink>
     </div>
-    <p v-if="persistence.notice" role="status" class="rounded-2xl bg-sage-pill p-4 text-sm text-brand-dark">{{ persistence.notice }}</p>
+    <p v-if="persistence.progressError" role="status" class="rounded-2xl bg-warning-bg p-4 text-sm text-warning-text">{{ userFacingText(persistence.progressError) }} <button type="button" class="font-bold underline" @click="lifecycle.recordProgress(activeStepIndex + 1)">Tentar novamente</button></p>
     <p v-if="lifecycle.readOnly.value" class="rounded-xl bg-warning-bg p-4 text-sm text-warning-text">Esta campanha está {{ persistence.estado }} e está disponível somente para consulta. A edição de versões não faz parte deste fluxo.</p>
     <main data-campaign-main tabindex="-1" class="outline-none">
-      <CampaignProposalReviewSummary v-if="lifecycle.readOnly.value" :campaign="campaign" :validation="validation" :show-python="true" />
+      <CampaignProposalReviewSummary v-if="lifecycle.readOnly.value" :campaign="campaign" :validation="validation" :show-python="true" :impact="lifecycle.currentSimulation.value && simulation.accepted ? simulation.result : null" />
       <fieldset v-else :disabled="persistenceBusy || Boolean(route.params.id && !persistence.id)" class="min-w-0 border-0 p-0">
       <CampaignCommonFieldsStep
         v-if="activeStep === 'dados'"
@@ -65,7 +65,7 @@
         :form="campaign" :simulation="simulation"
         @refresh-competences="lifecycle.loadCompetences"
         @select-competence="lifecycle.selectCompetence"
-        @run-simulation="lifecycle.runSimulation"
+        @run-simulation="runSimulation"
         @accept-simulation="requestAccept"
         @change-page="lifecycle.changePage"
         @change-page-size="(size) => lifecycle.changePage(1, size)"
@@ -74,30 +74,31 @@
       <CampaignProposalHandoffStep v-else-if="activeStep === 'simulacao'" :campaign="campaign" :validation="validation" :snapshot="canonicalSnapshot" :can-run-simulation="false" />
       <CampaignProposalReviewSummary
         v-else
-        :show-python="true"
+        :show-python="true" :impact="lifecycle.currentSimulation.value && simulation.accepted ? simulation.result : null"
         :campaign="campaign"
         :validation="validation"
       />
       </fieldset>
       <section v-if="activeStep === 'conferencia' && simulation.accepted" class="mt-5 rounded-2xl border border-sage-border bg-white p-5 text-sm">
-        <h2 class="text-lg font-extrabold">Simulação aceita pelo backend</h2>
+        <h2 class="text-lg font-extrabold">Simulação aceita</h2>
         <p class="mt-2">Protocolo: {{ simulation.result?.protocolo }} · Competência: {{ simulation.result?.competencia }}</p>
         <p class="mt-1">Responsável: {{ simulation.acceptance?.aceitoPor }} · Aceite: {{ simulation.acceptance?.aceitoEm }}</p>
-        <p class="mt-2">{{ persistence.readiness?.mensagem }}</p>
-        <p v-for="(difference, index) in persistence.readiness?.divergencias" :key="index" class="mt-2 text-danger-dark">{{ difference }}</p>
+        <p class="mt-2">{{ userFacingText(persistence.readiness?.mensagem) }}</p>
+        <p v-for="(difference, index) in persistence.readiness?.divergencias" :key="index" class="mt-2 text-danger-dark">{{ userFacingText(difference) }}</p>
       </section>
     </main>
 
-    <p v-if="activeStep === 'dados' && integrationState.error" role="alert" class="rounded-xl bg-danger-bg p-3 text-sm text-danger-dark">{{ integrationState.error }}</p>
-    <p class="text-sm text-sage-muted">{{ persistence.id ? `Campanha #${persistence.id} · ${isDirty ? 'Existem alterações ainda não salvas.' : 'Os dados estão salvos no backend.'}` : 'Os dados estão somente nesta página e ainda não foram salvos.' }}</p>
-    <p v-if="message" class="rounded-2xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-text" role="alert">{{ message }}</p>
+    <p v-if="activeStep === 'dados' && integrationState.error" role="alert" class="rounded-xl bg-danger-bg p-3 text-sm text-danger-dark">{{ userFacingText(integrationState.error) }}</p>
+    <p class="text-sm text-sage-muted">{{ persistence.id ? `${isDirty ? 'Existem alterações ainda não salvas.' : 'Rascunho salvo.'}` : 'Os dados estão somente nesta página e ainda não foram salvos.' }}</p>
+    <p v-if="message" class="rounded-2xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-text" role="alert">{{ userFacingText(message) }}</p>
 
-    <footer v-if="!lifecycle.readOnly.value" class="grid gap-3 border-t border-sage-border pt-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-      <CampaignRequestStatus v-if="activeStep === 'dados' && integrationState.busy" class="sm:col-span-2" message="Interpretando o texto da campanha…" @cancel="integration.cancel" />
-      <div>
+    <footer v-if="!lifecycle.readOnly.value" class="flex flex-col gap-4 border-t border-sage-border pt-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      <CampaignRequestStatus v-if="activeStep === 'dados' && integrationState.busy" class="w-full" message="Interpretando o texto da campanha…" @cancel="integration.cancel" />
+      <div class="order-2 flex items-center justify-between gap-3 sm:order-1 sm:justify-start">
         <button v-if="activeStep !== 'dados'" type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark" @click="backOneStep">← Voltar</button>
+        <button type="button" class="focus-ring rounded-full px-5 py-3 text-sm font-semibold text-sage-subtle transition hover:bg-white" @click="requestLeave('/campanhas')">Cancelar</button>
       </div>
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+      <div class="order-1 grid gap-3 sm:order-2 sm:flex sm:items-center sm:justify-end">
         <button v-if="provider.mode === 'api'" type="button" class="focus-ring rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-sage-light disabled:opacity-50" :disabled="persistenceBusy || integrationState.busy || Boolean(integrationState.review) || persistence.uncertainCreate || Boolean(route.params.id && !persistence.id)" @click="saveDraft">{{ persistence.saving ? 'Salvando…' : 'Salvar rascunho' }}</button>
         <template v-if="activeStep === 'dados'">
           <button type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50" :disabled="persistenceBusy || Boolean(route.params.id && !persistence.id) || !provider.capabilities.interpret || integrationState.busy || Boolean(integrationState.review)" @click="interpretDescription">{{ integrationState.busy ? 'Interpretando…' : 'Interpretar e continuar →' }}</button>
@@ -106,30 +107,29 @@
           <button type="button" class="focus-ring whitespace-nowrap rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="!canAdvanceLocally" :aria-describedby="!canAdvanceLocally ? 'advance-blocked-reason' : undefined" @click="navigateTo('simulacao')">{{ canAdvanceLocally && validation.blockers.length ? 'Verificar correções →' : 'Ir para simulação →' }}</button>
         </template>
         <template v-else-if="activeStep === 'simulacao'">
-          <button type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover" :disabled="provider.mode === 'api' && !lifecycle.canReview.value" @click="navigateTo('conferencia')">Conferir regras →</button>
+          <button v-if="provider.mode === 'api' && !simulation.accepted" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50" :disabled="persistenceBusy || integrationState.busy || !lifecycle.currentSimulation.value" @click="requestAccept">Aceitar simulação e continuar →</button>
+          <button v-else type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:opacity-50" :disabled="provider.mode === 'api' && !lifecycle.canReview.value" @click="navigateTo('conferencia')">Conferir regras →</button>
         </template>
         <template v-else>
-          <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark" @click="navigateTo('simulacao')">Voltar à simulação</button>
           <button v-if="provider.mode === 'api'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold transition hover:bg-brand-hover disabled:opacity-50" :disabled="!lifecycle.canActivate.value" @click="persistence.activationOpen = true">Aprovar e ativar campanha</button>
         </template>
-        <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark" @click="requestLeave('/campanhas')">Cancelar</button>
       </div>
-      <p v-if="activeStep === 'propostas' && !canAdvanceLocally" id="advance-blocked-reason" class="text-sm font-semibold text-danger-dark sm:col-span-2">
+      <p v-if="activeStep === 'propostas' && !canAdvanceLocally" id="advance-blocked-reason" class="order-3 w-full text-sm font-semibold text-danger-dark">
         {{ validation.blockers.length ? 'Corrija ' + validation.blockers.length + (validation.blockers.length === 1 ? ' pendência impeditiva' : ' pendências impeditivas') + ' para continuar.' : integrationState.busy || integrationState.review ? 'Conclua ou cancele a solicitação/revisão pendente para continuar.' : 'Adicione ao menos uma regra para continuar.' }}
       </p>
     </footer>
 
-    <CampaignLifecycleDialog :open="persistence.defaultsOpen" title="Salvar com a vigência padrão do servidor?" confirm-label="Salvar rascunho" :busy="persistence.saving" @cancel="persistence.defaultsOpen = false" @confirm="saveDraft(true)">
-      <p>O texto não forneceu uma vigência comum completa. Se o início estiver ausente, o backend usará a data atual do servidor. Se o fim estiver ausente, usará o início mais 30 dias.</p>
+    <CampaignLifecycleDialog :open="persistence.defaultsOpen" title="Salvar com a vigência padrão?" confirm-label="Salvar rascunho" :busy="persistence.saving" @cancel="persistence.defaultsOpen = false" @confirm="saveDraft(true)">
+      <p>O texto não forneceu uma vigência comum completa. Se o início estiver ausente, será usada a data de hoje. Se o fim estiver ausente, usará o início mais 30 dias.</p>
       <p class="mt-3 font-bold">O período confirmado será exibido após salvar. As explicações e validações dependentes serão verificadas antes da simulação.</p>
     </CampaignLifecycleDialog>
     <CampaignLifecycleDialog :open="simulation.acceptOpen" title="Aceitar a simulação" confirm-label="Registrar aceite e continuar" :busy="persistence.working" :disabled="!simulation.aceitoPor.trim()" @cancel="simulation.acceptOpen = false" @confirm="acceptSimulation">
-      <p>O aceite será registrado no backend para esta campanha e para o protocolo {{ simulation.result?.protocolo }}.</p>
+      <p>O aceite será registrado para esta campanha e para o protocolo {{ simulation.result?.protocolo }}.</p>
       <label for="simulation-accepted-by" class="mt-4 block font-bold">Responsável pelo aceite *</label>
       <input id="simulation-accepted-by" v-model="simulation.aceitoPor" class="focus-ring mt-2 w-full rounded-xl border border-sage-border p-3" autocomplete="name" :disabled="persistence.working" />
       <label for="simulation-accept-reason" class="mt-4 block font-bold">Observação (opcional)</label>
       <textarea id="simulation-accept-reason" v-model="simulation.motivo" rows="2" class="focus-ring mt-2 w-full rounded-xl border border-sage-border p-3" :disabled="persistence.working" />
-      <p v-if="simulation.error" role="alert" class="mt-3 text-danger-dark">{{ simulation.error }}</p>
+      <p v-if="simulation.error" role="alert" class="mt-3 text-danger-dark">{{ userFacingText(simulation.error) }}</p>
     </CampaignLifecycleDialog>
     <CampaignLifecycleDialog :open="persistence.activationOpen" title="Aprovar e ativar esta campanha?" confirm-label="Confirmar ativação" :busy="persistence.working" @cancel="persistence.activationOpen = false" @confirm="activateCampaign">
       <p>Serão ativadas as {{ campaign.propostas.length }} regras da versão salva, com a vigência {{ campaign.dataInicio }} a {{ campaign.dataFim }} e o aceite registrado no protocolo {{ simulation.result?.protocolo }}.</p>
@@ -148,6 +148,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRouter, useRoute } from 'vue-router'
 import CampaignDiscardDialog from '@/components/common/CampaignDiscardDialog.vue'
@@ -165,21 +166,41 @@ import CampaignProposalRemoveDialog from '@/components/campaigns/CampaignProposa
 import CampaignProposalReviewSummary from '@/components/campaigns/CampaignProposalReviewSummary.vue'
 import { CAMPAIGN_PROPOSAL_SCENARIOS as demoExamples } from '@/services/campaignProposalFixtures'
 import { useCampaignProposalFlow } from '@/services/useCampaignProposalFlow'
+import { useNotificationStore } from '@/stores/notificationStore'
+import { createCampaignActionFeedback } from '@/services/campaignActionFeedback'
 
 const router = useRouter()
 const route = useRoute()
 const {
-  campaign, lifecycle, persistence, simulation, persistenceBusy, saveDraft: persistDraft, provider, integration, integrationState, applyIntegrationReview, activeStep, activeStepIndex, steps, message, interpretation,
+  campaign, lifecycle, persistence, simulation, persistenceBusy, saveDraft: persistDraft, provider, integration, integrationState, applyIntegrationReview: applyReview, activeStep, activeStepIndex, reachedStep, steps, message, interpretation,
   validation, commonValidation, commonValidationAttempted, canAdvanceLocally, canRunSimulation,
   canonicalSnapshot, isDirty, pendingRemovalId, descriptionChanged, descriptionNeedsConfirmation,
   navigateTo, updateCampaign, confirmRetainProposals, addProposal: addProposalToCampaign,
   updateProposal, setAllSales, requestRemoveProposal, confirmRemoveProposal, cancelRemoveProposal,
-  interpretDescription, cancelInterpretation, applyReinterpretation, loadExample,
-  campaignReinterpretationOpen, confirmCampaignReinterpretation, cancelCampaignReinterpretation
+  interpretDescription: interpretCampaign, cancelInterpretation, applyReinterpretation, loadExample,
+  campaignReinterpretationOpen, confirmCampaignReinterpretation: reinterpretCampaign, cancelCampaignReinterpretation
 } = useCampaignProposalFlow()
+const feedback = createCampaignActionFeedback(useNotificationStore())
+const integrationError = () => integrationState.error || message.value
+async function interpretDescription() {
+  return feedback('interpret', interpretCampaign, { error: () => campaignReinterpretationOpen.value ? '' : integrationError() })
+}
+async function confirmCampaignReinterpretation() {
+  return feedback('reinterpret', reinterpretCampaign, { error: integrationError })
+}
+async function applyIntegrationReview() {
+  return feedback('apply', applyReview, { error: integrationError })
+}
+async function runSimulation() {
+  return feedback('simulate', () => lifecycle.runSimulation(), { error: () => simulation.error || persistence.error })
+}
 async function saveDraft(confirmDefaults = false) {
   const confirmed = confirmDefaults === true
-  if (await persistDraft({ confirmDefaults: confirmed }) && !route.params.id) {
+  const saved = await feedback('save', () => persistDraft({ confirmDefaults: confirmed }), {
+    error: () => persistence.defaultsOpen ? '' : persistence.error || message.value,
+    successMessage: () => persistence.notice
+  })
+  if (saved && !route.params.id) {
     await router.replace({ name: 'campanha-editar', params: { id: persistence.id }, query: { ...route.query, etapa: activeStep.value } })
   }
 }
@@ -187,9 +208,11 @@ async function requestAccept() {
   if (simulation.accepted && lifecycle.canReview.value) await navigateTo('conferencia')
   else simulation.acceptOpen = true
 }
-async function acceptSimulation() { if (await lifecycle.accept()) await navigateTo('conferencia') }
+async function acceptSimulation() {
+  if (await feedback('accept', () => lifecycle.accept(), { error: () => simulation.error || persistence.error })) await navigateTo('conferencia')
+}
 async function activateCampaign() {
-  if (await lifecycle.activate()) await router.push('/campanhas/' + persistence.id)
+  if (await feedback('activate', () => lifecycle.activate(), { error: () => persistence.error })) await router.push('/campanhas/' + persistence.id)
 }
 const demoExample = ref('threeComplete')
 async function loadDemoExample() { if (loadExample(demoExample.value)) await navigateTo('propostas') }

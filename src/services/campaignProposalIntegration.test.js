@@ -272,6 +272,23 @@ describe('comparison transactions', () => {
 })
 
 describe('current explanations, validation and navigation', () => {
+  it('removes an old competition blocker only after a fresh explicit analysis confirms no active competitors', async () => {
+    const { campaign, integration, provider } = setup()
+    const p = campaign.propostas[0]
+    p.metadadosRecebidos.validacaoPendente = false
+    p.pendenciasRemotas = [{ id: 'conflito', codigo: 'CONFLITO_REGRA', mensagem: 'Concorrente 12', severidade: 'IMPEDITIVO' }]
+    provider.validateCampaign.mockResolvedValue({ valida: true, erros: [], avisos: [], referenciasValidadas: [], analiseConcorrencia: { totalConcorrentes: 0, temEmpate: false, temIdentica: false, regrasConcorrentes: [] } })
+    expect(await integration.prepareReview()).toBe(true)
+    expect(provider.validateCampaign).toHaveBeenCalledOnce()
+    expect(p.pendenciasRemotas).toHaveLength(0)
+  })
+  it.each([undefined, { totalConcorrentes: 1, temEmpate: true, temIdentica: false, regrasConcorrentes: [{ idRegra: 12 }] }, { totalConcorrentes: 0 }])('keeps the blocker when competition is present or its absence is not confirmed: %j', async (analiseConcorrencia) => {
+    const { campaign, integration, provider } = setup()
+    campaign.propostas[0].pendenciasRemotas = [{ id: 'conflito', codigo: 'CONFLITO_REGRA', mensagem: 'Concorrente 12', severidade: 'IMPEDITIVO' }]
+    provider.validateCampaign.mockResolvedValue({ valida: true, erros: [], avisos: [], referenciasValidadas: [], analiseConcorrencia })
+    expect(await integration.prepareReview()).toBe(false)
+    expect(campaign.propostas[0].pendenciasRemotas.some((p) => p.codigo === 'CONFLITO_REGRA')).toBe(true)
+  })
   it('refreshes explanations while retaining semantic and global issues outside validation coverage', async () => {
     const { campaign, integration } = setup(); const p = campaign.propostas[0]
     p.pendenciasRemotas = [{ id: 'semantic', codigo: 'CRITERIO_NAO_SUPORTADO', campo: null, mensagem: 'Condição sem editor', severidade: 'IMPEDITIVO' }]

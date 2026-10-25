@@ -16,6 +16,48 @@ function setup(overrides = {}) {
 async function ready(s) { expect(await s.flow.save()).toBe(true); await s.flow.selectCompetence('2026-09'); expect(await s.flow.runSimulation()).toBe(true); s.flow.simulation.aceitoPor = 'Pessoa teste'; expect(await s.flow.accept()).toBe(true) }
 
 describe('draft, persisted simulation, formal acceptance and activation lifecycle', () => {
+  it('records progress without saving rules or invalidating an accepted simulation', async () => {
+    const s = setup({ progress: vi.fn(async (id, payload) => payload) })
+    await ready(s)
+    s.flow.state.versaoProposta = 1
+    expect(await s.flow.recordProgress(2)).toBe(true)
+    expect(s.flow.canReview.value).toBe(true)
+    expect(s.flow.simulation.accepted).toBe(true)
+    expect(s.api.save).toHaveBeenCalledOnce()
+    s.api.progress.mockRejectedValueOnce(new Error('Sem conexão'))
+    expect(await s.flow.recordProgress(3)).toBe(false)
+    expect(s.flow.state.ultimaEtapa).toBe(2)
+    expect(s.flow.state.progressError).toContain('não foi salva')
+    expect(s.flow.simulation.accepted).toBe(true)
+    s.scope.stop()
+  })
+  it('serializes progress writes so an old response cannot restore an earlier visited screen', async () => {
+    const first = deferred(), s = setup({ progress: vi.fn(async (id, payload) => payload) })
+    await s.flow.save()
+    s.api.progress.mockReset().mockImplementationOnce(() => first.promise).mockImplementationOnce(async (id, payload) => payload)
+    const a = s.flow.recordProgress(3), b = s.flow.recordProgress(2)
+    await Promise.resolve(); await Promise.resolve()
+    expect(s.api.progress).toHaveBeenCalledOnce()
+    first.resolve({ ultimaEtapa: 3, etapaMaisAvancada: 3, versaoProposta: 1 })
+    await a; await b
+    expect(s.flow.state.ultimaEtapa).toBe(2)
+    expect(s.flow.state.etapaMaisAvancada).toBe(3)
+    s.scope.stop()
+  })
+  it('explains incompatible backend responses instead of returning to a generic validation loop', async () => {
+    const s = setup()
+    s.api.save.mockImplementation(async () => {
+      const raw = savedResponse(s.campaign)
+      delete raw.versaoProposta
+      raw.regras.forEach((r) => { delete r.rastreabilidade })
+      return raw
+    })
+    expect(await s.flow.save()).toBe(false)
+    expect(s.flow.state.error).toContain('Reconstrua/reinicie o backend')
+    expect(s.flow.state.uncertainCreate).toBe(true)
+    expect(s.api.simulate).not.toHaveBeenCalled()
+    s.scope.stop()
+  })
   it('creates once, skips unchanged PUT and preserves all rules after reloading', async () => {
     const s = setup(); expect(s.flow.dirty.value).toBe(true)
     expect(await s.flow.save()).toBe(true); expect(s.flow.dirty.value).toBe(false)

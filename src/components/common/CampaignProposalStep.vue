@@ -42,12 +42,13 @@
         <p class="mt-1 text-sage-subtle">O texto será analisado para extração da regra. Nenhuma campanha será salva nesta etapa.</p>
         <button type="button" class="focus-ring mt-3 rounded-full border border-sage-border-dark px-3 py-2 text-xs font-bold text-brand-dark" @click="$emit('cancel-interpretation')">Cancelar interpretação</button>
       </div>
-      <div v-else-if="interpretation.error" class="mt-6 rounded-2xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm leading-6 text-danger-dark" role="alert">{{ interpretation.error }}</div>
+      <div v-else-if="interpretation.error" class="mt-6 rounded-2xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm leading-6 text-danger-dark" role="alert">{{ userFacingText(interpretation.error) }}</div>
     </aside>
   </div>
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 const props = defineProps({
   form: { type: Object, required: true },
   errors: { type: Object, default: () => ({}) },

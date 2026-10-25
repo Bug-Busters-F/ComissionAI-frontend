@@ -65,13 +65,13 @@
             <RefreshCw class="h-7 w-7 animate-spin text-warning-dark" />
           </div>
           <span class="mt-4 inline-block rounded-md bg-warning-light px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-warning-dark">
-            Processamento Assíncrono • Servidor Ativo
+            Processamento em andamento
           </span>
           <h3 class="mt-2 text-xl font-extrabold text-brand-dark">
-            Validando integridade no backend...
+            Conferindo os arquivos enviados…
           </h3>
           <p class="mx-auto mt-1 max-w-md text-xs text-sage-muted">
-            {{ store.activeJob.message || 'Processando registros e validando integridade estrutural...' }}
+            {{ userFacingText(store.activeJob.message || 'Conferindo os dados e os vínculos dos arquivos…') }}
           </p>
 
           <!-- Barra de Progresso com Porcentagem -->
@@ -492,7 +492,7 @@
 
         <!-- MENSAGEM DE ERRO DO FORMULÁRIO (SE HOUVER) -->
         <div v-if="store.uploadModal.errorMessage" class="rounded-xl border border-danger bg-danger-bg p-3.5 text-xs font-semibold text-danger-dark">
-          {{ store.uploadModal.errorMessage }}
+          {{ userFacingText(store.uploadModal.errorMessage) }}
         </div>
 
 
@@ -539,6 +539,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { ref } from 'vue'
 import {
   X,

@@ -1,5 +1,6 @@
 > Atualização de 22/10/2026: o escopo posterior de salvamento, simulação, aceite e ativação está no [guia de persistência multirregras](GUIA-PERSISTENCIA-MULTIRREGRAS.md). As restrições de fluxo somente em memória descritas abaixo pertencem à entrega anterior.
 
+> Atualização: Python, origens persistidas, progresso e impacto agora seguem o [guia de revisão e rastreabilidade](GUIA-REVISAO-RASTREABILIDADE-CAMPANHAS.md). As menções anteriores a código demonstrativo nessas etapas foram substituídas.
 # Integração multirregras — guia consolidado
 
 A implementação modifica somente o frontend, na branch `feat/formulario-multiregras`. Contratos de referência: backend `e3863c0`, IA `1cbcd1c`. O fluxo termina na revisão e permanece em memória; não salva, publica, ativa ou executa simulação.

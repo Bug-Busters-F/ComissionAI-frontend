@@ -18,7 +18,7 @@
             <StatusBadge label="Bloqueio Financeiro Ativo" tone="warning" />
           </div>
           <p class="mt-1 text-sm text-sage-muted">
-            Foram identificadas vendas sem regra ativa nem taxa padrão contratual aplicável em <code class="rounded bg-sage-light px-1.5 py-0.5 text-xs font-semibold text-brand-dark">tb_basecomiss</code>.
+            Foram identificadas vendas sem regra ativa nem taxa padrão contratual aplicável em <span class="rounded bg-sage-light px-1.5 py-0.5 text-xs font-semibold text-brand-dark">tabela de comissões</span>.
           </p>
         </div>
       </div>

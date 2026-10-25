@@ -17,7 +17,7 @@
           <span v-if="state.text !== state.sentText" class="text-xs text-warning-text">Texto alterado. Reinterprete antes de confirmar.</span>
         </div>
         <div v-if="state.loading" class="mt-4 rounded-xl bg-sage-light p-4 text-sm font-semibold motion-safe:animate-pulse" role="status">Interpretando este bloco…</div>
-        <p v-if="state.error" class="mt-4 rounded-xl bg-danger-bg p-3 text-sm text-danger-dark" role="alert">{{ state.error }}</p>
+        <p v-if="state.error" class="mt-4 rounded-xl bg-danger-bg p-3 text-sm text-danger-dark" role="alert">{{ userFacingText(state.error) }}</p>
         <p v-if="stale" class="mt-4 rounded-xl bg-warning-bg p-3 text-sm text-warning-text" role="alert">A regra ou o contexto mudou. Cancele e abra novamente a edição.</p>
         <div v-if="state.result" class="mt-5 space-y-3" :aria-busy="state.loading">
           <slot name="before-comparison" />
@@ -41,7 +41,7 @@
             </div>
           </div>
           </slot>
-          <p v-for="item in state.result.pendencias" :key="item.id" class="rounded-xl p-3 text-sm" :class="item.severidade === 'IMPEDITIVO' ? 'bg-danger-bg text-danger-dark' : 'bg-warning-bg text-warning-text'"><strong v-if="item.severidade">{{ item.severidade === 'IMPEDITIVO' ? 'Impeditiva: ' : 'Aviso: ' }}</strong>{{ item.mensagem }}</p>
+          <p v-for="item in state.result.pendencias" :key="item.id" class="rounded-xl p-3 text-sm" :class="item.severidade === 'IMPEDITIVO' ? 'bg-danger-bg text-danger-dark' : 'bg-warning-bg text-warning-text'"><strong v-if="item.severidade">{{ item.severidade === 'IMPEDITIVO' ? 'Impeditiva: ' : 'Aviso: ' }}</strong>{{ userFacingText(item.mensagem) }}</p>
           <slot name="after-comparison" />
         </div>
         <footer class="sticky bottom-0 mt-6 flex justify-end gap-3 border-t border-sage-border bg-white py-3">
@@ -54,6 +54,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 import { RULE_BOOLEAN_FIELDS as booleanFields, RULE_FIELD_LABELS as labels } from '@/services/ruleReinterpretation'

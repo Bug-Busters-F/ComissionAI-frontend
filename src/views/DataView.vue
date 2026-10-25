@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-7">
-    <PageHeader title="Base de dados" description="Organize e feche os ciclos mensais de dados de cada competência.">
+    <PageHeader title="Dados da empresa" description="Organize e feche os ciclos mensais de dados de cada competência.">
       <template #action>
         <div class="flex items-center gap-3">
           <button
@@ -29,12 +29,12 @@
       </div>
       <h2 class="mt-2 text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Fechamento do ciclo mensal</h2>
       <p class="mt-2 max-w-3xl text-sm leading-6 text-sage-muted">
-        Para a correta apuração e simulação das regras de negócio, as bases de <strong>RH e Vendas devem ser enviadas conjuntamente</strong> para cada competência mensal. O RH é processado primeiro e permanece cadastrado se o envio de vendas falhar. A competência aparece após a confirmação dos dados pelo backend.
+        Para a correta apuração e simulação das regras de negócio, as bases de <strong>RH e Vendas devem ser enviadas conjuntamente</strong> para cada competência mensal. O RH é processado primeiro e permanece cadastrado se o envio de vendas falhar. A competência aparece após a confirmação dos dados.
       </p>
     </section>
 
     <section v-if="store.competenciasLoading" class="rounded-2xl bg-white px-6 py-12 text-center text-sm text-sage-muted" role="status">
-      Consultando as competências disponíveis no backend…
+      Consultando as competências disponíveis…
     </section>
 
     <section v-else-if="store.competenciasError" class="rounded-2xl border border-danger/30 bg-danger-bg p-6" role="alert">
@@ -93,7 +93,7 @@
               />
             </div>
             <p class="mt-1.5 text-[11px] text-sage-muted truncate">
-              {{ store.activeJob.message }}
+              {{ userFacingText(store.activeJob.message) }}
             </p>
           </div>
 
@@ -119,7 +119,7 @@
         </div>
 
         <ul v-if="period.mensagens?.length" class="mt-4 space-y-1 text-xs text-sage-muted">
-          <li v-for="(message, index) in period.mensagens" :key="index">{{ message }}</li>
+          <li v-for="(message, index) in period.mensagens" :key="index">{{ userFacingText(message) }}</li>
         </ul>
         <div class="mt-7 pt-4 border-t border-sage-border-light flex flex-col gap-2">
           <button
@@ -146,7 +146,7 @@
             <span>→</span>
           </RouterLink>
           <span v-else class="rounded-xl bg-sage-light px-4 py-2.5 text-xs font-semibold text-sage-muted text-center">
-            Cálculo indisponível sem vendas persistidas
+            Cálculo indisponível sem vendas cadastradas
           </span>
 
           <div class="flex items-center justify-between pt-1 text-[11px]">
@@ -223,6 +223,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { onMounted } from 'vue'
 import { RefreshCw, Trash2, Database, FileSpreadsheet } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'

@@ -1,5 +1,6 @@
 # Integração de rascunho, simulação, aceite e ativação multirregras
 
+> Atualização: Python, origens persistidas, progresso e impacto agora seguem o [guia de revisão e rastreabilidade](GUIA-REVISAO-RASTREABILIDADE-CAMPANHAS.md). As menções anteriores a código demonstrativo nessas etapas foram substituídas.
 Entrega de 22/10/2026, somente frontend na branch `feat/formulario-multiregras`. Complementa a integração de interpretação já existente. Referências inspecionadas: backend dev `75a8e60`; layout de simulação reaproveitado de frontend `origin/dev` `519ed06`. Nenhum merge global da dev e nenhuma alteração no código do backend/IA.
 
 ## Guias rápidos por lote

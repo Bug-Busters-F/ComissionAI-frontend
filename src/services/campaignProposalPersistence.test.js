@@ -29,9 +29,10 @@ describe('persisting the real multi-rule contract', () => {
   })
   it('does not fabricate audience confirmation or origins on reload', () => {
     const c = campaignFixture(); c.propostas[0].campos.canal = ''; c.propostas[0].campos.publicoTodasVendas = true
-    const hydrated = persistedCampaignToProposal(savedResponse(c))
+    const raw = savedResponse(c); raw.regras.forEach((r) => { delete r.rastreabilidade })
+    const hydrated = persistedCampaignToProposal(raw)
     expect(hydrated.propostas[0].campos.publicoTodasVendas).toBe(false)
-    expect(hydrated.propostas[0].metadadosRecebidos.origensPorCampo).toBeUndefined()
+    expect(hydrated.propostas[0].metadadosRecebidos.origensPorCampo).toEqual({})
   })
   it('preserves general pending messages through the available per-rule string field', () => {
     const c = campaignFixture(); c.pendenciasCampanha = [createPending({ codigo: 'DESCONHECIDA', mensagem: 'Mensagem; com ponto e vírgula.', severidade: 'AVISO' })]
