@@ -5,7 +5,7 @@
         <h2 :id="titleId" class="text-xl font-extrabold">{{ title }}</h2>
         <p class="mt-2 text-sm text-sage-muted">{{ review.kind === 'campaign' ? 'Confira o conjunto atual e o proposto. Confirmar substituirá todas as regras atuais, incluindo valores editados manualmente.' : 'Somente o bloco selecionado será substituído. As demais regras serão preservadas.' }}</p>
         <p v-if="!canApply" role="alert" class="mt-4 rounded-xl bg-warning-bg p-3 text-sm text-warning-text">Os dados mudaram desde a solicitação. Cancele esta revisão e interprete novamente.</p>
-        <p v-if="error" role="alert" class="mt-4 rounded-xl bg-danger-bg p-3 text-sm text-danger-dark">{{ error }}</p>
+        <p v-if="error" role="alert" class="mt-4 rounded-xl bg-danger-bg p-3 text-sm text-danger-dark">{{ userFacingText(error) }}</p>
         <div class="mt-5 grid gap-5 md:grid-cols-2">
           <section aria-label="Valores atuais" class="min-w-0 rounded-2xl border border-sage-border p-3">
             <h3 class="p-2 text-lg font-bold">Atual · {{ review.before.propostas.length }} regra(s)</h3>
@@ -38,6 +38,7 @@
   </Teleport>
 </template>
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import CampaignProposalReviewSummary from './CampaignProposalReviewSummary.vue'
 import { validateCampaignProposalSet } from '@/services/campaignProposalValidation'

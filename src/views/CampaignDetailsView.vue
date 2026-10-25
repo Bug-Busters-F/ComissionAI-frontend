@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-7">
-    <PageHeader :title="campaign?.titulo || 'Detalhes da campanha'" description="Consulte os valores persistidos da campanha e da regra vinculada.">
+    <PageHeader :title="campaign?.titulo || 'Detalhes da campanha'" description="Consulte os valores salvos da campanha e da regra vinculada.">
       <template #action>
         <div class="flex flex-wrap gap-3">
           <RouterLink to="/campanhas" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-white">Voltar</RouterLink>

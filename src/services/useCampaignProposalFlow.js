@@ -1,3 +1,4 @@
+import { ruleArtifactsCurrent } from './campaignRuleArtifacts'
 import { focusCampaignStepStart } from './campaignStepNavigation'
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -32,6 +33,7 @@ export function useCampaignProposalFlow() {
   const router = useRouter()
   const campaign = reactive(createCampaignProposalForm())
   const activeStep = ref(normalizeProposalStep(route.query.etapa))
+  const reachedStep = ref(1)
   const revision = ref(0)
   const message = ref('')
   const interpretation = reactive({ status: 'idle', isProcessing: false, error: '' })
@@ -52,7 +54,7 @@ export function useCampaignProposalFlow() {
     interpretation.status = 'ready'
   } })
   const integrationState = integration.state
-  const lifecycle = createCampaignProposalLifecycle({ campaign, enabled: provider.mode === 'api', processing: () => interpretation.isProcessing || integrationState.busy || Boolean(integrationState.review) || campaignReinterpretationOpen.value, onLoaded: () => {
+  const lifecycle = createCampaignProposalLifecycle({ campaign, enabled: provider.mode === 'api', currentStep: () => activeStepIndex.value + 1, processing: () => interpretation.isProcessing || integrationState.busy || Boolean(integrationState.review) || campaignReinterpretationOpen.value, onLoaded: () => {
     descriptionAtProposalSource.value = campaign.textoOriginal
     descriptionNeedsConfirmation.value = false
   } })
@@ -63,10 +65,21 @@ export function useCampaignProposalFlow() {
   watch(() => route.params?.id, async (id) => {
     if (!id || String(id) === String(persistence.id)) return
     if (await lifecycle.load(id)) {
-      activeStep.value = requiredStep(normalizeProposalStep(route.query.etapa))
+      reachedStep.value = persistence.etapaMaisAvancada
+      const resumed = CAMPAIGN_PROPOSAL_STEPS[(persistence.etapaMaisAvancada || 1) - 1].key
+      activeStep.value = requiredStep(normalizeProposalStep(route.query.etapa || resumed))
+      reachedStep.value = Math.max(reachedStep.value, activeStepIndex.value + 1)
+      void lifecycle.recordProgress(activeStepIndex.value + 1)
+      if (activeStep.value === 'simulacao') void lifecycle.loadCompetences()
       await router.replace({ query: { ...route.query, etapa: activeStep.value } })
     }
   }, { immediate: true })
+
+  watch(activeStep, () => {
+    if (persistence.loading) return
+    reachedStep.value = Math.max(reachedStep.value, activeStepIndex.value + 1)
+    void lifecycle.recordProgress(activeStepIndex.value + 1)
+  })
 
   const canAdvanceLocally = computed(() => {
     if (lifecycle.busy.value || lifecycle.readOnly.value || interpretation.isProcessing || integrationState.busy || integrationState.review || campaignReinterpretationOpen.value) return false
@@ -76,7 +89,7 @@ export function useCampaignProposalFlow() {
     const retryableCampaign = { ...campaign, propostas: campaign.propostas.map((proposal) => ({
       ...proposal,
       pendenciasRemotas: proposal.pendenciasRemotas.filter((pending) =>
-        !(proposal.metadadosRecebidos.validacaoPendente !== false && isRulePendingRevalidatable(proposal, pending)))
+        !((pending.codigo === 'CONFLITO_REGRA' || proposal.metadadosRecebidos.validacaoPendente !== false) && isRulePendingRevalidatable(proposal, pending)))
     })) }
     return validateCampaignProposalSet(retryableCampaign).canAdvanceLocally
   })
@@ -121,7 +134,7 @@ export function useCampaignProposalFlow() {
     return getRequiredProposalStep(target, validation.value, campaign, {
       descriptionNeedsConfirmation: descriptionNeedsConfirmation.value,
       processing: interpretation.isProcessing || integrationState.busy || Boolean(integrationState.review) || campaignReinterpretationOpen.value,
-      needsValidation: provider.mode === 'api' && (campaign.propostas.some((p) => p.artefatosDesatualizados || p.metadadosRecebidos.validacaoPendente !== false) || !campaign.dataInicio || !campaign.dataFim)
+      needsValidation: provider.mode === 'api' && (campaign.propostas.some((p) => !ruleArtifactsCurrent(p, campaign)) || !campaign.dataInicio || !campaign.dataFim)
     })
   }
 
@@ -177,7 +190,7 @@ export function useCampaignProposalFlow() {
         message.value = 'Aguarde a solicitação ou confirme/cancele a revisão antes de continuar.'
       } else if (provider.mode === 'api' && (!campaign.dataInicio || !campaign.dataFim)) {
         message.value = 'Informe uma vigência comum no texto da campanha e reinterprete.'
-      } else if (provider.mode === 'api' && campaign.propostas.some((p) => p.artefatosDesatualizados || p.metadadosRecebidos.validacaoPendente !== false)) {
+      } else if (provider.mode === 'api' && campaign.propostas.some((p) => !ruleArtifactsCurrent(p, campaign))) {
         message.value = 'Valide as regras alteradas antes de continuar. Seus dados foram preservados.'
       } else {
         const blockingCount = validation.value.blockers.length
@@ -458,6 +471,7 @@ export function useCampaignProposalFlow() {
     applyIntegrationReview,
     activeStep,
     activeStepIndex,
+    reachedStep,
     steps: CAMPAIGN_PROPOSAL_STEPS,
     revision,
     message,

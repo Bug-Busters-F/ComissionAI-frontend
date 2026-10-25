@@ -15,7 +15,7 @@
         <div class="rounded-xl px-4 py-3" :class="validation.blockers.length ? 'bg-danger-bg text-danger-dark' : validation.warnings.length ? 'bg-warning-bg text-warning-text' : 'bg-sage-light text-brand-dark'">
           <p class="text-xs font-semibold">Pendências totais</p>
           <p class="mt-1 text-xl font-extrabold">{{ validation.pending.length }}</p>
-          <p class="mt-1 text-xs">{{ validation.blockers.length }} {{ validation.blockers.length === 1 ? 'impeditiva' : 'impeditivas' }} · {{ validation.warnings.length }} {{ validation.warnings.length === 1 ? 'aviso' : 'avisos' }}</p>
+          <p class="mt-1 text-xs">{{ validation.blockers.length }} {{ validation.blockers.length === 1 ? 'impeditiva' : 'impeditivas' }} · {{ validation.warnings.length }} {{ userFacingText(validation.warnings.length === 1 ? 'aviso' : 'avisos') }}</p>
         </div>
       </div>
       <div class="mt-4 rounded-xl border border-sage-border bg-white p-4">
@@ -29,11 +29,11 @@
         </div>
         <textarea id="proposal-campaign-description" :value="campaign.textoOriginal" rows="5" class="campaign-control campaign-description-control mt-3 resize-y" placeholder="Descreva os públicos, percentuais e condições..." @input="$emit('update-campaign', 'textoOriginal', $event.target.value)" />
         <CampaignRequestStatus v-if="campaignProcessing" class="mt-3" message="Reinterpretando o texto da campanha…" @cancel="cancelCampaignRequest" />
-        <p v-if="interpretation.error" class="mt-3 rounded-xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm leading-6 text-danger-dark" role="alert">{{ interpretation.error }}</p>
+        <p v-if="interpretation.error" class="mt-3 rounded-xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm leading-6 text-danger-dark" role="alert">{{ userFacingText(interpretation.error) }}</p>
       </div>
     </section>
 
-    <p v-if="provider.mode === 'api' && integration?.state.error" role="alert" class="rounded-xl bg-danger-bg p-3 text-sm text-danger-dark">{{ integration.state.error }}</p>
+    <p v-if="provider.mode === 'api' && integration?.state.error" role="alert" class="rounded-xl bg-danger-bg p-3 text-sm text-danger-dark">{{ userFacingText(integration.state.error) }}</p>
     <section v-if="!proposals.length" class="rounded-[22px] border border-dashed border-sage-border-dark bg-white px-6 py-12 text-center">
       <h3 class="text-lg font-extrabold text-brand-dark">Nenhuma regra adicionada</h3>
       <p class="mt-2 text-sm text-sage-muted">Adicione um bloco para definir o público, a taxa e os limites da regra.</p>
@@ -50,6 +50,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import CampaignApiRuleEditor from './CampaignApiRuleEditor.vue'
 import CampaignRequestStatus from './CampaignRequestStatus.vue'
 import { computed, ref } from 'vue'

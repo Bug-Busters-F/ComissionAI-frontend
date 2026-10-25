@@ -44,7 +44,7 @@ function normalizeExternalPending(raw, clientId = null) {
     : 'O serviço retornou uma pendência que precisa de classificação.'
 
   return createPending({
-    id: raw.id ? textValue(raw.id) + (pendingClientId ? ':' + pendingClientId : '') : undefined,
+    id: raw.id ? textValue(raw.id) + (pendingClientId && !textValue(raw.id).endsWith(':' + pendingClientId) ? ':' + pendingClientId : '') : undefined,
     codigo: textValue(raw.codigo) || 'PENDENCIA_EXTERNA_SEM_CLASSIFICACAO',
     mensagem: message,
     clientId: pendingClientId,
@@ -357,7 +357,7 @@ export function normalizeBackendCampaignResponse(raw) {
       metadadosRecebidos: {
         blocoId: p.blocoId, contratoBackend: clonePlain(p), vigenciaRecebida: clonePlain(p.vigencia || {}),
         operacaoBase: clonePlain(p.operacaoBase), origensPorCampo: clonePlain(p.origensPorCampo || {}),
-        referenciasConsultadas: clonePlain(p.referenciasConsultadas || []), explicacao: textValue(p.explicacao),
+        pythonAtualizado: p.pythonEquivalente || null, referenciasConsultadas: clonePlain(p.referenciasConsultadas || []), explicacao: textValue(p.explicacao),
         bonusPercentual: p.bonusPercentual ?? null, bonusValorFixo: p.bonusValorFixo ?? null,
         completa: p.completa, validacaoPendente: true
       }
@@ -409,7 +409,7 @@ export function proposalToBackend(proposal, campaign) {
       ? { tipoOperacao: 'DEFINIR_TAXA', valorAjuste: canonical.taxa, referenciaBase: null }
       : clonePlain(metadata.operacaoBase),
     vigencia: { dataInicio: campaign.dataInicio || null, dataFim: campaign.dataFim || null },
-    pendencias: [], referenciasConsultadas: metadata.referenciasConsultadas || [], origensPorCampo: metadata.origensPorCampo || {},
+    pendencias: [], referenciasConsultadas: metadata.origensDesatualizadas ? [] : metadata.referenciasConsultadas || [], origensPorCampo: metadata.origensPorCampo || {},
     bonusPercentual: metadata.bonusPercentual ?? null, bonusValorFixo: metadata.bonusValorFixo ?? null
   }
 }

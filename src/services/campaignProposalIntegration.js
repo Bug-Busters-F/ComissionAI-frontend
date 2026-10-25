@@ -1,4 +1,5 @@
 import { reactive } from 'vue'
+import { ruleArtifactSignature, ruleArtifactsCurrent } from './campaignRuleArtifacts'
 import { clonePlain, createClientId, createPending } from './campaignProposalModel'
 import { normalizeBackendCampaignResponse, normalizeExternalPending } from './campaignProposalMappers'
 import { decimalFractionToPercent, parseDecimalToMinor, validateCampaignProposalSet } from './campaignProposalValidation'
@@ -18,7 +19,7 @@ const CORRECTABLE_CODES = new Set(['CAMPO_AUSENTE', 'TAXA_AUSENTE', 'TAXA_NAO_CA
   'CANAL_NAO_ENCONTRADO', 'MATRICULA_NAO_ENCONTRADA', 'VALOR_MINIMO_NEGATIVO', 'VALOR_MAXIMO_INVALIDO'])
 
 export function isRulePendingRevalidatable(proposal, pending) {
-  return String(pending.id || '').startsWith('artefatos:') || String(pending.id || '').startsWith('cadastro:') ||
+  return pending.codigo === 'CONFLITO_REGRA' || String(pending.id || '').startsWith('artefatos:') || String(pending.id || '').startsWith('cadastro:') ||
     (CORRECTABLE_CODES.has(pending.codigo) && Boolean(pending.campo) && proposal.camposManuais.includes(pending.campo))
 }
 
@@ -208,17 +209,32 @@ export function createCampaignProposalIntegration({ campaign, provider, onChange
           cadastral.push(createPending({ clientId: id, codigo: 'DESCRICAO_DIVERGENTE', campo: field, id: 'cadastro:descricao:' + id + ':' + field, origem: 'BACKEND', mensagem: 'A descrição informada difere do cadastro para este código. Valor consultado: ' + reference.descricao + '. Corrija ou remova a descrição e valide novamente.' }))
         }
       }
+      // The cadastral endpoint also returns a fresh concurrency analysis. Never infer
+      // absence of conflict from valida=true alone: active competition may be a warning.
+      const concurrency = validation.analiseConcorrencia
+      const noCompetition = validation.valida && concurrency?.totalConcorrentes === 0 &&
+        concurrency.temEmpate === false && concurrency.temIdentica === false &&
+        Array.isArray(concurrency.regrasConcorrentes) && concurrency.regrasConcorrentes.length === 0
       updated.pendenciasRemotas = original.pendenciasRemotas.filter((p) => {
+        if (p.codigo === 'CONFLITO_REGRA') return !noCompetition
         if (p.id.startsWith('artefatos:') || p.id.startsWith('cadastro:')) return false
         return !(validation.valida && isRulePendingRevalidatable(original, p) && !artifactPendings.some((a) => a.campo === p.campo && a.severidade === 'IMPEDITIVO'))
       }).concat(artifactPendings, cadastral)
       updated.campos.taxaPercentual = artifacts.taxaCalculada === null ? '' : decimalFractionToPercent(artifacts.taxaCalculada).replace('.', ',')
+      updated.metadadosRecebidos.artefatosLegados = false
       updated.metadadosRecebidos.explicacao = artifacts.explicacao
       updated.metadadosRecebidos.pythonAtualizado = artifacts.pythonEquivalente || null
+      if (artifacts.operacaoBase) updated.metadadosRecebidos.operacaoBase = clonePlain(artifacts.operacaoBase)
+      if (artifacts.origensPorCampo) {
+        updated.metadadosRecebidos.origensPorCampo = clonePlain(artifacts.origensPorCampo)
+        updated.metadadosRecebidos.origensDesatualizadas = false
+      }
+      if (Array.isArray(artifacts.referenciasConsultadas)) updated.metadadosRecebidos.referenciasConsultadas = clonePlain(artifacts.referenciasConsultadas)
       updated.metadadosRecebidos.completa = artifacts.completa
       updated.metadadosRecebidos.validacaoPendente = false
       updated.metadadosRecebidos.referenciasValidadas = clonePlain(validation.referenciasValidadas)
       updated.artefatosDesatualizados = false
+      updated.metadadosRecebidos.assinaturaArtefatos = ruleArtifactSignature(updated, campaign)
       const changedRate = parseDecimalToMinor(updated.campos.taxaPercentual, 2) !== parseDecimalToMinor(original.campos.taxaPercentual, 2)
       if (changedRate && updated.campos.taxaPercentual !== original.campos.taxaPercentual) {
         newReview('artifacts', id, snapshot(campaign, [original]), snapshot(campaign, [updated]), baseFingerprint, baseContext)
@@ -232,7 +248,7 @@ export function createCampaignProposalIntegration({ campaign, provider, onChange
   async function prepareReview() {
     if (state.busy || state.review) return false
     for (const p of campaign.propostas) {
-      if (p.artefatosDesatualizados || p.metadadosRecebidos.validacaoPendente !== false) {
+      if (!ruleArtifactsCurrent(p, campaign) || p.pendenciasRemotas.some((pending) => pending.codigo === 'CONFLITO_REGRA')) {
         if (!await refreshRule(p.clientId) || state.review) return false
       }
     }

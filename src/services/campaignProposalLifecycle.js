@@ -1,4 +1,5 @@
 import { computed, reactive, watch } from 'vue'
+import { ruleArtifactsCurrent } from './campaignRuleArtifacts'
 import { isCoverageImpediment, parseCoverageDetails } from './coverageService'
 import { validateCampaignProposalSet } from './campaignProposalValidation'
 import { clonePlain, hasCampaignContent } from './campaignProposalModel'
@@ -17,8 +18,8 @@ function message(error) {
   return error?.message || normalizeCampaignError(error).message
 }
 
-export function createCampaignProposalLifecycle({ campaign, enabled = true, api = createCampaignLifecycleApi(), processing = () => false, onLoaded = () => {} }) {
-  const state = reactive({ id: null, estado: 'DRAFT', loading: false, saving: false, working: false, error: '', notice: '', baseline: null, defaultsOpen: false, activationOpen: false, uncertainCreate: false, readiness: null, savedAt: null, remoteChanged: false, serverSnapshot: null })
+export function createCampaignProposalLifecycle({ campaign, enabled = true, api = createCampaignLifecycleApi(), processing = () => false, onLoaded = () => {}, currentStep = () => 1 }) {
+  const state = reactive({ id: null, estado: 'DRAFT', loading: false, saving: false, working: false, error: '', notice: '', baseline: null, defaultsOpen: false, activationOpen: false, uncertainCreate: false, readiness: null, savedAt: null, remoteChanged: false, serverSnapshot: null, ultimaEtapa: 1, etapaMaisAvancada: 1, versaoProposta: null, progressError: '' })
   const simulation = reactive({ competences: [], selectedCompetencia: '', referenceValidation: null, isLoadingCompetences: false, isValidatingReference: false, isRunning: false, error: '', result: null, page: 1, pageSize: 10, totalItems: 0, totalPages: 1, executionId: '', status: '', progress: 0, stageMessage: '', accepted: false, acceptance: null, invalidationReasons: [], acceptOpen: false, aceitoPor: '', motivo: '', loadingSales: false, pageError: '' })
   const fingerprint = computed(() => draftFingerprint(campaign))
   const dirty = computed(() => state.baseline === null ? hasCampaignContent(campaign) : fingerprint.value !== state.baseline)
@@ -30,7 +31,8 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
   let disposed = false
   let simulationFingerprint = ''
   let defaultsFingerprint = ''
-  const rulesReady = computed(() => validateCampaignProposalSet(campaign).canAdvanceLocally && campaign.propostas.every((p) => !p.artefatosDesatualizados && p.metadadosRecebidos.validacaoPendente === false))
+  let progressQueue = Promise.resolve()
+  const rulesReady = computed(() => validateCampaignProposalSet(campaign).canAdvanceLocally && campaign.propostas.every((p) => ruleArtifactsCurrent(p, campaign)))
   const currentSimulation = computed(() => Boolean(rulesReady.value && simulation.result && simulationFingerprint === fingerprint.value && !dirty.value && simulation.result.competencia === simulation.selectedCompetencia))
   const canReview = computed(() => !busy.value && !processing() && !state.remoteChanged && currentSimulation.value && simulation.accepted && state.readiness?.aptaParaAtivacao === true)
   const canActivate = computed(() => canReview.value && !readOnly.value && state.id)
@@ -44,6 +46,11 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
   function applySaved(raw, previous) {
     const next = persistedCampaignToProposal(raw, previous)
     Object.assign(campaign, next)
+    if (!previous) {
+      state.ultimaEtapa = raw.ultimaEtapa || 1
+      state.etapaMaisAvancada = raw.etapaMaisAvancada || state.ultimaEtapa
+    }
+    state.versaoProposta = raw.versaoProposta ?? null
     state.id = raw.id; state.estado = raw.estado; state.savedAt = raw.atualizadoEm || null
     state.baseline = fingerprint.value
     state.serverSnapshot = serverSignature(raw); state.remoteChanged = false
@@ -61,6 +68,25 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
       throw new Error('A campanha foi alterada no backend por outra operação. Consulte a versão atual antes de continuar; suas alterações locais foram preservadas.')
     }
     return true
+  }
+  function recordProgress(step) {
+    if (!enabled || !api.progress || !state.id || !state.versaoProposta || readOnly.value || state.loading) return Promise.resolve(false)
+    const id = state.id, version = state.versaoProposta
+    // Serialize writes: a slow earlier response must not restore an older last stage.
+    progressQueue = progressQueue.catch(() => {}).then(async () => {
+      if (disposed || id !== state.id || version !== state.versaoProposta) return false
+      try {
+        const raw = await api.progress(id, { ultimaEtapa: step, etapaMaisAvancada: Math.max(step, state.etapaMaisAvancada), versaoProposta: version })
+        if (disposed || id !== state.id || version !== state.versaoProposta) return false
+        if (raw.ultimaEtapa !== step || raw.versaoProposta !== version) throw new Error('O backend não confirmou a etapa visitada.')
+        state.ultimaEtapa = raw.ultimaEtapa; state.etapaMaisAvancada = raw.etapaMaisAvancada; state.progressError = ''
+        return true
+      } catch (error) {
+        if (!disposed && id === state.id) state.progressError = 'A última etapa visitada não foi salva. ' + message(error)
+        return false
+      }
+    })
+    return progressQueue
   }
   async function load(id) {
     const request = ++requestSequence
@@ -106,12 +132,16 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
       const raw = await api.save(id, campaignToDraftRequest(previous))
       if (disposed || request !== requestSequence) return false
       if (raw.estado !== 'DRAFT' || (id && String(raw.id) !== String(id)) || raw.regras?.length !== previous.propostas.length || raw.regras?.some((r) => !previous.propostas.some((p) => p.clientId === r.blocoId))) throw new Error('O backend não confirmou o rascunho com todas as regras. Consulte a campanha antes de repetir.')
+      if (!Number.isInteger(raw.versaoProposta) || raw.regras.some((r) => !r.rastreabilidade || typeof r.rastreabilidade.artefatosAtualizados !== 'boolean')) {
+        throw new Error('O backend em execução não confirmou a versão e a rastreabilidade das regras. Reconstrua/reinicie o backend com a integração atual e recarregue a página antes de continuar. A resposta de salvamento é incompatível; consulte o rascunho antes de repetir a criação.')
+      }
       if (before !== fingerprint.value) {
         const persisted = persistedCampaignToProposal(raw)
         state.id = raw.id; campaign.id = raw.id; state.baseline = draftFingerprint(persisted); state.serverSnapshot = serverSignature(raw)
         state.notice = 'A versão enviada foi salva. Há alterações posteriores ainda não salvas.'
       } else { applySaved(raw, previous); state.notice = `Rascunho salvo com ${raw.regras.length} regra(s). Vigência: ${raw.dataInicio} a ${raw.dataFim}.` }
       simulation.accepted = false; state.readiness = null
+      await recordProgress(currentStep())
       return true
     } catch (error) {
       state.error = message(error)
@@ -151,7 +181,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
       if (raw.possuiAmbiguidadeCritica) impediments.push({ code: 'BACKEND', message: 'O recorte contém sobreposição de regras com ambiguidade crítica.' })
       if (!raw.totalVendasRecortadas) impediments.push({ code: 'INSUFFICIENT_REFERENCE', message: 'Nenhuma venda atende ao público nesta competência.' })
       const missingBases = impediments.filter((i) => i.code === 'MISSING_BASE_COVERAGE').map((i) => parseCoverageDetails(i.message, null, value))
-      simulation.referenceValidation = { ...raw, impediments, missingBases, canExecute: !impediments.length, origemDados: 'Dados cadastrados no backend para ' + value }
+      simulation.referenceValidation = { ...raw, impediments, missingBases, canExecute: !impediments.length, origemDados: 'Vendas, RH e taxas contratuais de ' + value }
       if (impediments.length) { simulation.accepted = false; state.readiness = null }
       return !impediments.length
     } catch (error) { if (request === referenceSequence) { simulation.error = message(error); simulation.accepted = false; state.readiness = null }; return false }
@@ -163,14 +193,14 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     if (!await selectCompetence(competence)) return false
     const before = fingerprint.value, id = state.id, request = ++requestSequence
     simulation.isRunning = true; simulation.error = ''; simulation.accepted = false; simulation.result = null; simulation.status = 'PROCESSANDO'; simulation.progress = 0; state.readiness = null
-    simulation.stageMessage = 'Aguardando o resultado do backend. O progresso intermediário não é informado pelo serviço.'
+    simulation.stageMessage = 'Calculando os cenários. Aguarde a conclusão.'
     try {
       const raw = await api.simulate(id, competence)
       if (!await verifySavedVersion()) return false
       if (disposed || request !== requestSequence || before !== fingerprint.value || competence !== simulation.selectedCompetencia) { simulation.status = 'INVALIDADA'; simulation.stageMessage = 'A campanha mudou durante a execução. Salve e simule novamente.'; return false }
       assertSimulation(raw, id, competence)
       simulation.result = simulationViewModel(raw); simulation.executionId = raw.id; simulationFingerprint = before
-      simulation.status = 'CONCLUIDA'; simulation.progress = 100; simulation.stageMessage = 'Resultado persistido. Protocolo: ' + raw.protocolo; simulation.invalidationReasons = []
+      simulation.status = 'CONCLUIDA'; simulation.progress = 100; simulation.stageMessage = 'Simulação concluída. Protocolo: ' + raw.protocolo; simulation.invalidationReasons = []
       simulation.totalItems = raw.totalVendasRecortadas; simulation.totalPages = Math.max(1, Math.ceil(raw.totalVendasRecortadas / simulation.pageSize)); simulation.page = 1
       await changePage(1)
       return true
@@ -223,9 +253,9 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
       // Never update the draft here: PUT would invalidate the formal acceptance.
       const raw = await api.activate(id)
       if (String(raw?.id) !== String(id) || raw.estado !== 'ATIVA' || raw.regras?.length !== campaign.propostas.length) throw new Error('A ativação não foi confirmada. Consulte o estado atual da campanha antes de repetir.')
-      state.estado = raw.estado; campaign.estado = raw.estado; state.notice = 'Campanha ativada pelo backend.'
+      state.estado = raw.estado; campaign.estado = raw.estado; state.notice = 'Campanha ativada.'
       return true
     } catch (error) { state.error = message(error); return false } finally { state.working = false }
   }
-  return { state, simulation, dirty, busy, readOnly, currentSimulation, canReview, canActivate, load, save, loadCompetences, selectCompetence, runSimulation, changePage, accept, activate, dispose() { disposed = true; ++requestSequence; ++referenceSequence; ++pageSequence } }
+  return { state, simulation, dirty, busy, readOnly, currentSimulation, canReview, canActivate, load, save, recordProgress, loadCompetences, selectCompetence, runSimulation, changePage, accept, activate, dispose() { disposed = true; ++requestSequence; ++referenceSequence; ++pageSequence } }
 }

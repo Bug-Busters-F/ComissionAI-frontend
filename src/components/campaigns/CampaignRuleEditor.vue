@@ -21,7 +21,7 @@
                   <option value="falha">Falha de interpretação</option><option value="multiplas">Resposta com várias regras</option><option value="vazio">Resposta sem regras</option>
                 </select>
               </div>
-              <p v-if="state.error && !state.reviewing" class="mt-3 text-sm text-danger-dark" role="alert">{{ state.error }}</p>
+              <p v-if="state.error && !state.reviewing" class="mt-3 text-sm text-danger-dark" role="alert">{{ userFacingText(state.error) }}</p>
               <div class="mt-3 flex gap-3">
                 <button type="button" class="focus-ring rounded-full bg-brand px-4 py-2 text-sm font-bold disabled:opacity-50" :disabled="!state.text.trim()" @click="session.interpret">Reinterpretar</button>
                 <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-4 py-2 text-sm font-bold" @click="cancel">Cancelar</button>
@@ -39,6 +39,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { Pencil } from 'lucide-vue-next'
 import CampaignProposalCard from './CampaignProposalCard.vue'

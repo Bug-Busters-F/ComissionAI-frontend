@@ -3,6 +3,7 @@ import { effectScope, nextTick, reactive } from 'vue'
 import { createCampaignProposal } from './campaignProposalModel'
 import { useCampaignProposalFlow } from './useCampaignProposalFlow'
 import { proposalToBackend } from './campaignProposalMappers'
+import { campaignFixture, savedResponse } from './campaignLifecycleTestFixtures'
 
 const bindings = vi.hoisted(() => ({ route: null, router: null, client: null, lifecycle: null }))
 vi.mock('vue-router', () => ({ useRoute: () => bindings.route, useRouter: () => bindings.router }))
@@ -10,8 +11,8 @@ vi.mock('vue', async (original) => ({ ...await original(), onBeforeUnmount: vi.f
 vi.mock('./campaignLifecycleApi', () => ({ createCampaignLifecycleApi: () => bindings.lifecycle }))
 vi.mock('./campaignProposalApiClient', () => ({ createCampaignProposalApiClient: () => bindings.client }))
 
-async function setup() {
-  bindings.route = reactive({ fullPath: '/campanhas/nova?etapa=propostas', query: { etapa: 'propostas' } })
+async function setup({ saved = null, lifecycleApi = {} } = {}) {
+  bindings.route = reactive({ ...(saved ? { params: { id: 42 } } : {}), fullPath: '/campanhas/nova?etapa=propostas', query: saved ? {} : { etapa: 'propostas' } })
   const change = async ({ query }) => { bindings.route.query = query; bindings.route.fullPath = '/campanhas/nova?etapa=' + query.etapa; await nextTick() }
   bindings.router = { push: vi.fn(change), replace: vi.fn(change) }
   bindings.client = {
@@ -20,13 +21,16 @@ async function setup() {
     validateCampaign: vi.fn(async () => ({ valida: true, erros: [], avisos: [], referenciasValidadas: [] }))
   }
   bindings.lifecycle = {
-    save: vi.fn(async (id, payload) => ({ ...payload, id: id || 41, estado: 'DRAFT', regras: payload.regras.map((r, index) => ({ ...r, id: index + 101, pendencias: r.pendencias.join('; '), dataInicio: payload.dataInicio, dataFim: payload.dataFim })) })),
-    competences: vi.fn(async () => [])
+    save: vi.fn(async (id, payload) => ({ ...payload, id: id || 41, estado: 'DRAFT', versaoProposta: 1, regras: payload.regras.map((r, index) => ({ ...r, id: index + 101, pendencias: r.pendencias.join('; '), dataInicio: payload.dataInicio, dataFim: payload.dataFim })) })),
+    load: vi.fn(async () => saved),
+    progress: vi.fn(async (id, payload) => ({ ...payload })),
+    competences: vi.fn(async () => []),
+    ...lifecycleApi
   }
   const scope = effectScope()
   const flow = scope.run(useCampaignProposalFlow)
-  Object.assign(flow.campaign, { titulo: 'T', textoOriginal: 'D', dataInicio: '2026-10-01', dataFim: '2026-10-31', propostas: [createCampaignProposal({ campos: { codLoja: '1', taxaPercentual: '5' }, metadadosRecebidos: { validacaoPendente: true } })] })
-  await nextTick(); await nextTick()
+  if (!saved) Object.assign(flow.campaign, { titulo: 'T', textoOriginal: 'D', dataInicio: '2026-10-01', dataFim: '2026-10-31', propostas: [createCampaignProposal({ campos: { codLoja: '1', taxaPercentual: '5' }, metadadosRecebidos: { validacaoPendente: true } })] })
+  for (let i = 0; i < 15; i++) await nextTick()
   return { flow, scope }
 }
 
@@ -40,6 +44,60 @@ function extractionResponse(flow) {
 }
 
 describe('campaign flow integration navigation', () => {
+  it.each([1, 2, 3])('resumes a draft in its highest reached stage %i after returning to the first stage', async (stage) => {
+    const c = campaignFixture(); c.propostas = c.propostas.slice(0, 1)
+    const saved = { ...savedResponse(c), versaoProposta: 1, ultimaEtapa: 1, etapaMaisAvancada: stage }
+    const { flow, scope } = await setup({ saved })
+    expect(flow.activeStep.value).toBe(flow.steps[stage - 1].key)
+    expect(flow.reachedStep.value).toBe(stage)
+    expect(bindings.lifecycle.save).not.toHaveBeenCalled()
+    expect(flow.isDirty.value).toBe(false)
+    scope.stop()
+  })
+  it('reopens review after leaving from the first stage when the accepted simulation is still valid', async () => {
+    const c = campaignFixture(); c.propostas = c.propostas.slice(0, 1)
+    const scenario = { totalVendas: '1000', totalComissaoBase: '20', totalComissaoProposta: '35', deltaComissao: '15', deltaPercentual: '75', comissaoProjetada: '35', deltaProjetado: '15', qtdVendasComMudancaFaixa: 0 }
+    const saved = { ...savedResponse(c), ultimaEtapa: 1, etapaMaisAvancada: 4, simulacaoAceitaId: 'sim-id', statusAceite: 'ACEITA' }
+    const { flow, scope } = await setup({ saved, lifecycleApi: {
+      simulation: vi.fn(async () => ({ id: 'sim-id', protocolo: 'protocol', campanhaId: 42, competencia: '2026-10', totalVendasRecortadas: 1, fatorProjecao: '1', diasInclusivos: 31, cenario100: scenario, cenario80: scenario, cenario120: scenario, cenario150: scenario, vendas: [], avisosGerais: [] })),
+      readiness: vi.fn(async () => ({ aptaParaAtivacao: true, simulacaoId: 'sim-id' })),
+      sales: vi.fn(async () => ({ simulacaoId: 'sim-id', paginaAtual: 0, totalElementos: 1, totalPaginas: 1, vendas: [] }))
+    } })
+    expect(flow.activeStep.value).toBe('conferencia')
+    expect(flow.reachedStep.value).toBe(4)
+    expect(flow.lifecycle.canReview.value).toBe(true)
+    expect(bindings.lifecycle.save).not.toHaveBeenCalled()
+    expect(flow.isDirty.value).toBe(false)
+    scope.stop()
+  })
+  it('falls back to simulation when a saved review no longer has a valid accepted result', async () => {
+    const c = campaignFixture(); c.propostas = c.propostas.slice(0, 1)
+    const { flow, scope } = await setup({ saved: { ...savedResponse(c), versaoProposta: 1, ultimaEtapa: 1, etapaMaisAvancada: 4 } })
+    expect(flow.activeStep.value).toBe('simulacao')
+    expect(flow.lifecycle.canReview.value).toBe(false)
+    scope.stop()
+  })
+  it('records backward navigation separately from saving business fields and retains the reached history', async () => {
+    const c = campaignFixture(); c.propostas = c.propostas.slice(0, 1)
+    const { flow, scope } = await setup({ saved: { ...savedResponse(c), versaoProposta: 1, ultimaEtapa: 3, etapaMaisAvancada: 3 } })
+    expect(await flow.navigateTo('dados')).toBe(true)
+    await flow.lifecycle.recordProgress(1)
+    expect(bindings.lifecycle.progress).toHaveBeenLastCalledWith(42, { ultimaEtapa: 1, etapaMaisAvancada: 3, versaoProposta: 1 })
+    expect(bindings.lifecycle.save).not.toHaveBeenCalled()
+    scope.stop()
+  })
+  it('allows retrying the concurrency check after an old campaign is removed without ignoring the blocker', async () => {
+    const { flow, scope } = await setup()
+    const p = flow.campaign.propostas[0]
+    p.metadadosRecebidos.validacaoPendente = false
+    p.pendenciasRemotas = [{ id: 'competition', codigo: 'CONFLITO_REGRA', mensagem: 'Regra 12', severidade: 'IMPEDITIVO' }]
+    expect(flow.canAdvanceLocally.value).toBe(true)
+    bindings.client.validateCampaign.mockResolvedValue({ valida: true, erros: [], avisos: [], referenciasValidadas: [], analiseConcorrencia: { totalConcorrentes: 0, temEmpate: false, temIdentica: false, regrasConcorrentes: [] } })
+    expect(await flow.navigateTo('simulacao')).toBe(true)
+    expect(flow.activeStep.value).toBe('simulacao')
+    expect(bindings.client.validateCampaign).toHaveBeenCalledOnce()
+    scope.stop()
+  })
   it('asks before replacing the campaign and cancellation sends no request or changes', async () => {
     const { flow, scope } = await setup(); const original = JSON.stringify(flow.campaign)
     expect(await flow.interpretDescription()).toBe(false)

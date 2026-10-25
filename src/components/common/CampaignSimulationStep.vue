@@ -118,7 +118,7 @@
           </div>
 
           <p class="text-xs text-sage-muted">
-            Filtros combinados por E (marca, cargo, loja) e união sem duplicação de vendas.
+            Vendas que atendem à marca, ao cargo e à loja selecionados, contadas uma única vez.
           </p>
         </article>
 
@@ -163,7 +163,7 @@
             </h3>
             <ul class="mt-1.5 list-disc space-y-1 pl-5 text-xs leading-5 text-warning-dark">
               <li v-for="(reason, idx) in simulation.invalidationReasons" :key="idx">
-                {{ reason }}
+                {{ userFacingText(reason) }}
               </li>
             </ul>
             <p class="mt-2 text-xs font-semibold text-brand-dark">
@@ -182,7 +182,7 @@
       </div>
     </section>
 
-    <!-- 3. Impedimento: Base Contratual Ausente (tb_basecomiss) ([FRONT-4]) -->
+    <!-- 3. Impedimento: Base Contratual Ausente (tabela de comissões) ([FRONT-4]) -->
     <section
       v-if="isMissingBaseBlocked"
       class="rounded-[22px] border border-warning-border bg-white p-6 shadow-sm sm:p-7"
@@ -202,12 +202,12 @@
               <StatusBadge label="Bloqueio Financeiro" tone="warning" />
             </div>
             <p class="mt-2 text-sm leading-6 text-sage-muted">
-              {{ missingBaseMessage }}
+              {{ userFacingText(missingBaseMessage) }}
             </p>
 
             <div v-if="missingBasesList.length" class="mt-4 rounded-xl border border-sage-border-light bg-sage-light p-3.5">
               <p class="text-xs font-bold uppercase tracking-[0.1em] text-sage-muted">
-                Combinação sem cobertura contratual em tb_basecomiss:
+                Combinação sem cobertura contratual nas taxas contratuais cadastradas:
               </p>
               <ul class="mt-1.5 space-y-1 text-sm font-semibold text-brand-dark">
                 <li v-for="(base, idx) in missingBasesList" :key="idx">
@@ -292,7 +292,7 @@
           </div>
           <ul class="mt-3 list-disc space-y-1.5 pl-5 text-sm leading-6 text-danger-dark">
             <li v-for="(imp, idx) in otherImpediments" :key="idx">
-              {{ imp.message }}
+              {{ userFacingText(imp.message) }}
             </li>
           </ul>
         </div>
@@ -316,7 +316,7 @@
         <div>
           <div class="flex flex-wrap items-center gap-2.5">
             <h3 id="simulation-execution-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">
-              Validação do recorte e execução assíncrona
+              Conferência do público e simulação
             </h3>
             <StatusBadge
               v-if="simulation.isValidatingReference"
@@ -331,7 +331,7 @@
           </div>
           <p class="mt-1 text-sm text-sage-muted">
             <template v-if="referenceValidation?.canExecute">
-              Foram validadas <strong class="font-bold text-brand-dark">{{ referenceValidation.totalVendasRecortadas }}</strong> venda(s) do público com vínculos de RH e cobertura contratual completa em <code class="font-bold text-brand-dark">tb_basecomiss</code>.
+              <strong class="font-bold text-brand-dark">{{ referenceValidation.totalVendasRecortadas }}</strong> vendas conferidas, com vínculos de RH e taxas contratuais disponíveis.
             </template>
             <template v-else>
               Verificando vendas da competência, vínculos cadastrais e cobertura das bases de comissão…
@@ -369,7 +369,7 @@
         <p class="font-bold text-brand-dark">Sobreposição de regras resolvida automaticamente por especificidade:</p>
         <ul class="mt-1 list-disc space-y-1 pl-5">
           <li v-for="(warning, idx) in referenceValidation.overlapWarnings" :key="idx">
-            {{ warning }}
+            {{ userFacingText(warning) }}
           </li>
         </ul>
       </div>
@@ -386,12 +386,7 @@
             <span class="text-xs font-bold uppercase tracking-[0.1em] text-sage-muted">
               Acompanhamento da execução
             </span>
-            <code
-              v-if="simulation.executionId"
-              class="rounded-full bg-white px-2.5 py-0.5 text-xs font-bold text-brand-dark"
-            >
-              ID: {{ simulation.executionId }}
-            </code>
+
             <StatusBadge :label="executionStatusLabel" :tone="executionStatusTone" />
           </div>
           <span class="text-xs font-extrabold text-brand-dark">{{ simulation.progress || 0 }}%</span>
@@ -406,7 +401,7 @@
         </div>
 
         <p v-if="simulation.stageMessage" class="mt-2 text-xs text-sage-muted">
-          {{ simulation.stageMessage }}
+          {{ userFacingText(simulation.stageMessage) }}
         </p>
 
         <div
@@ -414,7 +409,7 @@
           class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger-bg px-3.5 py-2.5 text-xs text-danger-dark"
           role="alert"
         >
-          <span>{{ simulation.error }}</span>
+          <span>{{ userFacingText(simulation.error) }}</span>
           <button
             type="button"
             class="focus-ring rounded-full bg-danger px-3.5 py-1.5 text-xs font-bold text-white"
@@ -493,7 +488,7 @@
                 {{ currency(simulationTotals.projetado.comissaoBase) }}
               </p>
               <p class="mt-1 text-xs text-sage-border">
-                Taxa contratual em tb_basecomiss
+                Taxa contratual de referência
               </p>
             </div>
 
@@ -806,7 +801,7 @@
             </p>
           </div>
 
-          <div class="flex flex-wrap items-center gap-3">
+          <div v-if="showDecisionActions" class="flex flex-wrap items-center gap-3">
             <button
               type="button"
               class="focus-ring rounded-full border border-sage-border-dark bg-white px-4 py-2.5 text-xs font-bold text-brand-dark shadow-sm transition hover:bg-sage-light"
@@ -814,7 +809,8 @@
             >
               ← Voltar e ajustar regras
             </button>
-            <button
+            <p v-if="simulation.accepted && !hasInvalidation" class="inline-flex items-center gap-2 text-sm font-bold text-success-dark" role="status"><CheckCircle2 class="h-4 w-4" aria-hidden="true" />Simulação aceita</p>
+            <button v-else
               type="button"
               data-testid="accept-simulation-btn"
               class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-6 py-2.5 text-sm font-black text-brand-dark shadow-md transition hover:bg-brand-hover hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
@@ -823,7 +819,7 @@
             >
               <CheckCircle2 class="h-4 w-4" aria-hidden="true" />
               <span>
-                {{ simulation.accepted && !hasInvalidation ? 'Simulação aceita — Ir para revisão →' : 'Aceitar simulação e continuar →' }}
+                Aceitar simulação e continuar →
               </span>
             </button>
           </div>
@@ -834,130 +830,42 @@
     <!-- 8. Modal de Memória do Cálculo da Venda ([FRONT-5]) -->
     <div
       v-if="selectedRow"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-brand-dark/50 p-4"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="calculation-memory-title"
       @click.self="closeMemoryModal"
+      @keydown.esc.prevent.stop="closeMemoryModal" @keydown.tab="trapMemoryFocus"
     >
-      <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[22px] bg-white p-6 shadow-xl sm:p-7">
-        <div class="flex items-start justify-between gap-4 border-b border-sage-border-light pb-4">
+      <div ref="memoryPanel" class="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[22px] bg-white p-6 shadow-xl sm:p-7">
+        <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-sage-border-light bg-white pb-4">
           <div>
             <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">
               Memória do Cálculo Individual
             </p>
             <h3 id="calculation-memory-title" class="mt-1 text-xl font-extrabold text-brand-dark">
-              Venda {{ selectedRow.saleId }} · Matrícula {{ selectedRow.matricula }}
+              Matrícula {{ selectedRow.matricula }}
             </h3>
           </div>
           <button
             type="button"
             class="focus-ring rounded-full border border-sage-border-dark px-3 py-1 text-xs font-bold text-brand-dark"
-            @click="closeMemoryModal"
+            ref="memoryClose" @click="closeMemoryModal"
           >
             Fechar
           </button>
         </div>
 
-        <pre v-if="typeof selectedRow.memoriaCalculo === 'string'" class="mt-5 whitespace-pre-wrap break-words rounded-xl bg-sage-light p-4 text-sm text-brand-dark">{{ selectedRow.memoriaCalculo }}</pre>
-        <template v-else>
-        <dl class="mt-5 grid gap-3 sm:grid-cols-2 text-sm">
-          <div class="rounded-2xl bg-sage-light p-3.5">
-            <dt class="text-xs font-bold uppercase tracking-[0.08em] text-sage-muted">1. Identificador e Data da Venda</dt>
-            <dd class="mt-1 font-bold text-brand-dark">
-              ID {{ selectedRow.memoriaCalculo.identificadorVenda }} · Data: {{ selectedRow.memoriaCalculo.dataVenda }}
-            </dd>
-            <dd class="mt-0.5 text-xs text-sage-muted">
-              Loja {{ selectedRow.loja }} · Marca {{ selectedRow.marca }} · Cargo {{ selectedRow.cargo }}
-            </dd>
-          </div>
-
-          <div class="rounded-2xl bg-sage-light p-3.5">
-            <dt class="text-xs font-bold uppercase tracking-[0.08em] text-sage-muted">2. Origem dos Dados Utilizados</dt>
-            <dd class="mt-1 font-bold text-brand-dark">
-              {{ selectedRow.memoriaCalculo.origemDados }}
-            </dd>
-          </div>
-
-          <div class="rounded-2xl bg-sage-light p-3.5">
-            <dt class="text-xs font-bold uppercase tracking-[0.08em] text-sage-muted">3. Taxa Base e Documento de Origem</dt>
-            <dd class="mt-1 font-bold text-brand-dark">
-              Taxa base: {{ percent(selectedRow.memoriaCalculo.taxaBasePct) }}
-            </dd>
-            <dd class="mt-0.5 text-xs text-sage-muted">
-              Origem: {{ selectedRow.memoriaCalculo.documentoOrigemBase }} (Competência {{ selectedRow.memoriaCalculo.competenciaOrigemBase }})
-            </dd>
-          </div>
-
-          <div class="rounded-2xl bg-sage-light p-3.5">
-            <dt class="text-xs font-bold uppercase tracking-[0.08em] text-sage-muted">4. Regra da Campanha Aplicada</dt>
-            <dd class="mt-1 font-bold text-brand-dark">
-              {{ selectedRow.memoriaCalculo.regraAplicada }}
-            </dd>
-            <dd class="mt-0.5 text-xs text-sage-muted">
-              {{
-                selectedRow.memoriaCalculo.manteveRegraBase
-                  ? 'Condição de valor não atingida — manteve a comissão base contratual.'
-                  : 'Substituiu a taxa base pela taxa da regra vencedora da campanha.'
-              }}
-            </dd>
-          </div>
-
-          <div class="rounded-2xl bg-sage-light p-3.5">
-            <dt class="text-xs font-bold uppercase tracking-[0.08em] text-sage-muted">5. Condição / Faixa Satisfeita</dt>
-            <dd class="mt-1 font-bold text-brand-dark">
-              {{ selectedRow.memoriaCalculo.condicaoOuFaixaSatisfeita }}
-            </dd>
-            <dd class="mt-0.5 text-xs text-sage-muted">
-              Especificidade dos filtros: {{ selectedRow.memoriaCalculo.scoreEspecificidade }} filtro(s) preenchido(s)
-            </dd>
-          </div>
-
-          <div class="rounded-2xl bg-sage-light p-3.5">
-            <dt class="text-xs font-bold uppercase tracking-[0.08em] text-sage-muted">6. Taxa Final e Arredondamento</dt>
-            <dd class="mt-1 font-bold text-brand-dark">
-              Taxa final aplicada: {{ percent(selectedRow.memoriaCalculo.taxaFinalPct) }}
-            </dd>
-            <dd class="mt-0.5 text-xs text-sage-muted">
-              {{ selectedRow.memoriaCalculo.criterioArredondamento }}
-            </dd>
-          </div>
-        </dl>
-
-        <div class="mt-4 rounded-2xl border border-sage-border-light bg-sage-light p-4">
-          <p class="text-xs font-bold uppercase tracking-[0.08em] text-sage-muted">
-            7. Demonstração e Diferença Financeira
-          </p>
-          <p class="mt-1 text-xs text-sage-muted">
-            {{ selectedRow.memoriaCalculo.formulaCalculo }}
-          </p>
-          <div class="mt-3 grid gap-3 sm:grid-cols-4 text-sm">
-            <div class="rounded-xl bg-white p-3">
-              <span class="block text-xs text-sage-muted">Valor da venda</span>
-              <strong class="font-extrabold text-brand-dark">{{ currency(selectedRow.valorVenda) }}</strong>
-            </div>
-            <div class="rounded-xl bg-white p-3">
-              <span class="block text-xs text-sage-muted">Comissão base</span>
-              <strong class="font-extrabold text-brand-dark">{{ currency(selectedRow.comissaoBase) }}</strong>
-            </div>
-            <div class="rounded-xl bg-white p-3">
-              <span class="block text-xs text-sage-muted">Comissão proposta</span>
-              <strong class="font-extrabold text-brand-dark">{{ currency(selectedRow.comissaoProposta) }}</strong>
-            </div>
-            <div class="rounded-xl bg-white p-3">
-              <span class="block text-xs text-sage-muted">Diferença</span>
-              <strong class="font-extrabold text-brand-dark">{{ signedCurrency(selectedRow.diferenca) }}</strong>
-            </div>
-          </div>
-        </div>
-        </template>
+        <CampaignSimulationMemory :row="selectedRow" :simulation="simulationResult" class="mt-5" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { userFacingText } from '@/services/userFacingText'
+import { computed, ref, nextTick } from 'vue'
+import CampaignSimulationMemory from '@/components/campaigns/CampaignSimulationMemory.vue'
 import {
   AlertTriangle,
   Calendar,
@@ -983,6 +891,7 @@ import { checkProposalCoverage } from '@/services/coverageService'
 const showPremises = ref(false)
 
 const props = defineProps({
+  showDecisionActions: { type: Boolean, default: true },
   demo: { type: Object, default: () => ({}) },
   serverPagination: { type: Object, default: null },
   form: { type: Object, default: () => ({}) },
@@ -1166,12 +1075,24 @@ function handleRunSimulation() {
   emit('run-simulation')
 }
 
-function openMemoryModal(row) {
+const memoryPanel = ref(null), memoryClose = ref(null)
+let previousMemoryFocus = null
+async function openMemoryModal(row) {
+  previousMemoryFocus = document.activeElement
   selectedRow.value = row
+  await nextTick()
+  memoryClose.value?.focus()
 }
 
 function closeMemoryModal() {
   selectedRow.value = null
+  if (previousMemoryFocus?.isConnected) previousMemoryFocus.focus()
+}
+function trapMemoryFocus(event) {
+  const controls = [...(memoryPanel.value?.querySelectorAll('button, summary, [href], [tabindex="0"]') || [])]
+  if (!controls.length) return
+  if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls.at(-1).focus() }
+  else if (!event.shiftKey && document.activeElement === controls.at(-1)) { event.preventDefault(); controls[0].focus() }
 }
 
 function currency(value) {

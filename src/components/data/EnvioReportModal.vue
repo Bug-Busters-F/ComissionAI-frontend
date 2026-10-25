@@ -35,7 +35,7 @@
       <div class="bg-warning-bg/60 border-b border-warning-border/60 px-6 py-3 text-xs text-brand-dark flex items-center gap-2">
         <Info class="h-4 w-4 text-warning-dark shrink-0" />
         <span>
-          <strong>Orientação para correção:</strong> Para corrigir apontamentos e inconsistências, altere o arquivo XLSX/CSV original e realize um novo envio pelo upload. A edição direta de registros no sistema não é permitida para garantir a rastreabilidade e integridade relacional.
+          <strong>Orientação para correção:</strong> Para corrigir apontamentos e inconsistências, altere o arquivo XLSX/CSV original e realize um novo envio pelo upload. A edição direta de registros no sistema não é permitida para garantir a rastreabilidade e consistência dos vínculos.
         </span>
       </div>
 

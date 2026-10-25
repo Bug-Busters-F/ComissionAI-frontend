@@ -30,13 +30,13 @@
             <p class="mt-2 text-sm leading-6 text-warning-dark">
               {{
                 hasInvalidation
-                  ? 'A proposta, a competência, a vigência ou a base de dados mudou após o aceite da simulação. A ativação da campanha está bloqueada até que uma nova simulação seja executada e aceita.'
+                  ? 'A proposta, a competência, a vigência ou os dados de referência mudaram após o aceite da simulação. A ativação da campanha está bloqueada até que uma nova simulação seja executada e aceita.'
                   : 'Para ativar a campanha, é obrigatório executar uma simulação sobre uma competência cadastrada e registrar o aceite explícito dos resultados.'
               }}
             </p>
             <ul v-if="hasInvalidation" class="mt-2 list-disc space-y-1 pl-5 text-xs font-semibold text-warning-dark">
               <li v-for="(reason, idx) in simulation.invalidationReasons" :key="idx">
-                {{ reason }}
+                {{ userFacingText(reason) }}
               </li>
             </ul>
           </div>
@@ -187,6 +187,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { computed } from 'vue'
 import { AlertTriangle } from 'lucide-vue-next'
 import CampaignSummary from './CampaignSummary.vue'

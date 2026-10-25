@@ -7,7 +7,7 @@
           A campanha <strong class="text-brand-dark">{{ campaignTitle }}</strong> deixará de aparecer nas consultas. O histórico operacional será preservado.
         </p>
 
-        <p v-if="errorMessage" class="mt-4 rounded-xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm leading-6 text-danger-dark" role="alert">{{ errorMessage }}</p>
+        <p v-if="errorMessage" class="mt-4 rounded-xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm leading-6 text-danger-dark" role="alert">{{ userFacingText(errorMessage) }}</p>
 
         <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button ref="cancelButton" type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-sage-light" :disabled="isRemoving" @click="cancel">Cancelar</button>
@@ -21,6 +21,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { nextTick, ref, watch } from 'vue'
 
 const props = defineProps({

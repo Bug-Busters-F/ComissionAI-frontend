@@ -58,9 +58,9 @@
 
     <div v-if="pendencias.length" class="mt-5 space-y-2">
       <p class="text-sm font-bold text-brand-dark">Pendências deste bloco</p>
-      <p v-if="pendencias.some((item) => item.codigo === 'PERSISTIDA_NAO_REAVALIADA' && item.severidade === 'IMPEDITIVO')" class="text-xs leading-5 text-sage-muted">O backend guardou estas pendências somente em texto. Reinterprete este bloco para reavaliá-las após as correções.</p>
+      <p v-if="pendencias.some((item) => item.codigo === 'PERSISTIDA_NAO_REAVALIADA' && item.severidade === 'IMPEDITIVO')" class="text-xs leading-5 text-sage-muted">Estas pendências precisam de uma nova verificação. Reinterprete este bloco para reavaliá-las após as correções.</p>
       <p v-for="item in pendencias" :key="item.id" class="rounded-xl px-3 py-2 text-sm leading-5" :class="item.severidade === 'IMPEDITIVO' ? 'bg-danger-bg text-danger-dark' : 'bg-warning-bg text-warning-text'">
-        <strong>{{ item.severidade === 'IMPEDITIVO' ? 'Impeditiva:' : 'Aviso:' }}</strong> {{ item.mensagem }}
+        <strong>{{ item.severidade === 'IMPEDITIVO' ? 'Impeditiva:' : 'Aviso:' }}</strong> {{ userFacingText(item.mensagem) }}
       </p>
     </div>
     <p v-if="proposal.artefatosDesatualizados && hasReceivedArtifacts" class="mt-4 rounded-xl bg-warning-bg px-3 py-2 text-xs leading-5 text-warning-text">Dados de referência recebidos estão desatualizados após a edição. Eles não foram usados para substituir seus campos.</p>
@@ -68,6 +68,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { computed } from 'vue'
 import { describeFieldOrigin } from '@/services/campaignFieldOrigins'
 import { RULE_FIELD_LABELS as fieldLabels } from '@/services/ruleReinterpretation'

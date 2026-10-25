@@ -9,5 +9,5 @@ export function campaignFixture() {
 }
 export function savedResponse(campaign, id = 42) {
   const payload = campaignToDraftRequest(campaign)
-  return { ...payload, id, estado: 'DRAFT', dataInicio: payload.dataInicio || '2026-10-22', dataFim: payload.dataFim || '2026-11-21', regras: payload.regras.map((r, index) => ({ ...r, id: index + 101, pendencias: r.pendencias.join('; ') })) }
+  return { ...payload, id, estado: 'DRAFT', versaoProposta: 1, ultimaEtapa: 1, etapaMaisAvancada: 1, dataInicio: payload.dataInicio || '2026-10-22', dataFim: payload.dataFim || '2026-11-21', regras: payload.regras.map((r, index) => ({ ...r, id: index + 101, pendencias: r.pendencias.join('; ') })) }
 }

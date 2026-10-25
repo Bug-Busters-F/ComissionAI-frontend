@@ -1,3 +1,4 @@
+import { isHiddenRuleNotice } from './userFacingText'
 import { createPending } from './campaignProposalModel'
 import { normalizeExternalPending } from './campaignProposalMappers'
 
@@ -67,7 +68,7 @@ export function validateCampaignCommon(campaign) {
     add('VIGENCIA_INVERTIDA', 'dataFim', 'A data de fim não pode anteceder a data de início.')
   }
 
-  const remote = (campaign.pendenciasCampanha || []).map((item) => normalizeExternalPending(item))
+  const remote = (campaign.pendenciasCampanha || []).map((item) => normalizeExternalPending(item)).filter((item) => !isHiddenRuleNotice(item))
   return { pending: [...pending, ...remote], errors }
 }
 
@@ -229,7 +230,7 @@ export function validateCampaignProposalSet(campaign) {
   campaign.propostas.forEach((proposal) => {
     const local = validateProposal(proposal)
     localById[proposal.clientId] = local
-    const remote = (proposal.pendenciasRemotas || []).map((item) => normalizeExternalPending(item, proposal.clientId))
+    const remote = (proposal.pendenciasRemotas || []).map((item) => normalizeExternalPending(item, proposal.clientId)).filter((item) => !isHiddenRuleNotice(item))
     byProposal[proposal.clientId] = [...local, ...remote]
     pending.push(...local, ...remote)
   })
