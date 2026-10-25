@@ -6,7 +6,7 @@ import {
 import { ASYNC_EXECUTION_STATES } from '@/services/asyncExecutionService'
 import { saveCalculationCache } from '@/services/calculationCache'
 import { CALCULATION_OPERATION } from '@/services/calculationFlow'
-import { normalizeCompetence } from '@/services/competenceUtils'
+import { getCompetenceDateRange, normalizeCompetence } from '@/services/competenceUtils'
 import { useNotificationStore } from './notificationStore'
 
 const CALCULATION_STATUS = Object.freeze({
@@ -37,7 +37,8 @@ export const useCalculationStore = defineStore('calculation', {
     mensagemErro: '',
     iniciadoEm: null,
     concluidoEm: null,
-    requestController: null
+    requestController: null,
+    monitoringPromise: null
   }),
 
   getters: {
@@ -188,6 +189,12 @@ export const useCalculationStore = defineStore('calculation', {
 
       if (record.status === ASYNC_EXECUTION_STATES.AGUARDANDO || record.status === ASYNC_EXECUTION_STATES.PROCESSANDO) {
         this.status = CALCULATION_STATUS.PROCESSING
+        // Inicia monitoramento em background para acompanhar até a conclusão do servidor
+        if (!this.monitoringPromise) {
+          this.monitoringPromise = this.monitorServerProcessing(normalized).finally(() => {
+            this.monitoringPromise = null
+          })
+        }
       } else if (record.status === ASYNC_EXECUTION_STATES.CONCLUIDA) {
         this.resultado = record.result || null
         if (record.result?.totalImpedimentos && record.result?.totalCalculados) {
@@ -203,6 +210,71 @@ export const useCalculationStore = defineStore('calculation', {
       }
 
       return record
+    },
+
+    /**
+     * Monitora periodicamente o término do processamento no servidor após F5
+     * consultando os logs gerados para a competência sem reenviar o POST de cálculo.
+     */
+    async monitorServerProcessing(competencia) {
+      const normalized = normalizeCompetence(competencia)
+      if (!normalized) return
+
+      let attempts = 0
+      const maxAttempts = 60
+      const range = getCompetenceDateRange(normalized)
+
+      while (attempts < maxAttempts && this.isProcessing && this.competencia === normalized) {
+        attempts += 1
+        await new Promise((r) => setTimeout(r, 2000))
+
+        if (!this.isProcessing || this.competencia !== normalized) break
+
+        try {
+          if (this.progress < 85) {
+            this.progress = Math.min(85, this.progress + 5)
+            this.stage = 'Acompanhando apuração em andamento no servidor...'
+          }
+          this.transientWarning = ''
+
+          if (typeof calculationService.listLogs === 'function') {
+            const logs = await calculationService.listLogs({ ...range, page: 0, size: 1 })
+            if (logs && Number(logs.totalElements || 0) > 0) {
+              // Concluiu no servidor! Busca a consolidação dos resultados já existentes
+              this.stage = 'Consolidando resultados concluídos...'
+              let resultadoConsolidado = null
+              if (typeof calculationService.calculateByCompetence === 'function') {
+                resultadoConsolidado = await calculationService.calculateByCompetence(normalized, { recalcular: false })
+              }
+
+              this.resultado = resultadoConsolidado
+              this.asyncStatus = ASYNC_EXECUTION_STATES.CONCLUIDA
+              this.status = CALCULATION_STATUS.COMPLETED
+              this.progress = 100
+              this.stage = 'Apuração concluída com sucesso.'
+              this.concluidoEm = now()
+
+              if (resultadoConsolidado) {
+                saveCalculationCache({
+                  competencia: normalized,
+                  tipoOperacao: this.tipoOperacao,
+                  resultado: resultadoConsolidado,
+                  recebidoEm: this.concluidoEm
+                })
+              }
+
+              const notifications = useNotificationStore()
+              notifications.success(
+                'Cálculo concluído',
+                `A apuração de ${normalized} foi concluída com sucesso no servidor.`
+              )
+              return
+            }
+          }
+        } catch (err) {
+          this.transientWarning = 'Oscilação temporária na consulta de status. A apuração segue no servidor.'
+        }
+      }
     },
 
     dismissExecution(competencia) {

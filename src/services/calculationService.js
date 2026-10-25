@@ -60,6 +60,20 @@ export const calculationService = {
       shouldRecalculate ? 'Recalculando comissões no servidor...' : 'Calculando comissões no servidor...'
     )
 
+    let currentProgress = 45
+    const progressTimer = setInterval(() => {
+      if (currentProgress < 85) {
+        currentProgress += 5
+        let msg = 'Processando comissões no servidor...'
+        if (currentProgress >= 60 && currentProgress < 75) {
+          msg = 'Cruzando vínculos de colaboradores e aplicando regras vigentes...'
+        } else if (currentProgress >= 75) {
+          msg = 'Consolidando memória de cálculo e preparando histórico imutável...'
+        }
+        updateProgress(ASYNC_EXECUTION_STATES.PROCESSANDO, currentProgress, msg)
+      }
+    }, 2500)
+
     try {
       const response = await api.post(
         '/comissoes/calcular-competencia',
@@ -101,7 +115,7 @@ export const calculationService = {
       // Backend síncrono padrão com fechamento atômico
       updateProgress(
         ASYNC_EXECUTION_STATES.PROCESSANDO,
-        85,
+        90,
         'Consolidando totais e gerando histórico imutável...'
       )
 
@@ -120,6 +134,8 @@ export const calculationService = {
         errorKind: normalizedError.kind
       })
       throw normalizedError
+    } finally {
+      clearInterval(progressTimer)
     }
   },
 
