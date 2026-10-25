@@ -76,14 +76,72 @@
       Algumas vendas não foram recalculadas; seus resultados anteriores foram preservados.
     </p>
 
-    <section v-if="isCalculating" class="rounded-[22px] border border-warning-border bg-warning-bg p-6" role="status" aria-live="polite">
-      <div class="flex items-center gap-3">
-        <RefreshCw class="h-5 w-5 animate-spin text-warning-dark" aria-hidden="true" />
-        <div>
-          <h2 class="font-extrabold text-brand-dark">{{ recalculationRequested ? 'Recalculando as comissões' : 'Calculando as comissões' }} de {{ formatCompetenceLabel(competenceKey) }}…</h2>
-          <p class="mt-1 text-sm text-sage-muted">O processamento está sendo executado no sistema.</p>
+    <!-- Acompanhamento Assíncrono da Apuração (FRONT-11) -->
+    <section
+      v-if="isCalculating || activeExecutionForThisCompetence"
+      class="rounded-[22px] border border-warning-border bg-warning-bg p-6 space-y-4"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <RefreshCw
+            v-if="isCalculating"
+            class="h-5 w-5 animate-spin text-warning-dark shrink-0"
+            aria-hidden="true"
+          />
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="font-extrabold text-brand-dark">
+                {{ recalculationRequested ? 'Recalculando apuração' : 'Acompanhando apuração' }} de {{ formatCompetenceLabel(competenceKey) }}
+              </h2>
+              <span
+                v-if="calculationStore.executionId"
+                class="rounded-md border border-warning-border bg-white/70 px-2 py-0.5 font-mono text-[11px] font-bold text-brand-dark"
+                title="Identificador da execução"
+              >
+                {{ calculationStore.executionId }}
+              </span>
+            </div>
+            <p class="mt-1 text-sm text-sage-muted">
+              {{ calculationStore.stage || 'Processamento em andamento...' }}
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+          <StatusBadge
+            :label="currentAsyncStatusLabel"
+            :tone="currentAsyncStatusTone"
+          />
+          <span class="text-sm font-extrabold text-brand-dark tabular-nums">
+            {{ calculationStore.progress == null ? '—' : calculationStore.progress + '%' }}
+          </span>
         </div>
       </div>
+
+      <!-- Barra de Progresso Percentual -->
+      <div class="h-2.5 w-full overflow-hidden rounded-full bg-white/80 border border-warning-border/50">
+        <div
+          class="h-full bg-brand transition-all duration-300"
+          :style="{ width: `${calculationStore.progress ?? 0}%` }"
+        ></div>
+      </div>
+
+      <!-- Alerta Transitório de Conexão -->
+      <div
+        v-if="calculationStore.transientWarning"
+        class="rounded-xl border border-warning-border/80 bg-white/80 p-3 text-xs font-medium text-warning-dark"
+        role="alert"
+      >
+        {{ calculationStore.transientWarning }}
+      </div>
+
+      <button v-if="calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.ACOMPANHAMENTO_PAUSADO" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark disabled:opacity-50" :disabled="Boolean(calculationStore.monitoringPromise)" @click="calculationStore.resumeExecution()">Retomar acompanhamento</button>
+      <!-- Orientação de Fechamento Seguro da Tela -->
+      <p class="text-xs text-sage-muted">
+        O cálculo continua mesmo fora desta tela. Ao navegar pelo sistema ou atualizar a página nesta aba, o acompanhamento será retomado sem iniciar outra execução.
+      </p>
     </section>
 
     <section v-else-if="anotherCalculationProcessing" class="rounded-[22px] border border-warning-border bg-warning-bg p-6" role="status" aria-live="polite">
@@ -118,7 +176,8 @@
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 id="calculation-summary-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Resultado da competência</h2>
-            <p class="mt-1 text-sm text-sage-muted">Os totais consideram o retorno integral do cálculo.</p>
+            <p class="mt-1 text-sm text-sage-muted">{{ result.resumoExecucao ? 'Contagens confirmadas desta execução. Os totais financeiros e os detalhes por venda não estão disponíveis neste resumo.' : 'Os totais consideram o retorno integral do cálculo.' }}</p>
+            <button v-if="result.resumoExecucao" type="button" class="focus-ring mt-3 rounded text-sm font-bold underline" @click="consultHistory">Consultar histórico de cálculos</button>
           </div>
           <StatusBadge :label="result.totalImpedimentos ? 'Concluído com impedimentos' : 'Concluído'" :tone="result.totalImpedimentos ? 'warning' : 'success'" />
         </div>
@@ -130,7 +189,7 @@
           </div>
         </dl>
 
-        <p v-if="result.totalImpedimentos" class="mt-5 rounded-xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-dark">
+        <p v-if="result.totalImpedimentos && !result.resumoExecucao" class="mt-5 rounded-xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-dark">
           O total de comissões considera somente as vendas calculadas com sucesso.
         </p>
       </section>
@@ -252,7 +311,7 @@
         </div>
       </details>
 
-      <section v-if="!result.resultados.length && !result.impedimentos.length" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
+      <section v-if="!result.resumoExecucao && !result.resultados.length && !result.impedimentos.length" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
         <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
         <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência.</p>
       </section>
@@ -331,6 +390,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { RefreshCw } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import { ASYNC_EXECUTION_STATES, formatExecutionStateLabel, executionStateTone } from '@/services/asyncExecutionService'
 import { dataService } from '@/services/dataService'
 import { calculationService } from '@/services/calculationService'
 import { readCalculationCache } from '@/services/calculationCache'
@@ -418,6 +478,21 @@ const canCalculate = computed(() => isCalculationReady({
   historicoComErro: Boolean(historyError.value),
   calculando: calculationStore.isProcessing
 }))
+const activeExecutionForThisCompetence = computed(() =>
+  calculationStore.competencia === competenceKey.value &&
+  (calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.AGUARDANDO ||
+   calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.PROCESSANDO ||
+   calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.ACOMPANHAMENTO_PAUSADO)
+)
+
+const currentAsyncStatusLabel = computed(() =>
+  formatExecutionStateLabel(calculationStore.asyncStatus || (isCalculating.value ? ASYNC_EXECUTION_STATES.PROCESSANDO : ASYNC_EXECUTION_STATES.IDLE))
+)
+
+const currentAsyncStatusTone = computed(() =>
+  executionStateTone(calculationStore.asyncStatus || (isCalculating.value ? ASYNC_EXECUTION_STATES.PROCESSANDO : ASYNC_EXECUTION_STATES.IDLE))
+)
+
 const hasPreviousCalculation = computed(() => hasPreviousCalculationState())
 
 watch(competenceKey, () => {
@@ -429,6 +504,7 @@ watch([matriculaFilter, originFilter], () => {
 })
 
 async function loadCompetence() {
+  calculationStore.recoverExecution(competenceKey.value)
   const generation = competenceGeneration.value + 1
   competenceGeneration.value = generation
   salesQueryRequestId.value += 1
@@ -610,6 +686,7 @@ function consultHistory() {
 }
 
 function currency(value) {
+  if (value == null || value === '') return '—'
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0))
 }
 

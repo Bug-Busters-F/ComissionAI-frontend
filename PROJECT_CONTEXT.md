@@ -46,6 +46,14 @@
     - **Tabela Paginada, Memória do Cálculo e Totais (FRONT-5)**: Tabela paginada do público (`Matrícula | Loja | Valor da venda | Comissão base | Comissão com campanha proposta | Detalhes`), modal de memória individual do cálculo (identificador/data, origem dos dados, taxa e documento base, regra aplicada ou manutenção da base, faixa satisfeita, arredondamento `HALF_UP` e diferença) e totais de todo o recorte (histórico 100% vs projetado pela duração no mês comercial de **30 dias**, fator `dias / 30` sem arredondamento antecipado).
     - **Cenários de Variação Uniforme 80%, 120% e 150% (FRONT-5)**: Recálculo venda a venda do valor, faixa atingida e comissão base vs proposta, contabilizando quantas vendas mudaram de faixa de valor em cada cenário.
     - **Aceite, Invalidação Reativa e Confirmação Explícita para Ativação (FRONT-6)**: Separação entre aceitar a simulação (`Aceitar simulação e continuar`) e ativar a campanha (`Aprovar e ativar campanha`). Qualquer alteração posterior em regras, taxas, competência, vigência ou base contratual (`tb_basecomiss`) retira o aceite automaticamente (`evaluateSimulationValidity`) e exige nova simulação. Na Revisão, exige confirmação humana explícita via checkbox antes de ativar.
+  - **Acompanhamento Assíncrono da Apuração e Resiliência pós-Reload (FRONT-11)**:
+    - **Contrato real do BACK-10 / PR #26**: envio por `POST /execucoes/calculo`, consulta por `GET /execucoes/calculo/{uuid}` e nova tentativa explícita por `POST /execucoes/calculo/{uuid}/retomar`.
+    - **Identidade e progresso confirmados**: UUID, estado e percentual recebidos do backend, sem IDs de execução inventados nem progresso por temporizador.
+    - **Recuperação idempotente**: chave armazenada antes do envio e reutilizada se a resposta inicial for perdida; depois de receber o UUID, recuperação consulta somente essa execução. Escopo `calculation-v2` no sessionStorage.
+    - **Consulta pausada**: perda de comunicação preserva o acompanhamento e oferece retomada, sem declarar falha ou sucesso do cálculo. Resultados só entram no cache após CONCLUIDA com resumo válido.
+    - **Competências isoladas**: navegar para outra competência não altera a identidade da execução em curso; respostas antigas não substituem o acompanhamento atual.
+    - **Limite do resultado disponível**: o backend atual devolve contagens no campo `resultado`, não totais financeiros ou listas completas. O resumo mostra apenas dados confirmados e mantém o histórico acessível, sem fabricar R$ 0,00.
+    - **Recuperação global**: Topbar e tela de apuração compartilham um monitor; navegação e F5 na mesma aba preservam a consulta. SessionStorage não garante recuperação depois de encerrar a sessão/aba.
 - Sprint 3:
   - Detecção estatística de anomalias/outliers em vendas (3 desvios padrão acima da média).
   - Explainable AI (XAI): sugestões automáticas de redução de percentuais para adequação orçamentária em caso de estouro de teto.
