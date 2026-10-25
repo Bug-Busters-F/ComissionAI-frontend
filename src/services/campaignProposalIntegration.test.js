@@ -113,6 +113,15 @@ describe('real HTTP client', () => {
     expect(http.post.mock.calls[1][1]).toMatchObject({ texto: 'Apenas este bloco', contexto: { vigenciaCampanha: { inicio: '2026-10-01', fim: '2026-10-31' } } })
     expect(JSON.stringify(http.post.mock.calls)).not.toContain('Nunca reenviar')
   })
+  it('identifies the campaign during both interpretations to ignore its own active rules', async () => {
+    const http = { post: vi.fn(async () => ({ data: response() })) }
+    const client = createCampaignProposalApiClient(http)
+    await client.interpretCampaign({ descricao: 'Texto completo', campanhaId: 7 })
+    await client.reinterpretRule({ texto: 'Bloco individual', campanha: { id: 7, dataInicio: '2026-10-01', dataFim: '2026-10-31' } })
+    for (const call of http.post.mock.calls) expect(call[1].contexto).toMatchObject({ campanhaId: '7', origem: 'VERSAO_EXISTENTE' })
+    expect(http.post.mock.calls[0][1].contexto.vigenciaCampanha).toBeUndefined()
+    expect(http.post.mock.calls[1][1].texto).toBe('Bloco individual')
+  })
   it('preserves manual rate intention and never sends save or activation requests', async () => {
     const { campaign } = setup(); const proposal = campaign.propostas[0]
     proposal.camposManuais.push('taxaPercentual'); proposal.campos.taxaPercentual = '4,25'

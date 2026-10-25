@@ -82,7 +82,7 @@ export function createCampaignProposalIntegration({ campaign, provider, onChange
     const before = snapshot(campaign)
     const baseFingerprint = fingerprint(campaign)
     try {
-      const raw = await provider.interpretCampaign({ titulo: campaign.titulo, descricao: campaign.textoOriginal }, { signal: request.controller.signal })
+      const raw = await provider.interpretCampaign({ titulo: campaign.titulo, descricao: campaign.textoOriginal, campanhaId: campaign.id }, { signal: request.controller.signal })
       if (request.number !== sequence) return false
       if (baseFingerprint !== fingerprint(campaign)) throw new Error('Os dados mudaram durante a interpretação. Tente novamente; as regras foram preservadas.')
       const { campaign: received } = normalizeBackendCampaignResponse(raw)

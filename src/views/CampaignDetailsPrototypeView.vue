@@ -5,23 +5,26 @@
       <div v-if="isLoading" class="mt-7 rounded-[22px] bg-white px-6 py-12 text-sm text-sage-muted" role="status">Carregando detalhes…</div>
       <section v-else-if="loadError" class="mt-7 rounded-[22px] border border-danger/30 bg-danger-bg p-6" role="alert"><h1 class="text-xl font-extrabold text-danger-dark">Não foi possível abrir a campanha</h1><p class="mt-2 text-sm leading-6 text-danger-dark/80">{{ loadError }}</p><div class="mt-5 flex flex-wrap gap-3"><button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-white" @click="loadCampaign">Tentar novamente</button><RouterLink to="/campanhas" class="focus-ring rounded-full border border-danger/30 px-5 py-3 text-sm font-bold text-danger-dark">Voltar para campanhas</RouterLink></div></section>
       <template v-else-if="campaign">
-        <div class="mt-7 flex flex-wrap items-end justify-between gap-5"><div><h1 class="text-4xl font-extrabold tracking-[-0.05em] sm:text-[42px]">{{ campaign.titulo }}</h1><p class="mt-2 text-sm text-sage-muted">{{ formatPeriodArrow(campaign.dataInicio, campaign.dataFim) }}</p></div><div class="flex flex-wrap items-center gap-3"><StatusBadge :label="formatCampaignState(campaign.estado)" :tone="campaignStateTone(campaign.estado)" /><RouterLink v-if="campaign.estado === 'DRAFT'" :to="`/campanhas/${campaign.id}/editar`" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover">Continuar rascunho</RouterLink><button type="button" class="focus-ring rounded-full border border-danger/30 px-5 py-3 text-sm font-bold text-danger-dark" @click="isDeleteOpen = true">Remover</button></div></div>
+        <div class="mt-7 flex flex-wrap items-end justify-between gap-5"><div><h1 class="text-4xl font-extrabold tracking-[-0.05em] sm:text-[42px]">{{ campaign.titulo }}</h1><p class="mt-2 text-sm text-sage-muted">{{ formatPeriodArrow(campaign.dataInicio, campaign.dataFim) }}</p><div v-if="!isDemo" class="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold"><span v-if="campaign.versaoVigente != null" class="rounded-full bg-success-bg px-3 py-1 text-success-dark">Versão atual: {{ campaign.versaoVigente }}</span><span v-else class="rounded-full bg-sage-pill px-3 py-1 text-sage-muted">Ainda não publicada</span><span v-if="campaign.versaoProposta != null && campaign.versaoVigente != null" class="rounded-full bg-warning-bg px-3 py-1 text-warning-text">Proposta de alteração: {{ campaign.versaoProposta }}</span></div></div><div class="flex flex-wrap items-center gap-3"><StatusBadge :label="formatCampaignState(campaign.estado)" :tone="campaignStateTone(campaign.estado)" /><RouterLink v-if="['DRAFT', 'ATIVA', 'INATIVA'].includes(campaign.estado) && !campaign.motivoBloqueioEdicao" :to="`/campanhas/${campaign.id}/editar`" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover">{{ campaign.estado === 'DRAFT' ? 'Continuar rascunho' : 'Editar campanha' }}</RouterLink><button type="button" class="focus-ring rounded-full border border-danger/30 px-5 py-3 text-sm font-bold text-danger-dark" @click="isDeleteOpen = true">Remover</button></div></div>
       </template>
     </header>
 
     <template v-if="campaign && !loadError">
+      <p v-if="campaign.motivoBloqueioEdicao" class="rounded-xl bg-warning-bg p-4 text-sm text-warning-text">{{ campaign.motivoBloqueioEdicao }}</p>
+      <p v-if="campaign.versaoProposta && campaign.versaoVigente" class="rounded-xl bg-sage-light p-4 text-sm">Existe uma proposta de alteração separada (versão {{ campaign.versaoProposta }}). Os dados abaixo pertencem à versão vigente {{ campaign.versaoVigente }}.</p>
+      <CampaignVersionHistory v-if="!isDemo" :campaign-id="campaign.id" :current-version="campaign.versaoVigente" />
       <div v-if="isDemo" class="rounded-[22px] border border-success/20 bg-success-bg p-5"><p class="font-bold text-success-dark">Campanha pronta para consulta</p><p class="mt-1 text-sm leading-6 text-success-dark/80">Confira os dados da regra vinculada.</p></div>
       <div v-else class="rounded-[22px] border border-success/20 bg-success-bg p-5"><p class="font-bold text-success-dark">Campanha salva como {{ formatCampaignState(campaign.estado).toLocaleLowerCase() }}</p><p class="mt-1 text-sm leading-6 text-success-dark/80">Texto original, vigência e todas as regras abaixo são os dados salvos.</p></div>
 
       <CampaignSummary v-if="isDemo" :title="'Revisão consolidada'" :subtitle="isDemo ? 'Regra vinculada à campanha.' : 'Dados salvos da regra vinculada à campanha.'" :badge="formatCampaignState(campaign.estado)" :summary-items="summaryItems" :original-text="campaign.textoOriginal" />
 
-      <CampaignProposalReviewSummary v-if="!isDemo && proposalCampaign" :campaign="proposalCampaign" :validation="proposalValidation" :show-python="true" />
+      <CampaignProposalReviewSummary v-if="!isDemo && proposalCampaign" :campaign="proposalCampaign" :validation="proposalValidation" :show-python="true" hide-impact />
       <section class="rounded-[22px] bg-white p-6 sm:p-7 text-sm">
         <h2 class="text-xl font-extrabold">Registro da campanha</h2>
         <p class="mt-3">Criada em: {{ dateTime(campaign.criadoEm) }}</p>
         <p class="mt-2">Atualizada em: {{ dateTime(campaign.atualizadoEm) }}</p>
         <p v-if="campaign.simulacaoAceitaId" class="mt-3 break-words">Simulação vinculada: {{ campaign.simulacaoAceitaId }} · {{ campaign.statusAceite || 'Estado do aceite não informado' }}</p>
-        <p v-if="campaign.estado !== 'DRAFT'" class="mt-3 text-sage-muted">Campanha disponível somente para consulta. A edição de versões será integrada em uma próxima entrega.</p>
+        <p v-if="campaign.estado !== 'DRAFT'" class="mt-3 text-sage-muted">O histórico preserva as versões publicadas. Alterações são preparadas em uma proposta separada.</p>
       </section>
 
     </template>
@@ -31,6 +34,8 @@
 </template>
 
 <script setup>
+import { createCampaignLifecycleApi } from '@/services/campaignLifecycleApi'
+import CampaignVersionHistory from '@/components/campaigns/CampaignVersionHistory.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CampaignDeleteDialog from '@/components/common/CampaignDeleteDialog.vue'
@@ -78,7 +83,16 @@ onMounted(loadCampaign)
 
 async function loadCampaign() {
   try {
-    campaign.value = isDemo ? campaignDemo.get(route.params.id) : await campaignService.get(route.params.id)
+    isLoading.value = true; loadError.value = ''
+    let current = isDemo ? campaignDemo.get(route.params.id) : await campaignService.get(route.params.id)
+    if (!isDemo && current?.versaoVigente) {
+      const published = await createCampaignLifecycleApi().version(current.id, current.versaoVigente)
+      current = { ...current, titulo: published.titulo, textoOriginal: published.textoOriginal,
+        dataInicio: published.dataInicio, dataFim: published.dataFim,
+        simulacaoAceitaId: published.simulacaoAceitaId, statusAceite: published.simulacaoAceitaId ? 'ACEITA' : null,
+        regras: published.regras.map((r) => ({ ...r, dataInicio: published.dataInicio, dataFim: published.dataFim })) }
+    }
+    campaign.value = current
     if (!campaign.value) loadError.value = 'A campanha não foi encontrada ou já foi removida.'
   } catch (error) {
     loadError.value = normalizeCampaignError(error).message

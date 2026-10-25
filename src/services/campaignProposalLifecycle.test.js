@@ -95,7 +95,7 @@ describe('draft, persisted simulation, formal acceptance and activation lifecycl
     expect(s.api.simulate).toHaveBeenCalledWith(42, '2026-09')
     expect(s.api.accept).toHaveBeenCalledWith('sim-id', { campanhaId: 42, aceitoPor: 'Pessoa teste', motivo: null })
     expect(s.flow.simulation.result.protocolo).toBe('protocol'); expect(s.flow.canReview.value).toBe(true)
-    expect(await s.flow.activate()).toBe(true); expect(s.api.activate).toHaveBeenCalledWith(42)
+    expect(await s.flow.activate()).toBe(true); expect(s.api.activate).toHaveBeenCalledWith(42, null, null)
     expect(s.api.save).toHaveBeenCalledOnce(); expect(s.flow.state.estado).toBe('ATIVA'); s.scope.stop()
   })
   it('blocks acceptance and activation when an API operation fails, without fallback results', async () => {
@@ -178,4 +178,92 @@ it('adapta impedimentos de cobertura para o bloqueio da tela da dev, preservando
   expect(s.flow.simulation.referenceValidation.missingBases[0]).toMatchObject({ marca: 'PRETO', cargo: 'VENDEDOR' })
   expect(s.api.simulate).not.toHaveBeenCalled()
   s.scope.stop()
+})
+
+describe('published campaign edit sessions', () => {
+  const copyJson = (value) => JSON.parse(JSON.stringify(value))
+  function publishedSetup() {
+    const s = setup()
+    const base = { ...savedResponse(s.campaign), estado: 'ATIVA', versaoVigente: 1, versaoProposta: null, revisaoControle: 4 }
+    let remote = copyJson(base)
+    s.api.load.mockImplementation(async () => copyJson(remote))
+    s.api.version = vi.fn(async () => ({ ...base, campanhaId: 42, numero: 1 }))
+    s.api.startProposal = vi.fn(async () => {
+      remote = { ...remote, versaoProposta: 2, versaoOrigem: 1, revisaoControle: 5, ultimaEtapa: 1, etapaMaisAvancada: 1, simulacaoAceitaId: null }
+      return copyJson(remote)
+    })
+    s.api.save.mockImplementation(async (_id, payload) => {
+      remote = { ...copyJson(payload), id: 42, estado: 'ATIVA', versaoVigente: 1, versaoProposta: 2, versaoOrigem: 1, revisaoControle: 6,
+        regras: payload.regras.map((r, i) => ({ ...r, id: 100 + i })) }
+      return copyJson(remote)
+    })
+    s.api.cancelProposal = vi.fn(async () => {})
+    return { ...s, remote: () => remote, setRemote: (value) => { remote = value } }
+  }
+  it('opens a separate proposal based on the published version without restoring its previous simulation', async () => {
+    const s = publishedSetup()
+    expect(await s.flow.load(42)).toBe(true)
+    expect(s.api.startProposal).toHaveBeenCalledWith(42, 4)
+    expect(s.flow.state.versaoOrigem).toBe(1)
+    expect(s.flow.state.etapaMaisAvancada).toBe(2)
+    expect(s.flow.readOnly.value).toBe(false)
+    expect(s.flow.state.published.numero).toBe(1)
+    expect(s.flow.simulation.accepted).toBe(false)
+    expect(s.flow.canActivate.value).toBe(false)
+    s.campaign.titulo = 'Proposta revisada'
+    expect(await s.flow.save()).toBe(true)
+    expect(s.api.save).toHaveBeenCalledWith(42, expect.objectContaining({ titulo: 'Proposta revisada' }), 5)
+    expect(s.flow.state.estado).toBe('ATIVA')
+    expect(s.flow.state.published.titulo).toBe('Campanha')
+    s.scope.stop()
+  })
+  it('requires a new simulation and publishes the exact proposed version with current revision', async () => {
+    const s = publishedSetup()
+    await s.flow.load(42)
+    expect(s.flow.canActivate.value).toBe(false)
+    await s.flow.selectCompetence('2026-09')
+    expect(await s.flow.runSimulation()).toBe(true)
+    s.flow.simulation.aceitoPor = 'Gestor'
+    expect(await s.flow.accept()).toBe(true)
+    s.api.activate.mockImplementationOnce(async () => ({ ...s.remote(), versaoVigente: 2, versaoProposta: null }))
+    expect(await s.flow.activate()).toBe(true)
+    expect(s.api.accept).toHaveBeenCalledWith('sim-id', expect.objectContaining({ versaoEsperada: 1 }))
+    expect(s.api.activate).toHaveBeenCalledWith(42, 1, 5)
+    expect(s.api.save).not.toHaveBeenCalled()
+    s.scope.stop()
+  })
+  it('reuses an existing proposal and discards it explicitly with its revision', async () => {
+    const s = publishedSetup()
+    s.setRemote({ ...s.remote(), versaoProposta: 2, versaoOrigem: 1 })
+    await s.flow.load(42)
+    expect(s.api.startProposal).not.toHaveBeenCalled()
+    expect(await s.flow.cancelProposal()).toBe(true)
+    expect(s.api.cancelProposal).toHaveBeenCalledWith(42, 4)
+    expect(s.flow.state.published.numero).toBe(1)
+    expect(s.api.activate).not.toHaveBeenCalled()
+    s.scope.stop()
+  })
+  it('keeps local edits on a concurrent save and never cancels a newer proposal', async () => {
+    const s = publishedSetup()
+    await s.flow.load(42)
+    s.campaign.propostas[0].campos.taxaPercentual = '6'
+    s.setRemote({ ...s.remote(), revisaoControle: 9, titulo: 'Outra edição' })
+    expect(await s.flow.save()).toBe(false)
+    expect(s.flow.state.remoteChanged).toBe(true)
+    expect(s.campaign.propostas[0].campos.taxaPercentual).toBe('6')
+    expect(s.api.save).not.toHaveBeenCalled()
+    expect(await s.flow.cancelProposal()).toBe(false)
+    expect(s.api.cancelProposal).not.toHaveBeenCalled()
+    s.scope.stop()
+  })
+  it('opens closed campaigns for consultation and does not create an edit proposal', async () => {
+    const s = publishedSetup()
+    s.setRemote({ ...s.remote(), motivoBloqueioEdicao: 'Competência fechada.' })
+    expect(await s.flow.load(42)).toBe(true)
+    expect(s.flow.readOnly.value).toBe(true)
+    expect(s.api.startProposal).not.toHaveBeenCalled()
+    expect(await s.flow.save()).toBe(false)
+    expect(await s.flow.runSimulation()).toBe(false)
+    s.scope.stop()
+  })
 })

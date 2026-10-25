@@ -27,10 +27,10 @@ export function createCampaignProposalApiClient(http = api) {
     saveDraft: ({ id, payload }) => lifecycle.save(id, payload),
     simulateCampaign: ({ campanhaId, competencia }) => lifecycle.simulate(campanhaId, competencia),
     interpretCampaign(input, { signal } = {}) {
-      return post('extrair-propostas', { texto: input.descricao, contexto: { dataReferencia: referenceDate() } }, signal, PROPOSAL_INTERPRETATION_TIMEOUT)
+      return post('extrair-propostas', { texto: input.descricao, contexto: { dataReferencia: referenceDate(), ...(input.campanhaId ? { campanhaId: String(input.campanhaId), origem: 'VERSAO_EXISTENTE' } : {}) } }, signal, PROPOSAL_INTERPRETATION_TIMEOUT)
     },
     reinterpretRule(input, { signal } = {}) {
-      const contexto = { dataReferencia: referenceDate() }
+      const contexto = { dataReferencia: referenceDate(), ...(input.campanha.id ? { campanhaId: String(input.campanha.id), origem: 'VERSAO_EXISTENTE' } : {}) }
       if (input.campanha.dataInicio && input.campanha.dataFim) contexto.vigenciaCampanha = { inicio: input.campanha.dataInicio, fim: input.campanha.dataFim }
       return post('extrair-propostas', { texto: input.texto, contexto }, signal, PROPOSAL_INTERPRETATION_TIMEOUT)
     },

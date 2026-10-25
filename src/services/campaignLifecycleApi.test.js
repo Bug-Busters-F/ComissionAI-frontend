@@ -13,3 +13,15 @@ describe('real campaign lifecycle HTTP client', () => {
     expect(http.post).toHaveBeenCalledWith('/campanhas/7/ativar', {}, expect.any(Object))
   })
 })
+
+it('carries edit revisions and reads immutable published versions', async () => {
+  const http = { get: vi.fn(async () => ({ data: [] })), post: vi.fn(async () => ({ data: {} })), put: vi.fn(async () => ({ data: {} })), delete: vi.fn(async () => ({})) }
+  const api = createCampaignLifecycleApi(http)
+  await api.startProposal(7, 10); await api.save(7, { titulo: 'Proposta' }, 11)
+  await api.activate(7, 2, 12); await api.cancelProposal(7, 13); await api.history(7); await api.version(7, 2)
+  expect(http.post).toHaveBeenCalledWith('/campanhas/7/proposta', {}, expect.objectContaining({ headers: { 'X-Campanha-Revisao': 10 } }))
+  expect(http.put).toHaveBeenCalledWith('/campanhas/7', { titulo: 'Proposta' }, expect.objectContaining({ headers: { 'X-Campanha-Revisao': 11 } }))
+  expect(http.post).toHaveBeenCalledWith('/campanhas/7/ativar', { versaoEsperada: 2 }, expect.objectContaining({ headers: { 'X-Campanha-Revisao': 12 } }))
+  expect(http.delete).toHaveBeenCalledWith('/campanhas/7/proposta', expect.objectContaining({ headers: { 'X-Campanha-Revisao': 13 } }))
+  expect(http.get).toHaveBeenCalledWith('/campanhas/7/versoes/2', expect.any(Object))
+})

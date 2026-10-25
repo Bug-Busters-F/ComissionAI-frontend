@@ -1,4 +1,7 @@
 const actions = {
+  saveProposal: { success: 'Proposta salva', message: 'As alterações foram salvas separadamente da versão vigente.', error: 'Não foi possível salvar a proposta' },
+  publish: { success: 'Nova versão publicada', message: 'A nova versão está vigente para todo o período da campanha. As anteriores permanecem no histórico.', error: 'Não foi possível publicar a nova versão' },
+  discardProposal: { success: 'Proposta descartada', message: 'A campanha vigente e seus resultados foram preservados.', error: 'Não foi possível descartar a proposta' },
   save: { success: 'Rascunho salvo', message: 'Suas alterações foram salvas.', error: 'Não foi possível salvar o rascunho' },
   interpret: { success: 'Regras interpretadas', message: 'Confira os campos e as pendências antes de continuar.', error: 'Não foi possível interpretar a campanha' },
   reinterpret: { success: 'Campanha reinterpretada', message: 'O novo conjunto de regras foi aplicado. Confira as alterações.', error: 'Não foi possível reinterpretar a campanha' },
