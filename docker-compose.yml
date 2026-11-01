@@ -1,0 +1,20 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: comissionai-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      # Monta o código-fonte para hot reload em desenvolvimento
+      - .:/app
+      # Preserva o node_modules do container (evita conflitos com o SO do host)
+      - /app/node_modules
+    env_file:
+      - .env
+    environment:
+      # host.docker.internal aponta para a máquina host (onde o backend roda)
+      - VITE_BACKEND_URL=http://host.docker.internal:8080
+      - CHOKIDAR_USEPOLLING=true
+    restart: unless-stopped
