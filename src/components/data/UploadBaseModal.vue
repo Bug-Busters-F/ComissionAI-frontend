@@ -1,11 +1,11 @@
 <template>
   <div
     v-if="store.uploadModal.isOpen"
-    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-brand-dark/60 p-4 backdrop-blur-sm transition-opacity"
+    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-overlay/60 p-4 backdrop-blur-sm transition-opacity"
     @click.self="store.closeUploadModal"
   >
     <div
-      class="w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl border border-sage-border bg-white p-5 shadow-2xl transition-all sm:p-8"
+      class="w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl border border-sage-border bg-surface p-5 shadow-2xl transition-all sm:p-8"
       role="dialog"
       aria-modal="true"
     >
@@ -61,7 +61,7 @@
       <!-- CORPO 2: PROCESSAMENTO ASSÍNCRONO EM SEGUNDO PLANO -->
       <div v-else-if="store.uploadModal.isLoading" class="mt-6 space-y-6 py-2">
         <div class="rounded-2xl border border-warning-border bg-warning-bg/40 p-6 text-center">
-          <div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white border border-warning-border shadow-sm">
+          <div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-surface border border-warning-border shadow-sm">
             <RefreshCw class="h-7 w-7 animate-spin text-warning-dark" />
           </div>
           <span class="mt-4 inline-block rounded-md bg-warning-light px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-warning-dark">
@@ -96,7 +96,7 @@
           </h4>
 
           <!-- Etapa 1: RH -->
-          <div class="flex items-center justify-between rounded-xl bg-white p-3.5 border border-sage-border-light">
+          <div class="flex items-center justify-between rounded-xl bg-surface p-3.5 border border-sage-border-light">
             <div class="flex items-center gap-3">
               <div class="grid h-8 w-8 place-items-center rounded-lg bg-sage-light">
                 <Users class="h-4 w-4 text-brand-dark" />
@@ -129,7 +129,7 @@
           </div>
 
           <!-- Etapa 2: Vendas -->
-          <div class="flex items-center justify-between rounded-xl bg-white p-3.5 border border-sage-border-light">
+          <div class="flex items-center justify-between rounded-xl bg-surface p-3.5 border border-sage-border-light">
             <div class="flex items-center gap-3">
               <div class="grid h-8 w-8 place-items-center rounded-lg bg-sage-light">
                 <TrendingUp class="h-4 w-4 text-brand-dark" />
@@ -163,7 +163,7 @@
         </div>
 
         <!-- Banner Explicativo de UX: Pode navegar livremente -->
-        <div class="flex items-start gap-3 rounded-xl border border-sage-border bg-white p-4">
+        <div class="flex items-start gap-3 rounded-xl border border-sage-border bg-surface p-4">
           <Info class="h-5 w-5 shrink-0 text-brand-dark mt-0.5" />
           <div class="text-xs text-sage-muted leading-relaxed">
             <strong class="text-brand-dark">Você não precisa esperar aqui:</strong>
@@ -176,7 +176,7 @@
           <button
             type="button"
             @click="store.minimizarModal"
-            class="focus-ring flex items-center justify-center gap-2 rounded-full bg-brand-dark px-6 py-3 text-xs font-bold text-white transition hover:bg-brand-dark-hover"
+            class="focus-ring flex items-center justify-center gap-2 rounded-full bg-inverse px-6 py-3 text-xs font-bold text-on-inverse transition hover:bg-inverse-hover"
           >
             <Minimize2 class="h-4 w-4" />
             <span>Continuar navegando em segundo plano</span>
@@ -199,10 +199,10 @@
                 'focus-ring flex items-start gap-3 rounded-xl border p-4 text-left transition',
                 store.uploadModal.modo === 'CICLO'
                   ? 'border-brand-dark bg-sage-light shadow-sm'
-                  : 'border-sage-border bg-white hover:border-sage-border-dark'
+                  : 'border-sage-border bg-surface hover:border-sage-border-dark'
               ]"
             >
-              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white border border-sage-border-dark">
+              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface border border-sage-border-dark">
                 <Layers class="h-5 w-5 text-brand-dark" />
               </div>
               <div>
@@ -218,10 +218,10 @@
                 'focus-ring flex items-start gap-3 rounded-xl border p-4 text-left transition',
                 store.uploadModal.modo === 'COMISS'
                   ? 'border-brand-dark bg-sage-light shadow-sm'
-                  : 'border-sage-border bg-white hover:border-sage-border-dark'
+                  : 'border-sage-border bg-surface hover:border-sage-border-dark'
               ]"
             >
-              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white border border-sage-border-dark">
+              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface border border-sage-border-dark">
                 <Percent class="h-5 w-5 text-brand-dark" />
               </div>
               <div>
@@ -246,11 +246,11 @@
                 v-model="store.uploadModal.competencia"
                 @input="store.onCompetenciaChange($event.target.value)"
                 placeholder="Ex: 08/2025"
-                class="focus-ring w-full sm:max-w-xs rounded-xl border border-sage-border bg-white px-4 py-2.5 text-sm font-semibold text-brand-dark outline-none"
+                class="focus-ring w-full sm:max-w-xs rounded-xl border border-sage-border bg-surface px-4 py-2.5 text-sm font-semibold text-brand-dark outline-none"
               />
               <span
                 v-if="store.nomeCompetenciaFormatada && store.nomeCompetenciaFormatada !== 'Competência'"
-                class="rounded-lg bg-white border border-sage-border-dark px-3 py-1.5 text-xs font-bold text-brand-dark shadow-sm shrink-0"
+                class="rounded-lg bg-surface border border-sage-border-dark px-3 py-1.5 text-xs font-bold text-brand-dark shadow-sm shrink-0"
               >
                 Mês detectado: {{ store.nomeCompetenciaFormatada }}
               </span>
@@ -279,7 +279,7 @@
                     ? 'border-success bg-success-bg/40'
                     : isDraggingRh
                     ? 'border-brand bg-success-bg'
-                    : 'border-sage-border-dark bg-white hover:border-brand'
+                    : 'border-sage-border-dark bg-surface hover:border-brand'
                 ]"
               >
                 <input
@@ -317,7 +317,7 @@
                   </div>
                   <p class="mt-2.5 text-xs font-extrabold text-brand-dark">1. Base de Recursos Humanos</p>
                   <p class="mt-0.5 text-[11px] text-sage-muted">Colaboradores, cargos e filiais</p>
-                  <span class="mt-3 inline-block rounded-full bg-brand-dark px-3 py-1 text-[11px] font-bold text-white hover:bg-brand-dark-hover">
+                  <span class="mt-3 inline-block rounded-full bg-inverse px-3 py-1 text-[11px] font-bold text-on-inverse hover:bg-inverse-hover">
                     Anexar RH (.xlsx)
                   </span>
                 </div>
@@ -334,7 +334,7 @@
                     ? 'border-success bg-success-bg/40'
                     : isDraggingVendas
                     ? 'border-brand bg-success-bg'
-                    : 'border-sage-border-dark bg-white hover:border-brand'
+                    : 'border-sage-border-dark bg-surface hover:border-brand'
                 ]"
               >
                 <input
@@ -372,7 +372,7 @@
                   </div>
                   <p class="mt-2.5 text-xs font-extrabold text-brand-dark">2. Base de Vendas</p>
                   <p class="mt-0.5 text-[11px] text-sage-muted">Transações e faturamento por vendedor</p>
-                  <span class="mt-3 inline-block rounded-full bg-brand-dark px-3 py-1 text-[11px] font-bold text-white hover:bg-brand-dark-hover">
+                  <span class="mt-3 inline-block rounded-full bg-inverse px-3 py-1 text-[11px] font-bold text-on-inverse hover:bg-inverse-hover">
                     Anexar Vendas (.xlsx)
                   </span>
                 </div>
@@ -397,7 +397,7 @@
                 <input
                   type="date"
                   v-model="store.uploadModal.dataInicio"
-                  class="focus-ring mt-1 w-full rounded-xl border border-sage-border bg-white px-3 py-2.5 text-sm font-semibold text-brand-dark outline-none"
+                  class="focus-ring mt-1 w-full rounded-xl border border-sage-border bg-surface px-3 py-2.5 text-sm font-semibold text-brand-dark outline-none"
                 />
               </div>
               <div>
@@ -405,7 +405,7 @@
                 <input
                   type="date"
                   v-model="store.uploadModal.dataFim"
-                  class="focus-ring mt-1 w-full rounded-xl border border-sage-border bg-white px-3 py-2.5 text-sm font-semibold text-brand-dark outline-none"
+                  class="focus-ring mt-1 w-full rounded-xl border border-sage-border bg-surface px-3 py-2.5 text-sm font-semibold text-brand-dark outline-none"
                 />
               </div>
             </div>
@@ -425,7 +425,7 @@
               @drop.prevent="onDropComiss"
               :class="[
                 'mt-2 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-7 text-center transition',
-                isDraggingComiss ? 'border-brand bg-success-bg' : 'border-sage-border-dark bg-white hover:border-brand'
+                isDraggingComiss ? 'border-brand bg-success-bg' : 'border-sage-border-dark bg-surface hover:border-brand'
               ]"
             >
               <input
@@ -502,7 +502,7 @@
           <button
             type="button"
             @click="store.closeUploadModal"
-            class="focus-ring w-full sm:w-auto rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-semibold text-brand-dark transition hover:bg-sage-light"
+            class="focus-ring w-full sm:w-auto rounded-full border border-sage-border-dark bg-surface px-5 py-3 text-sm font-semibold text-brand-dark transition hover:bg-sage-light"
           >
             Cancelar
           </button>
@@ -511,7 +511,7 @@
             type="button"
             :disabled="store.uploadModal.isLoading || !store.podeEnviar"
             @click="store.enviarDados"
-            class="focus-ring flex w-full sm:w-auto items-center justify-center gap-2 rounded-full bg-brand px-7 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+            class="focus-ring flex w-full sm:w-auto items-center justify-center gap-2 rounded-full bg-brand px-7 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span v-if="store.uploadModal.isLoading" class="flex items-center gap-2">
               <RefreshCw class="h-4 w-4 animate-spin" />

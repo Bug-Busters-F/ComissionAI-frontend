@@ -1,5 +1,5 @@
 <template>
-  <article :id="'proposal-card-' + encodeURIComponent(proposal.clientId)" tabindex="-1" class="rounded-[22px] border border-sage-border bg-white p-5 outline-none sm:p-6">
+  <article :id="'proposal-card-' + encodeURIComponent(proposal.clientId)" tabindex="-1" class="rounded-[22px] border border-sage-border bg-surface p-5 outline-none sm:p-6">
     <header class="flex flex-wrap items-start justify-between gap-3 border-b border-sage-border-light pb-4">
       <div>
         <h3 class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Regra {{ index + 1 }}</h3>
@@ -121,7 +121,7 @@ function emitUpdate(field, value) {
 
 <style scoped>
 .campaign-label { @apply mb-2 block text-sm font-bold text-brand-dark; }
-.campaign-control { @apply focus-ring w-full rounded-xl border border-sage-border bg-white px-4 py-3 text-sm text-brand-dark outline-none transition placeholder:text-sage-muted; }
+.campaign-control { @apply focus-ring w-full rounded-xl border border-sage-border bg-surface px-4 py-3 text-sm text-brand-dark outline-none transition placeholder:text-sage-muted; }
 .campaign-control-error { @apply border-danger; }
 .campaign-error { @apply mt-2 text-xs font-semibold leading-5 text-danger-dark; }
 </style>

@@ -2,8 +2,8 @@
   <div class="space-y-5">
     <ul v-if="row.impedimentos?.length" class="space-y-2"><li v-for="(issue, index) in row.impedimentos" :key="index" class="rounded-xl bg-warning-bg p-3 text-sm text-warning-text">{{ userFacingText(issue) }}</li></ul>
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <div v-for="item in summary" :key="item.label" class="rounded-2xl p-4" :class="item.highlight ? 'bg-brand-dark text-white' : 'bg-sage-light text-brand-dark'">
-        <p class="text-xs" :class="item.highlight ? 'text-sage-border' : 'text-sage-muted'">{{ item.label }}</p>
+      <div v-for="item in summary" :key="item.label" class="rounded-2xl p-4" :class="item.highlight ? 'bg-inverse text-on-inverse' : 'bg-sage-light text-brand-dark'">
+        <p class="text-xs" :class="item.highlight ? 'text-inverse-muted' : 'text-sage-muted'">{{ item.label }}</p>
         <p class="mt-2 break-words text-lg font-extrabold" :class="item.highlight ? 'text-brand' : ''">{{ money(item.value) }}</p>
       </div>
     </div>

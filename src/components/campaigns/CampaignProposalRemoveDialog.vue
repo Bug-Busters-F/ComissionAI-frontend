@@ -1,12 +1,12 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="fixed inset-0 z-50 grid place-items-center bg-brand-dark/50 px-5 py-8" role="presentation" @click.self="$emit('cancel')">
-      <section ref="dialog" class="w-full max-w-md rounded-[22px] bg-white p-6 shadow-2xl sm:p-7" role="alertdialog" aria-modal="true" aria-labelledby="remove-proposal-title" aria-describedby="remove-proposal-description" @keydown.esc="$emit('cancel')" @keydown="trapFocus">
+    <div v-if="open" class="fixed inset-0 z-50 grid place-items-center bg-overlay/50 px-5 py-8" role="presentation" @click.self="$emit('cancel')">
+      <section ref="dialog" class="w-full max-w-md rounded-[22px] bg-surface p-6 shadow-2xl sm:p-7" role="alertdialog" aria-modal="true" aria-labelledby="remove-proposal-title" aria-describedby="remove-proposal-description" @keydown.esc="$emit('cancel')" @keydown="trapFocus">
         <h2 id="remove-proposal-title" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Remover regra {{ index }}?</h2>
         <p id="remove-proposal-description" class="mt-3 text-sm leading-6 text-sage-muted">Este bloco será removido desta campanha. As outras regras serão mantidas.</p>
         <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button ref="cancelButton" type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark" @click="$emit('cancel')">Manter regra</button>
-          <button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-danger-dark" @click="$emit('confirm')">Remover regra</button>
+          <button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-on-status transition-colors hover:bg-danger-dark" @click="$emit('confirm')">Remover regra</button>
         </div>
       </section>
     </div>

@@ -14,21 +14,21 @@
     <section v-if="provider.mode === 'demo'" class="flex flex-wrap items-end gap-3 rounded-2xl border border-warning-border bg-warning-bg p-4">
       <div class="min-w-0 flex-1">
         <label for="proposal-demo-example" class="block text-xs font-bold text-warning-text">Carregar campanha demonstrativa (substitui os dados após confirmação)</label>
-        <select id="proposal-demo-example" v-model="demoExample" class="focus-ring mt-2 w-full rounded-xl border border-warning-border bg-white p-3 text-sm">
+        <select id="proposal-demo-example" v-model="demoExample" class="focus-ring mt-2 w-full rounded-xl border border-warning-border bg-surface p-3 text-sm">
           <option v-for="(example, key) in demoExamples" :key="key" :value="key">{{ example.label }}</option>
         </select>
       </div>
-      <button type="button" class="focus-ring rounded-full border border-warning-border bg-white px-4 py-3 text-sm font-bold" @click="loadDemoExample">Carregar exemplo</button>
+      <button type="button" class="focus-ring rounded-full border border-warning-border bg-surface px-4 py-3 text-sm font-bold" @click="loadDemoExample">Carregar exemplo</button>
     </section>
 
-    <section v-if="persistence.versaoVigente" class="rounded-2xl border border-sage-border bg-white p-5 text-sm">
+    <section v-if="persistence.versaoVigente" class="rounded-2xl border border-sage-border bg-surface p-5 text-sm">
       <p class="font-bold">Versão vigente {{ persistence.versaoVigente }}<span v-if="persistence.editingPublished"> · Proposta {{ persistence.versaoProposta }} baseada na versão {{ persistence.versaoOrigem }}</span></p>
       <p class="mt-2 text-sage-muted">As alterações ficam separadas da versão vigente e dos seus resultados até a publicação. Toda alteração exige nova simulação.</p>
       <button v-if="persistence.editingPublished && !persistence.remoteChanged" type="button" class="focus-ring mt-3 rounded-full border border-danger/30 px-4 py-2 font-bold text-danger-dark hover:bg-danger-bg disabled:opacity-50" :disabled="persistenceBusy" @click="cancelProposalOpen = true">Descartar proposta de alteração</button>
     </section>
     <CampaignStepNav :steps="steps" :current-step="activeStep" :current-step-number="activeStepIndex + 1" :reached-step="reachedStep" @select="navigateTo" />
 
-    <p v-if="persistence.loading" role="status" class="rounded-2xl bg-white p-5 text-sm">Carregando campanha e todas as regras…</p>
+    <p v-if="persistence.loading" role="status" class="rounded-2xl bg-surface p-5 text-sm">Carregando campanha e todas as regras…</p>
     <div v-if="persistence.error" role="alert" class="rounded-2xl bg-danger-bg p-4 text-sm text-danger-dark">
       <p>{{ userFacingText(persistence.error) }}</p>
       <button v-if="persistence.remoteChanged" type="button" class="focus-ring mt-3 rounded font-bold underline" @click="reloadProposalOpen = true">Recarregar proposta atual</button>
@@ -86,7 +86,7 @@
         :validation="validation"
       />
       </fieldset>
-      <section v-if="activeStep === 'conferencia' && simulation.accepted" class="mt-5 rounded-2xl border border-sage-border bg-white p-5 text-sm">
+      <section v-if="activeStep === 'conferencia' && simulation.accepted" class="mt-5 rounded-2xl border border-sage-border bg-surface p-5 text-sm">
         <h2 class="text-lg font-extrabold">Simulação aceita</h2>
         <p class="mt-2">Protocolo: {{ simulation.result?.protocolo }} · Competência: {{ simulation.result?.competencia }}</p>
         <p class="mt-1">Responsável: {{ simulation.acceptance?.aceitoPor }} · Aceite: {{ simulation.acceptance?.aceitoEm }}</p>
@@ -103,19 +103,19 @@
       <CampaignRequestStatus v-if="activeStep === 'dados' && integrationState.busy" class="w-full" message="Interpretando o texto da campanha…" @cancel="integration.cancel" />
       <div class="order-2 flex items-center justify-between gap-3 sm:order-1 sm:justify-start">
         <button v-if="activeStep !== 'dados'" type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark" @click="backOneStep">← Voltar</button>
-        <button type="button" class="focus-ring rounded-full px-5 py-3 text-sm font-semibold text-sage-subtle transition hover:bg-white" @click="requestLeave('/campanhas')">Cancelar</button>
+        <button type="button" class="focus-ring rounded-full px-5 py-3 text-sm font-semibold text-sage-subtle transition hover:bg-surface" @click="requestLeave('/campanhas')">Cancelar</button>
       </div>
       <div class="order-1 grid gap-3 sm:order-2 sm:flex sm:items-center sm:justify-end">
-        <button v-if="provider.mode === 'api'" type="button" class="focus-ring rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-sage-light disabled:opacity-50" :disabled="persistenceBusy || integrationState.busy || Boolean(integrationState.review) || persistence.uncertainCreate || Boolean(route.params.id && !persistence.id)" @click="saveDraft">{{ persistence.saving ? 'Salvando…' : persistence.editingPublished ? 'Salvar proposta' : 'Salvar rascunho' }}</button>
+        <button v-if="provider.mode === 'api'" type="button" class="focus-ring rounded-full border border-sage-border-dark bg-surface px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-sage-light disabled:opacity-50" :disabled="persistenceBusy || integrationState.busy || Boolean(integrationState.review) || persistence.uncertainCreate || Boolean(route.params.id && !persistence.id)" @click="saveDraft">{{ persistence.saving ? 'Salvando…' : persistence.editingPublished ? 'Salvar proposta' : 'Salvar rascunho' }}</button>
         <template v-if="activeStep === 'dados'">
           <button type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50" :disabled="persistenceBusy || Boolean(route.params.id && !persistence.id) || !provider.capabilities.interpret || integrationState.busy || Boolean(integrationState.review)" @click="interpretDescription">{{ integrationState.busy ? 'Interpretando…' : 'Interpretar e continuar →' }}</button>
         </template>
         <template v-else-if="activeStep === 'propostas'">
-          <button type="button" class="focus-ring whitespace-nowrap rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="!canAdvanceLocally" :aria-describedby="!canAdvanceLocally ? 'advance-blocked-reason' : undefined" @click="navigateTo('simulacao')">{{ canAdvanceLocally && validation.blockers.length ? 'Verificar correções →' : 'Ir para simulação →' }}</button>
+          <button type="button" class="focus-ring whitespace-nowrap rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="!canAdvanceLocally" :aria-describedby="!canAdvanceLocally ? 'advance-blocked-reason' : undefined" @click="navigateTo('simulacao')">{{ canAdvanceLocally && validation.blockers.length ? 'Verificar correções →' : 'Ir para simulação →' }}</button>
         </template>
         <template v-else-if="activeStep === 'simulacao'">
-          <button v-if="provider.mode === 'api' && !simulation.accepted" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50" :disabled="persistenceBusy || integrationState.busy || !lifecycle.currentSimulation.value" @click="requestAccept">Aceitar simulação e continuar →</button>
-          <button v-else type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:opacity-50" :disabled="provider.mode === 'api' && !lifecycle.canReview.value" @click="navigateTo('conferencia')">Conferir regras →</button>
+          <button v-if="provider.mode === 'api' && !simulation.accepted" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50" :disabled="persistenceBusy || integrationState.busy || !lifecycle.currentSimulation.value" @click="requestAccept">Aceitar simulação e continuar →</button>
+          <button v-else type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover disabled:opacity-50" :disabled="provider.mode === 'api' && !lifecycle.canReview.value" @click="navigateTo('conferencia')">Conferir regras →</button>
         </template>
         <template v-else>
           <button v-if="provider.mode === 'api'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold transition hover:bg-brand-hover disabled:opacity-50" :disabled="!lifecycle.canActivate.value" @click="persistence.activationOpen = true">{{ persistence.editingPublished ? 'Publicar nova versão' : 'Aprovar e ativar campanha' }}</button>

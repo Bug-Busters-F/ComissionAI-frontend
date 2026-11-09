@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="fixed inset-0 z-50 grid place-items-center bg-brand-dark/50 px-5 py-8" role="presentation" @click.self="cancel">
-      <section ref="dialog" class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description" @keydown.esc="cancel" @keydown="trapFocus">
+    <div v-if="open" class="fixed inset-0 z-50 grid place-items-center bg-overlay/50 px-5 py-8" role="presentation" @click.self="cancel">
+      <section ref="dialog" class="w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description" @keydown.esc="cancel" @keydown="trapFocus">
         <h2 id="delete-dialog-title" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Remover campanha?</h2>
         <p id="delete-dialog-description" class="mt-3 text-sm leading-6 text-sage-muted">
           A campanha <strong class="text-brand-dark">{{ campaignTitle }}</strong> deixará de aparecer nas consultas. O histórico operacional será preservado.
@@ -11,7 +11,7 @@
 
         <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button ref="cancelButton" type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-sage-light" :disabled="isRemoving" @click="cancel">Cancelar</button>
-          <button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-white transition hover:bg-danger-dark disabled:cursor-not-allowed disabled:opacity-60" :disabled="isRemoving" @click="emit('confirm')">
+          <button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-on-status transition hover:bg-danger-dark disabled:cursor-not-allowed disabled:opacity-60" :disabled="isRemoving" @click="emit('confirm')">
             {{ isRemoving ? 'Removendo…' : 'Remover campanha' }}
           </button>
         </div>

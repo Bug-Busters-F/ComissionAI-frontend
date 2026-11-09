@@ -5,13 +5,13 @@
       description="Calcule as comissões das vendas cadastradas da competência."
     >
       <template #action>
-        <RouterLink to="/dados" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-white">
+        <RouterLink to="/dados" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-surface">
           ← Dados
         </RouterLink>
       </template>
     </PageHeader>
 
-    <section class="flex flex-col gap-5 rounded-[22px] bg-white p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+    <section class="flex flex-col gap-5 rounded-[22px] bg-surface p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
       <div>
         <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">Competência selecionada</p>
         <h2 class="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-brand-dark">{{ formatCompetenceCode(competenceKey) }}</h2>
@@ -25,7 +25,7 @@
       <div class="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          class="focus-ring inline-flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+          class="focus-ring inline-flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="!canCalculate"
           @click="handleCalculation"
         >
@@ -40,7 +40,7 @@
       <p class="mt-2 text-sm leading-6 text-danger-dark/80">Informe uma competência válida no formato MM/AAAA, com mês entre 01 e 12.</p>
     </section>
 
-    <section v-else-if="salesQueryState === SALES_QUERY_STATE.LOADING" class="rounded-2xl border border-sage-border bg-white p-6" role="status" aria-live="polite">
+    <section v-else-if="salesQueryState === SALES_QUERY_STATE.LOADING" class="rounded-2xl border border-sage-border bg-surface p-6" role="status" aria-live="polite">
       <div class="flex items-center gap-3">
         <RefreshCw class="h-5 w-5 animate-spin text-sage-muted" aria-hidden="true" />
         <div>
@@ -53,12 +53,12 @@
     <section v-else-if="salesQueryState === SALES_QUERY_STATE.ERROR" class="rounded-2xl border border-danger/30 bg-danger-bg p-6" role="alert">
       <h2 class="text-xl font-extrabold text-danger-dark">Não foi possível consultar as vendas</h2>
       <p class="mt-2 text-sm leading-6 text-danger-dark/80">{{ salesQueryError }}</p>
-      <button type="button" class="focus-ring mt-5 rounded-full bg-danger px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60" :disabled="isCalculating" @click="retrySalesQuery">
+      <button type="button" class="focus-ring mt-5 rounded-full bg-danger px-5 py-3 text-sm font-bold text-on-status disabled:cursor-not-allowed disabled:opacity-60" :disabled="isCalculating" @click="retrySalesQuery">
         Tentar consultar novamente
       </button>
     </section>
 
-    <section v-else-if="salesQueryState === SALES_QUERY_STATE.SUCCESS && salesCount === 0" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
+    <section v-else-if="salesQueryState === SALES_QUERY_STATE.SUCCESS && salesCount === 0" class="rounded-2xl border border-sage-border bg-surface p-6" role="status">
       <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
       <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência. O cálculo permanece indisponível.</p>
     </section>
@@ -67,7 +67,7 @@
       {{ result.recalculoExecutado ? 'As regras atuais foram aplicadas ao recálculo desta competência.' : 'Resultados já registrados são reaproveitados pelo sistema quando a competência é executada novamente.' }}
     </p>
 
-    <p v-if="restoredResult" class="rounded-2xl border border-sage-border bg-white px-5 py-4 text-sm leading-6 text-sage-muted" role="status">
+    <p v-if="restoredResult" class="rounded-2xl border border-sage-border bg-surface px-5 py-4 text-sm leading-6 text-sage-muted" role="status">
       <strong class="text-brand-dark">Resultado da última execução nesta sessão</strong>
       — recebido em {{ formatDateTime(restoredResult.recebidoEm) }}. Esse resultado não garante que as regras e bases atuais já tenham sido aplicadas.
     </p>
@@ -97,7 +97,7 @@
               </h2>
               <span
                 v-if="calculationStore.executionId"
-                class="rounded-md border border-warning-border bg-white/70 px-2 py-0.5 font-mono text-[11px] font-bold text-brand-dark"
+                class="rounded-md border border-warning-border bg-surface/70 px-2 py-0.5 font-mono text-[11px] font-bold text-brand-dark"
                 title="Identificador da execução"
               >
                 {{ calculationStore.executionId }}
@@ -121,7 +121,7 @@
       </div>
 
       <!-- Barra de Progresso Percentual -->
-      <div class="h-2.5 w-full overflow-hidden rounded-full bg-white/80 border border-warning-border/50">
+      <div class="h-2.5 w-full overflow-hidden rounded-full bg-surface/80 border border-warning-border/50">
         <div
           class="h-full bg-brand transition-all duration-300"
           :style="{ width: `${calculationStore.progress ?? 0}%` }"
@@ -131,13 +131,13 @@
       <!-- Alerta Transitório de Conexão -->
       <div
         v-if="calculationStore.transientWarning"
-        class="rounded-xl border border-warning-border/80 bg-white/80 p-3 text-xs font-medium text-warning-dark"
+        class="rounded-xl border border-warning-border/80 bg-surface/80 p-3 text-xs font-medium text-warning-dark"
         role="alert"
       >
         {{ calculationStore.transientWarning }}
       </div>
 
-      <button v-if="calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.ACOMPANHAMENTO_PAUSADO" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark disabled:opacity-50" :disabled="Boolean(calculationStore.monitoringPromise)" @click="calculationStore.resumeExecution()">Retomar acompanhamento</button>
+      <button v-if="calculationStore.asyncStatus === ASYNC_EXECUTION_STATES.ACOMPANHAMENTO_PAUSADO" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand disabled:opacity-50" :disabled="Boolean(calculationStore.monitoringPromise)" @click="calculationStore.resumeExecution()">Retomar acompanhamento</button>
       <!-- Orientação de Fechamento Seguro da Tela -->
       <p class="text-xs text-sage-muted">
         O cálculo continua mesmo fora desta tela. Ao navegar pelo sistema ou atualizar a página nesta aba, o acompanhamento será retomado sem iniciar outra execução.
@@ -158,10 +158,10 @@
       <h2 class="text-xl font-extrabold text-danger-dark">Não foi possível concluir o cálculo</h2>
       <p class="mt-2 text-sm leading-6 text-danger-dark/80">{{ calculationErrorMessage }}</p>
       <div v-if="!isCalculating" class="mt-5 flex flex-wrap gap-3">
-        <button type="button" class="focus-ring rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-bold text-brand-dark" @click="consultHistory">
+        <button type="button" class="focus-ring rounded-full border border-sage-border-dark bg-surface px-5 py-3 text-sm font-bold text-brand-dark" @click="consultHistory">
           Consultar histórico
         </button>
-        <button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60" :disabled="!canCalculate" @click="retryLastOperation">
+        <button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-on-status disabled:cursor-not-allowed disabled:opacity-60" :disabled="!canCalculate" @click="retryLastOperation">
           Tentar novamente
         </button>
       </div>
@@ -172,7 +172,7 @@
     </p>
 
     <template v-if="result">
-      <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="calculation-summary-heading">
+      <section class="rounded-[22px] bg-surface p-6 sm:p-7" aria-labelledby="calculation-summary-heading">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 id="calculation-summary-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Resultado da competência</h2>
@@ -202,7 +202,7 @@
         @recalculate="handleMissingBasesRecalculate"
       />
 
-      <section v-if="result.resultados.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="calculated-sales-heading">
+      <section v-if="result.resultados.length" class="rounded-[22px] bg-surface p-6 sm:p-7" aria-labelledby="calculated-sales-heading">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h2 id="calculated-sales-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Vendas calculadas</h2>
@@ -266,7 +266,7 @@
         <PaginationControls :page="resultPage" :total-pages="resultTotalPages" @previous="resultPage -= 1" @next="resultPage += 1" />
       </section>
 
-      <section v-if="cadastralImpediments.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="cadastral-blocked-sales-heading">
+      <section v-if="cadastralImpediments.length" class="rounded-[22px] bg-surface p-6 sm:p-7" aria-labelledby="cadastral-blocked-sales-heading">
         <div>
           <h2 id="cadastral-blocked-sales-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Vendas com impedimento cadastral (RH)</h2>
           <p class="mt-1 text-sm text-sage-muted">Inconsistências em vínculos com colaboradores, ausência de cargo ou datas fora da vigência contratual.</p>
@@ -289,7 +289,7 @@
         </div>
       </section>
 
-      <details v-if="coverageSales.length" class="group rounded-[22px] bg-white p-6 sm:p-7">
+      <details v-if="coverageSales.length" class="group rounded-[22px] bg-surface p-6 sm:p-7">
         <summary class="cursor-pointer text-sm font-bold text-brand-dark transition hover:text-brand">
           Ver listagem individual de vendas com bloqueio de cobertura ({{ coverageSales.length }} vendas protegidas)
         </summary>
@@ -311,25 +311,25 @@
         </div>
       </details>
 
-      <section v-if="!result.resumoExecucao && !result.resultados.length && !result.impedimentos.length" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
+      <section v-if="!result.resumoExecucao && !result.resultados.length && !result.impedimentos.length" class="rounded-2xl border border-sage-border bg-surface p-6" role="status">
         <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
         <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência.</p>
       </section>
     </template>
 
-    <section v-if="historyLoading" class="rounded-2xl bg-white px-6 py-10 text-center text-sm text-sage-muted" role="status">
+    <section v-if="historyLoading" class="rounded-2xl bg-surface px-6 py-10 text-center text-sm text-sage-muted" role="status">
       Consultando cálculos já registrados…
     </section>
 
     <section v-else-if="historyError" class="rounded-2xl border border-danger/30 bg-danger-bg p-6" role="alert">
       <h2 class="text-xl font-extrabold text-danger-dark">Não foi possível consultar os cálculos registrados</h2>
       <p class="mt-2 text-sm leading-6 text-danger-dark/80">{{ historyError }}</p>
-      <button type="button" class="focus-ring mt-5 rounded-full bg-danger px-5 py-3 text-sm font-bold text-white" @click="loadHistory()">
+      <button type="button" class="focus-ring mt-5 rounded-full bg-danger px-5 py-3 text-sm font-bold text-on-status" @click="loadHistory()">
         Tentar novamente
       </button>
     </section>
 
-    <section v-else-if="history.content.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="history-calculation-heading">
+    <section v-else-if="history.content.length" class="rounded-[22px] bg-surface p-6 sm:p-7" aria-labelledby="history-calculation-heading">
       <div>
         <h2 id="history-calculation-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Cálculos registrados</h2>
         <p class="mt-1 text-sm leading-6 text-sage-muted">Este histórico contém os registros consolidados de cada execução concluída, incluindo a origem histórica da taxa.</p>
@@ -356,7 +356,7 @@
       <PaginationControls :page="history.number" :total-pages="history.totalPages" @previous="loadHistory(history.number - 1)" @next="loadHistory(history.number + 1)" />
     </section>
 
-    <section v-else-if="!result && !historyLoading && salesCount === 0" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
+    <section v-else-if="!result && !historyLoading && salesCount === 0" class="rounded-2xl border border-sage-border bg-surface p-6" role="status">
       <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
       <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência.</p>
     </section>
@@ -365,8 +365,8 @@
       Nenhum cálculo foi executado nesta sessão. Use o botão acima para iniciar o processamento.
     </p>
 
-    <div v-if="showRecalculateConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-brand-dark/40 px-4" role="presentation" @click.self="showRecalculateConfirm = false">
-      <section class="w-full max-w-lg rounded-[22px] bg-white p-6 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="recalculate-confirm-title">
+    <div v-if="showRecalculateConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 px-4" role="presentation" @click.self="showRecalculateConfirm = false">
+      <section class="w-full max-w-lg rounded-[22px] bg-surface p-6 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="recalculate-confirm-title">
         <h2 id="recalculate-confirm-title" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Recalcular comissões?</h2>
         <p class="mt-3 text-sm leading-6 text-sage-muted">
           Serão usadas as regras atualmente cadastradas e aplicáveis às datas das vendas. Resultados anteriores bem-sucedidos serão substituídos; vendas impedidas manterão seus resultados anteriores no histórico.
@@ -375,7 +375,7 @@
           <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark" @click="showRecalculateConfirm = false">
             Cancelar
           </button>
-          <button type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark disabled:cursor-not-allowed disabled:opacity-60" :disabled="!canCalculate" @click="confirmRecalculation">
+          <button type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand disabled:cursor-not-allowed disabled:opacity-60" :disabled="!canCalculate" @click="confirmRecalculation">
             Confirmar recálculo
           </button>
         </div>
@@ -718,5 +718,5 @@ function shortId(value) {
 </script>
 
 <style scoped>
-.campaign-control { @apply rounded-xl border border-sage-border bg-white px-3 py-2.5 text-sm text-brand-dark outline-none focus:border-sage-border-dark; }
+.campaign-control { @apply rounded-xl border border-sage-border bg-surface px-3 py-2.5 text-sm text-brand-dark outline-none focus:border-sage-border-dark; }
 </style>

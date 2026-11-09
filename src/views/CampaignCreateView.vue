@@ -2,7 +2,7 @@
   <div class="space-y-7">
     <PageHeader title="Nova campanha" description="Cadastre uma campanha e sua única regra vinculada.">
       <template #action>
-        <RouterLink to="/campanhas" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-white">Voltar para campanhas</RouterLink>
+        <RouterLink to="/campanhas" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-surface">Voltar para campanhas</RouterLink>
       </template>
     </PageHeader>
 

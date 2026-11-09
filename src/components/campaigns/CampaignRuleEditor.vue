@@ -9,14 +9,14 @@
                 <h3 :id="summaryId" class="text-xs font-bold text-sage-muted">Texto da regra {{ index + 1 }}</h3>
                 <p v-if="!state.editing" class="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-brand-dark">{{ proposal.resumo || proposal.textoOrigem || 'Resumo não recebido para esta regra.' }}</p>
               </div>
-              <button v-if="!state.editing" ref="editButton" type="button" class="focus-ring rounded-full p-2 text-brand-dark hover:bg-white" :aria-label="'Editar texto da regra ' + (index + 1)" @click="start"><Pencil :size="18" /></button>
+              <button v-if="!state.editing" ref="editButton" type="button" class="focus-ring rounded-full p-2 text-brand-dark hover:bg-surface" :aria-label="'Editar texto da regra ' + (index + 1)" @click="start"><Pencil :size="18" /></button>
             </div>
             <template v-if="state.editing">
               <label :for="summaryId + '-input'" class="sr-only">Texto da regra {{ index + 1 }}</label>
-              <textarea :id="summaryId + '-input'" ref="textInput" v-model="state.text" rows="3" class="focus-ring mt-3 w-full rounded-xl border border-sage-border bg-white p-3 text-sm" />
+              <textarea :id="summaryId + '-input'" ref="textInput" v-model="state.text" rows="3" class="focus-ring mt-3 w-full rounded-xl border border-sage-border bg-surface p-3 text-sm" />
               <div v-if="provider.mode === 'demo'" class="mt-3">
                 <label :for="summaryId + '-scenario'" class="text-xs font-bold text-warning-text">Demonstração — resposta fictícia</label>
-                <select :id="summaryId + '-scenario'" v-model="state.scenario" class="focus-ring ml-2 rounded-lg border border-sage-border bg-white p-2 text-xs">
+                <select :id="summaryId + '-scenario'" v-model="state.scenario" class="focus-ring ml-2 rounded-lg border border-sage-border bg-surface p-2 text-xs">
                   <option value="texto">Taxa, marca ou loja do texto</option><option value="novoFiltro">Novo preenchimento: loja 75</option>
                   <option value="falha">Falha de interpretação</option><option value="multiplas">Resposta com várias regras</option><option value="vazio">Resposta sem regras</option>
                 </select>
@@ -31,7 +31,7 @@
         </template>
       </CampaignProposalCard>
     </fieldset>
-    <div v-if="state.loading" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-[22px] bg-white/80 p-5">
+    <div v-if="state.loading" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-[22px] bg-surface/80 p-5">
       <CampaignRequestStatus class="w-full max-w-lg" :message="'Reinterpretando regra ' + (index + 1) + '…'" @cancel="cancel" />
     </div>
     <CampaignRuleReviewDialog :open="state.reviewing" :state="state" :index="index" :client-id="proposal.clientId" :demo="provider.mode === 'demo'" :can-apply="session.canApply()" :stale="state.reviewing && !session.isCurrent()" @cancel="cancel" @closed="restoreEditorFocus" @text="state.text = $event" @reinterpret="session.interpret" @correct="session.correct" @confirm="confirm" />

@@ -2,9 +2,21 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="src/assets/images/comissionai-icon.png" />
+    <link rel="icon" type="image/png" href="src/assets/images/comissionai-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#e8ebe6" />
     <title>ComissonAI</title>
+    <script>
+      // Aplica o tema antes do Vue montar para evitar o flash do tema claro.
+      // Mantenha sincronizado com src/services/useTheme.js.
+      (function () {
+        var preference = 'system'
+        try { preference = localStorage.getItem('comissionai:theme') || 'system' } catch (e) {}
+        var dark = preference === 'dark' ||
+          (preference !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

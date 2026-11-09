@@ -1,5 +1,5 @@
 <template>
-  <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="campaign-summary-title">
+  <section class="rounded-[22px] bg-surface p-6 sm:p-7" aria-labelledby="campaign-summary-title">
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
         <h2 id="campaign-summary-title" class="text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">{{ title }}</h2>

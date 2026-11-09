@@ -113,7 +113,7 @@ src/
   - Tokens de cores centralizados como **Variáveis CSS Dinâmicas** (`:root` em `src/assets/main.css`), consumidas semanticamente no `tailwind.config.js` (`brand`, `sage`, `success`, `warning`, `danger`).
   - **Zero Cores Hardcoded**: Eliminação total de valores hexadecimais soltos nos componentes Vue, garantindo manutenibilidade em ponto único.
   - **HMR Instantâneo**: Atualização em tempo real de estilos e cores pelo Vite sem necessidade de reinício do servidor de desenvolvimento.
-  - **Pronto para Modo Noturno**: Suporte a Dark Mode com chaveamento de variáveis via classe `.dark` no `main.css`, sem necessidade de alterar templates Vue.
+  - **Modo Noturno**: Temas Claro, Escuro e Sistema escolhidos pelo `ThemeToggle` (rodapé da sidebar no desktop, Topbar no mobile). O atributo `data-theme` no `<html>` troca as variáveis de `main.css`; a preferência fica salva no `localStorage` (`useTheme.js`). Detalhes em `docs/GUIA-MODO-ESCURO.md`.
 - **Aderência Estrita à Identidade Wise**: Paleta Sage para fundos e superfícies, acento verde CTA, cards arredondados (`rounded-2xl`) e feedback visual de alta legibilidade.
 - **Consulta de Dados Efetivados & Histórico de Envios (S1-B18)**:
   - **Dados Efetivados**: Visualização paginada dos registros persistidos no banco de dados para RH (`GET /api/v1/matriculas`), Vendas (`GET /api/v1/vendas`) e Comissões Base (`COMISS`).

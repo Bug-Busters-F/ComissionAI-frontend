@@ -1,5 +1,5 @@
 <template>
-  <section v-if="pendencias.length" class="rounded-[22px] border border-sage-border bg-white p-5 sm:p-6" aria-labelledby="proposal-pending-heading">
+  <section v-if="pendencias.length" class="rounded-[22px] border border-sage-border bg-surface p-5 sm:p-6" aria-labelledby="proposal-pending-heading">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 id="proposal-pending-heading" class="text-lg font-extrabold text-brand-dark">Pendências da campanha</h2>
@@ -14,7 +14,7 @@
           <p class="text-xs font-bold" :class="item.severidade === 'IMPEDITIVO' ? 'text-danger-dark' : 'text-warning-text'">{{ item.severidade === 'IMPEDITIVO' ? 'Impeditiva' : 'Aviso' }}</p>
           <p class="mt-1 text-sm leading-5 text-brand-dark">{{ proposalLabel(item) }}{{ userFacingText(item.mensagem) }}</p>
         </div>
-        <button v-if="item.clientId || item.campo" type="button" class="focus-ring rounded-full border border-sage-border-dark bg-white px-3 py-2 text-xs font-bold text-brand-dark" @click="$emit('focus-pending', { clientId: item.clientId, campo: item.campo })">Ir para correção</button>
+        <button v-if="item.clientId || item.campo" type="button" class="focus-ring rounded-full border border-sage-border-dark bg-surface px-3 py-2 text-xs font-bold text-brand-dark" @click="$emit('focus-pending', { clientId: item.clientId, campo: item.campo })">Ir para correção</button>
       </li>
     </ul>
   </section>

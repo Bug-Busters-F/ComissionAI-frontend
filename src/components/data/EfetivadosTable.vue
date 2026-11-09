@@ -10,7 +10,7 @@
           :class="[
             'focus-ring flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition',
             store.dadosEfetivados.tipoBaseAtiva === 'RH'
-              ? 'bg-white text-brand-dark shadow-sm'
+              ? 'bg-surface text-brand-dark shadow-sm'
               : 'text-sage-muted hover:text-brand-dark'
           ]"
         >
@@ -30,7 +30,7 @@
           :class="[
             'focus-ring flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition',
             store.dadosEfetivados.tipoBaseAtiva === 'VENDAS'
-              ? 'bg-white text-brand-dark shadow-sm'
+              ? 'bg-surface text-brand-dark shadow-sm'
               : 'text-sage-muted hover:text-brand-dark'
           ]"
         >
@@ -50,7 +50,7 @@
           :class="[
             'focus-ring flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition',
             store.dadosEfetivados.tipoBaseAtiva === 'COMISS'
-              ? 'bg-white text-brand-dark shadow-sm'
+              ? 'bg-surface text-brand-dark shadow-sm'
               : 'text-sage-muted hover:text-brand-dark'
           ]"
         >
@@ -72,7 +72,7 @@
           :value="store.dadosEfetivados.competenciaFiltro"
           @change="store.setCompetenciaFiltro($event.target.value)"
           aria-label="Filtrar por competência"
-          class="focus-ring rounded-xl border border-sage-border bg-white px-3.5 py-2 text-xs font-semibold text-brand-dark outline-none"
+          class="focus-ring rounded-xl border border-sage-border bg-surface px-3.5 py-2 text-xs font-semibold text-brand-dark outline-none"
         >
           <option value="TODAS">Todas as competências</option>
           <option
@@ -91,7 +91,7 @@
             :value="store.dadosEfetivados.termoBusca"
             @input="store.setTermoBusca($event.target.value)"
             placeholder="Filtrar matrícula, cargo..."
-            class="focus-ring rounded-xl border border-sage-border bg-white pl-8 pr-4 py-2 text-xs text-brand-dark outline-none w-48 sm:w-56"
+            class="focus-ring rounded-xl border border-sage-border bg-surface pl-8 pr-4 py-2 text-xs text-brand-dark outline-none w-48 sm:w-56"
           />
         </div>
 
@@ -102,7 +102,7 @@
             v-if="store.dadosEfetivados.competenciaFiltro !== 'TODAS'"
             type="button"
             @click="store.abrirModalExclusaoBase(store.dadosEfetivados.competenciaFiltro)"
-            class="focus-ring flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger-bg px-3 py-2 text-xs font-bold text-danger hover:bg-danger hover:text-white transition"
+            class="focus-ring flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger-bg px-3 py-2 text-xs font-bold text-danger hover:bg-danger hover:text-on-status transition"
             :title="`Excluir permanentemente todas as vendas da competência ${store.dadosEfetivados.competenciaFiltro}`"
           >
             <Trash2 class="h-3.5 w-3.5" />
@@ -113,7 +113,7 @@
           <button
             type="button"
             @click="store.abrirModalExclusaoTodasVendas"
-            class="focus-ring flex items-center gap-1.5 rounded-xl border border-sage-border bg-white px-3 py-2 text-xs font-semibold text-sage-muted hover:text-danger hover:border-danger/30 hover:bg-danger-bg/50 transition"
+            class="focus-ring flex items-center gap-1.5 rounded-xl border border-sage-border bg-surface px-3 py-2 text-xs font-semibold text-sage-muted hover:text-danger hover:border-danger/30 hover:bg-danger-bg/50 transition"
             title="Excluir todas as vendas cadastradas"
           >
             <Trash2 class="h-3.5 w-3.5" />
@@ -126,7 +126,7 @@
           <button
             type="button"
             @click="store.abrirModalExclusaoTodasMatriculas"
-            class="focus-ring flex items-center gap-1.5 rounded-xl border border-sage-border bg-white px-3 py-2 text-xs font-semibold text-sage-muted hover:text-danger hover:border-danger/30 hover:bg-danger-bg/50 transition"
+            class="focus-ring flex items-center gap-1.5 rounded-xl border border-sage-border bg-surface px-3 py-2 text-xs font-semibold text-sage-muted hover:text-danger hover:border-danger/30 hover:bg-danger-bg/50 transition"
             title="Excluir todas as matrículas se não houver vendas vinculadas"
           >
             <Trash2 class="h-3.5 w-3.5" />
@@ -139,7 +139,7 @@
           <button
             type="button"
             @click="store.abrirModalExclusaoTodasComissoes"
-            class="focus-ring flex items-center gap-1.5 rounded-xl border border-sage-border bg-white px-3 py-2 text-xs font-semibold text-sage-muted hover:text-danger hover:border-danger/30 hover:bg-danger-bg/50 transition"
+            class="focus-ring flex items-center gap-1.5 rounded-xl border border-sage-border bg-surface px-3 py-2 text-xs font-semibold text-sage-muted hover:text-danger hover:border-danger/30 hover:bg-danger-bg/50 transition"
             title="Excluir todas as taxas de comissão base se não houver cálculos vinculados"
           >
             <Trash2 class="h-3.5 w-3.5" />
@@ -152,7 +152,7 @@
           type="button"
           @click="store.carregarDadosEfetivados"
           :disabled="store.dadosEfetivados.loading"
-          class="focus-ring rounded-xl border border-sage-border bg-white p-2 text-sage-muted hover:text-brand-dark hover:bg-sage-light transition disabled:opacity-50"
+          class="focus-ring rounded-xl border border-sage-border bg-surface p-2 text-sage-muted hover:text-brand-dark hover:bg-sage-light transition disabled:opacity-50"
           title="Recarregar dados"
         >
           <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': store.dadosEfetivados.loading }" />
@@ -185,11 +185,11 @@
     </div>
 
     <!-- Tabela de Dados Efetivados -->
-    <div class="overflow-x-auto rounded-2xl border border-sage-border-light bg-white relative">
+    <div class="overflow-x-auto rounded-2xl border border-sage-border-light bg-surface relative">
       <!-- Loading overlay -->
       <div
         v-if="store.dadosEfetivados.loading"
-        class="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-[1px]"
+        class="absolute inset-0 z-10 flex items-center justify-center bg-surface/70 backdrop-blur-[1px]"
       >
         <div class="flex items-center gap-2 text-xs font-bold text-brand-dark">
           <RefreshCw class="h-4 w-4 animate-spin text-brand" />
@@ -386,7 +386,7 @@
             <select
               :value="store.dadosEfetivados.size"
               @change="store.mudarTamanhoPaginaEfetivados($event.target.value)"
-              class="rounded-lg border border-sage-border bg-white px-2 py-1 font-semibold text-brand-dark outline-none"
+              class="rounded-lg border border-sage-border bg-surface px-2 py-1 font-semibold text-brand-dark outline-none"
             >
               <option :value="10">10</option>
               <option :value="20">20</option>
@@ -400,7 +400,7 @@
               type="button"
               @click="store.mudarPaginaEfetivados(store.dadosEfetivados.page - 1)"
               :disabled="store.dadosEfetivados.page <= 0 || store.dadosEfetivados.loading"
-              class="focus-ring flex items-center gap-1 rounded-lg border border-sage-border bg-white px-3 py-1 font-semibold text-brand-dark hover:bg-sage-light disabled:opacity-40 transition"
+              class="focus-ring flex items-center gap-1 rounded-lg border border-sage-border bg-surface px-3 py-1 font-semibold text-brand-dark hover:bg-sage-light disabled:opacity-40 transition"
             >
               <ChevronLeft class="h-3.5 w-3.5" />
               <span>Anterior</span>
@@ -409,7 +409,7 @@
               type="button"
               @click="store.mudarPaginaEfetivados(store.dadosEfetivados.page + 1)"
               :disabled="store.dadosEfetivados.page + 1 >= store.dadosEfetivados.totalPages || store.dadosEfetivados.loading"
-              class="focus-ring flex items-center gap-1 rounded-lg border border-sage-border bg-white px-3 py-1 font-semibold text-brand-dark hover:bg-sage-light disabled:opacity-40 transition"
+              class="focus-ring flex items-center gap-1 rounded-lg border border-sage-border bg-surface px-3 py-1 font-semibold text-brand-dark hover:bg-sage-light disabled:opacity-40 transition"
             >
               <span>Próxima</span>
               <ChevronRight class="h-3.5 w-3.5" />

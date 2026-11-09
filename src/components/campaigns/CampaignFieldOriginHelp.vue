@@ -4,7 +4,7 @@
       <CircleHelp :size="16" aria-hidden="true" />
     </button>
     <Teleport to="body">
-      <div v-if="opened" :id="tooltipId" ref="panel" role="tooltip" class="fixed z-[70] rounded-xl border border-sage-border bg-white px-4 py-3 text-xs leading-5 text-brand-dark shadow-lg" :style="position" @mouseenter="hold" @mouseleave="scheduleClose">
+      <div v-if="opened" :id="tooltipId" ref="panel" role="tooltip" class="fixed z-[70] rounded-xl border border-sage-border bg-surface px-4 py-3 text-xs leading-5 text-brand-dark shadow-lg" :style="position" @mouseenter="hold" @mouseleave="scheduleClose">
         {{ origin }}
       </div>
     </Teleport>

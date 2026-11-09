@@ -12,11 +12,11 @@
     <CampaignStepNav :steps="CAMPAIGN_STEPS" :current-step="activeStep" :current-step-number="currentStepIndex + 1" @select="goToStep" />
 
     <main ref="mainContent" data-campaign-main tabindex="-1" class="outline-none">
-      <div v-if="state.isLoading" class="rounded-[22px] bg-white px-6 py-14 text-center text-sm text-sage-muted" role="status">Carregando campanha…</div>
+      <div v-if="state.isLoading" class="rounded-[22px] bg-surface px-6 py-14 text-center text-sm text-sage-muted" role="status">Carregando campanha…</div>
       <section v-else-if="loadError" class="rounded-[22px] border border-danger/30 bg-danger-bg p-6 sm:p-8" role="alert">
         <h2 class="text-xl font-extrabold text-danger-dark">Não foi possível abrir esta campanha</h2>
         <p class="mt-2 max-w-2xl text-sm leading-6 text-danger-dark/80">{{ loadError }}</p>
-        <div class="mt-5 flex flex-wrap gap-3"><button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-white" @click="reload">Tentar novamente</button><RouterLink to="/campanhas" class="focus-ring rounded-full border border-danger/30 px-5 py-3 text-sm font-bold text-danger-dark">Voltar para campanhas</RouterLink></div>
+        <div class="mt-5 flex flex-wrap gap-3"><button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-on-status" @click="reload">Tentar novamente</button><RouterLink to="/campanhas" class="focus-ring rounded-full border border-danger/30 px-5 py-3 text-sm font-bold text-danger-dark">Voltar para campanhas</RouterLink></div>
       </section>
       <template v-else>
         <CampaignProposalStep
@@ -73,12 +73,12 @@
       <button v-if="activeStep !== 'proposta'" type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark" @click="goToStep(CAMPAIGN_STEPS[currentStepIndex - 1].key)">← Voltar</button>
       <span v-else></span>
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <button v-if="activeStep === 'proposta'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="state.interpretation.isProcessing" @click="interpretProposal">{{ state.interpretation.isProcessing ? 'Interpretando…' : 'Interpretar regras →' }}</button>
-        <button v-else-if="activeStep === 'interpretacao'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover" @click="goToStep('simulacao')">Ir para simulação →</button>
+        <button v-if="activeStep === 'proposta'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="state.interpretation.isProcessing" @click="interpretProposal">{{ state.interpretation.isProcessing ? 'Interpretando…' : 'Interpretar regras →' }}</button>
+        <button v-else-if="activeStep === 'interpretacao'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover" @click="goToStep('simulacao')">Ir para simulação →</button>
         <button
           v-else-if="activeStep === 'simulacao'"
           type="button"
-          class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+          class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="!canAdvanceFromSimulation"
           @click="handleSimulationContinue"
         >
@@ -91,7 +91,7 @@
             v-if="canApprove"
             type="button"
             data-testid="approve-campaign-btn"
-            class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+            class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="state.isSaving || state.isApproving || !canActivateInReview"
             @click="approveCampaign({ requireAcceptedSimulation: true })"
           >

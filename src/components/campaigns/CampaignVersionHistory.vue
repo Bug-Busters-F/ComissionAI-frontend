@@ -1,12 +1,12 @@
 <template>
-  <section class="rounded-2xl border border-sage-border bg-white p-5 sm:p-7">
+  <section class="rounded-2xl border border-sage-border bg-surface p-5 sm:p-7">
     <h2 class="text-xl font-extrabold">Histórico de versões</h2>
     <p class="mt-2 text-sm text-sage-muted">Versões publicadas disponíveis somente para leitura, com suas explicações e código preservados.</p>
     <p v-if="loading" role="status" class="mt-4 text-sm">Carregando histórico…</p>
     <p v-if="error" role="alert" class="mt-4 text-sm text-danger-dark">{{ userFacingText(error) }} <button class="focus-ring rounded font-bold underline" @click="load">Tentar novamente</button></p>
     <p v-if="!loading && !error && !versions.length" class="mt-4 text-sm text-sage-muted">Esta campanha ainda não possui versões publicadas.</p>
     <label v-if="versions.length" class="mt-4 block text-sm font-bold">Versão publicada
-      <select :value="selected" class="focus-ring mt-2 block w-full rounded-xl border border-sage-border bg-white p-3 sm:max-w-md" @change="select($event.target.value)">
+      <select :value="selected" class="focus-ring mt-2 block w-full rounded-xl border border-sage-border bg-surface p-3 sm:max-w-md" @change="select($event.target.value)">
         <option value="">Selecione uma versão</option>
         <option v-for="version in versions" :key="version.numero" :value="version.numero">Versão {{ version.numero }}{{ version.numero === currentVersion ? ' · Atual' : '' }} · {{ version.responsavel || 'Responsável não informado' }}</option>
       </select>

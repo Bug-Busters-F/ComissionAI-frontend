@@ -4,7 +4,7 @@
       <LoaderCircle :size="18" class="shrink-0 motion-safe:animate-spin" aria-hidden="true" />
       <span>{{ userFacingText(message) }}</span>
     </div>
-    <button type="button" class="focus-ring inline-flex min-h-10 shrink-0 items-center justify-center gap-2 self-start rounded-full border border-danger/30 bg-white px-4 py-2 text-sm font-bold text-danger-dark transition-colors hover:border-danger hover:bg-danger-bg sm:self-auto" @click="$emit('cancel')">
+    <button type="button" class="focus-ring inline-flex min-h-10 shrink-0 items-center justify-center gap-2 self-start rounded-full border border-danger/30 bg-surface px-4 py-2 text-sm font-bold text-danger-dark transition-colors hover:border-danger hover:bg-danger-bg sm:self-auto" @click="$emit('cancel')">
       <X :size="16" aria-hidden="true" />
       Cancelar solicitação
     </button>

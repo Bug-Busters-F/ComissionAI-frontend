@@ -6,7 +6,7 @@
     aria-modal="true"
   >
     <div
-      class="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+      class="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"
     >
       <!-- Cabeçalho do Modal -->
       <div class="flex items-center justify-between border-b border-sage-border-light px-6 py-4">
@@ -58,7 +58,7 @@
         <button
           type="button"
           @click="store.fecharRelatorioEnvio"
-          class="focus-ring rounded-xl bg-brand px-5 py-2.5 text-xs font-bold text-brand-dark transition hover:bg-brand-hover"
+          class="focus-ring rounded-xl bg-brand px-5 py-2.5 text-xs font-bold text-on-brand transition hover:bg-brand-hover"
         >
           Fechar relatório
         </button>

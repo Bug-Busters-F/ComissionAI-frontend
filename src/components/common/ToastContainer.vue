@@ -39,7 +39,7 @@
             <button
               type="button"
               @click="handleAction(item)"
-              class="focus-ring rounded-lg bg-brand-dark px-3 py-1 text-[11px] font-bold text-white transition hover:bg-brand-dark-hover"
+              class="focus-ring rounded-lg bg-inverse px-3 py-1 text-[11px] font-bold text-on-inverse transition hover:bg-inverse-hover"
             >
               {{ item.actionLabel }}
             </button>
@@ -76,7 +76,7 @@ function getStyleClasses(type) {
     case 'warning':
       return 'border-warning/30 bg-warning-bg/95 text-brand-dark'
     default:
-      return 'border-sage-border bg-white/95 text-brand-dark'
+      return 'border-sage-border bg-surface/95 text-brand-dark'
   }
 }
 

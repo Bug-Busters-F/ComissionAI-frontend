@@ -17,7 +17,7 @@
     >
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div class="flex items-start gap-3.5">
-          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-warning-dark">
+          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-surface text-warning-dark">
             <AlertTriangle class="h-6 w-6" aria-hidden="true" />
           </div>
           <div>
@@ -44,7 +44,7 @@
 
         <button
           type="button"
-          class="focus-ring shrink-0 self-start rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-brand-dark transition hover:bg-brand-hover"
+          class="focus-ring shrink-0 self-start rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-on-brand transition hover:bg-brand-hover"
           @click="$emit('go-to-simulation')"
         >
           ← Ir para Simulação
@@ -55,7 +55,7 @@
     <!-- 2. Resultados da Simulação Aceita e Cenários Projetados ([FRONT-5] + [FRONT-6]) -->
     <section
       v-else
-      class="rounded-[22px] bg-white p-6 sm:p-7"
+      class="rounded-[22px] bg-surface p-6 sm:p-7"
       aria-labelledby="review-simulation-heading"
     >
       <div class="flex flex-wrap items-start justify-between gap-4">

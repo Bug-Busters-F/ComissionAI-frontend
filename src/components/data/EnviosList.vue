@@ -27,7 +27,7 @@
     </div>
 
     <!-- Tabela de Envios -->
-    <div class="overflow-x-auto rounded-2xl border border-sage-border-light bg-white">
+    <div class="overflow-x-auto rounded-2xl border border-sage-border-light bg-surface">
       <table class="w-full min-w-[700px] text-left text-sm">
         <thead class="bg-sage-pill text-[10px] uppercase tracking-[0.12em] text-sage-muted border-b border-sage-border-light">
           <tr>

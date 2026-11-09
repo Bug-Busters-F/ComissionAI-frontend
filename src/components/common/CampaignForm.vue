@@ -1,6 +1,6 @@
 <template>
   <form class="space-y-6" novalidate @submit.prevent="emit('submit')">
-    <section class="rounded-2xl bg-white p-6 sm:p-7" aria-labelledby="campaign-data-heading">
+    <section class="rounded-2xl bg-surface p-6 sm:p-7" aria-labelledby="campaign-data-heading">
       <div>
         <h2 id="campaign-data-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Campanha</h2>
         <p class="mt-1 text-sm text-sage-muted">Identifique a campanha e preserve o texto que originou a regra.</p>
@@ -22,7 +22,7 @@
       </div>
     </section>
 
-    <section class="rounded-2xl bg-white p-6 sm:p-7" aria-labelledby="campaign-period-heading">
+    <section class="rounded-2xl bg-surface p-6 sm:p-7" aria-labelledby="campaign-period-heading">
       <div>
         <h2 id="campaign-period-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Vigência</h2>
         <p class="mt-1 text-sm text-sage-muted">As datas são enviadas como datas locais, sem conversão de fuso horário.</p>
@@ -47,7 +47,7 @@
       </p>
     </section>
 
-    <section class="rounded-2xl bg-white p-6 sm:p-7" aria-labelledby="campaign-rule-heading">
+    <section class="rounded-2xl bg-surface p-6 sm:p-7" aria-labelledby="campaign-rule-heading">
       <div>
         <h2 id="campaign-rule-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Regra vinculada</h2>
         <p class="mt-1 text-sm text-sage-muted">Todos os campos desta seção são opcionais, exceto a taxa positiva.</p>
@@ -99,9 +99,9 @@
     <p v-if="generalError" class="rounded-xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm leading-6 text-danger-dark" role="alert">{{ generalError }}</p>
 
     <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-      <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-white" :disabled="isSubmitting" @click="emit('cancel')">Cancelar</button>
-      <button type="submit" class="focus-ring inline-flex items-center justify-center rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="isSubmitting">
-        <span v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-brand-dark/30 border-t-brand-dark" aria-hidden="true"></span>
+      <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-surface" :disabled="isSubmitting" @click="emit('cancel')">Cancelar</button>
+      <button type="submit" class="focus-ring inline-flex items-center justify-center rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="isSubmitting">
+        <span v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-on-brand/30 border-t-on-brand" aria-hidden="true"></span>
         {{ isSubmitting ? 'Salvando…' : submitLabel }}
       </button>
     </div>
@@ -145,7 +145,7 @@ function fieldError(field) {
 }
 
 .form-control {
-  @apply focus-ring w-full rounded-xl border border-sage-border bg-white px-4 py-3 text-sm text-brand-dark outline-none transition placeholder:text-sage-muted;
+  @apply focus-ring w-full rounded-xl border border-sage-border bg-surface px-4 py-3 text-sm text-brand-dark outline-none transition placeholder:text-sage-muted;
 }
 
 .form-control-error {

@@ -1,5 +1,5 @@
 <template>
-  <section v-if="comparison" class="rounded-2xl border border-sage-border bg-white p-5 sm:p-7" aria-labelledby="version-comparison-title">
+  <section v-if="comparison" class="rounded-2xl border border-sage-border bg-surface p-5 sm:p-7" aria-labelledby="version-comparison-title">
     <h2 id="version-comparison-title" class="text-xl font-extrabold">Revisão das alterações</h2>
     <p class="mt-2 text-sm text-sage-muted">Versão vigente {{ published.numero }} → Proposta {{ proposedNumber }} · Baseada na versão {{ sourceNumber ?? published.numero }}.</p>
     <p class="mt-3 rounded-xl bg-warning-bg p-3 text-sm text-warning-text">Ao publicar, a nova versão valerá para todo o período da campanha. A versão vigente permanece preservada até a confirmação.</p>

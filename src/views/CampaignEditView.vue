@@ -2,16 +2,16 @@
   <div class="space-y-7">
     <PageHeader title="Editar campanha" description="Revise a campanha e a regra vinculada antes de salvar.">
       <template #action>
-        <RouterLink :to="`/campanhas/${route.params.id}`" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-white">Voltar para detalhes</RouterLink>
+        <RouterLink :to="`/campanhas/${route.params.id}`" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-surface">Voltar para detalhes</RouterLink>
       </template>
     </PageHeader>
 
-    <div v-if="isLoading" class="rounded-2xl bg-white px-5 py-10 text-center text-sm text-sage-muted" role="status">Carregando dados da campanha…</div>
+    <div v-if="isLoading" class="rounded-2xl bg-surface px-5 py-10 text-center text-sm text-sage-muted" role="status">Carregando dados da campanha…</div>
 
     <section v-else-if="loadError" class="rounded-2xl border border-danger/30 bg-danger-bg p-6 sm:p-7" role="alert">
       <h2 class="text-xl font-extrabold text-danger-dark">Campanha não encontrada</h2>
       <p class="mt-2 text-sm leading-6 text-danger-dark/80">{{ loadError }}</p>
-      <RouterLink to="/campanhas" class="focus-ring mt-5 inline-flex rounded-full bg-danger px-5 py-3 text-sm font-bold text-white">Voltar para campanhas</RouterLink>
+      <RouterLink to="/campanhas" class="focus-ring mt-5 inline-flex rounded-full bg-danger px-5 py-3 text-sm font-bold text-on-status">Voltar para campanhas</RouterLink>
     </section>
 
     <CampaignForm v-else :model-value="form" :errors="errors" :general-error="generalError" :is-submitting="isSubmitting" submit-label="Salvar alterações" @update:model-value="updateForm" @submit="submit" @cancel="cancel" />

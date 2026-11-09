@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="fixed inset-0 z-50 grid place-items-center bg-brand-dark/50 px-5 py-8" role="presentation" @click.self="$emit('close')">
-      <section ref="dialog" class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[22px] bg-white p-6 shadow-2xl sm:p-8" role="dialog" aria-modal="true" aria-labelledby="memory-dialog-title" @keydown.esc="$emit('close')" @keydown="trapFocus">
+    <div v-if="open" class="fixed inset-0 z-50 grid place-items-center bg-overlay/50 px-5 py-8" role="presentation" @click.self="$emit('close')">
+      <section ref="dialog" class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[22px] bg-surface p-6 shadow-2xl sm:p-8" role="dialog" aria-modal="true" aria-labelledby="memory-dialog-title" @keydown.esc="$emit('close')" @keydown="trapFocus">
         <div class="flex items-start justify-between gap-4"><div><h2 id="memory-dialog-title" class="text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">Memória do cálculo</h2><p class="mt-2 text-sm text-sage-muted">Exemplo demonstrativo · cenário de referência</p></div><button ref="closeButton" type="button" class="focus-ring grid h-10 w-10 place-items-center rounded-full bg-sage-pill text-xl font-bold text-brand-dark" aria-label="Fechar" @click="$emit('close')">×</button></div>
         <p class="mt-6 text-sm font-bold text-brand-dark">Ana Martins · matrícula 1001</p><p class="mt-1 text-sm text-sage-muted">Loja física · Varejo. Regra da campanha aplicável.</p>
         <dl class="mt-7"> <div v-for="item in items" :key="item.label" class="flex items-center justify-between gap-4 border-b border-sage-border-light py-3 text-sm"><dt class="text-sage-muted">{{ item.label }}</dt><dd class="text-right font-bold text-brand-dark">{{ item.value }}</dd></div></dl>

@@ -2,13 +2,13 @@
   <div class="space-y-7">
     <PageHeader title="Campanhas" description="Crie campanhas com regras, revise-as e acompanhe suas vigências.">
       <template #action>
-        <RouterLink to="/campanhas/nova" class="focus-ring inline-flex rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover">
+        <RouterLink to="/campanhas/nova" class="focus-ring inline-flex rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover">
           + Nova campanha
         </RouterLink>
       </template>
     </PageHeader>
 
-    <section class="rounded-2xl bg-white p-6 sm:p-7" aria-labelledby="campaign-list-heading">
+    <section class="rounded-2xl bg-surface p-6 sm:p-7" aria-labelledby="campaign-list-heading">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 id="campaign-list-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Campanhas cadastradas</h2>
@@ -16,9 +16,9 @@
         </div>
         <div class="flex flex-col gap-3 sm:flex-row">
           <label class="sr-only" for="campaign-search">Buscar campanha</label>
-          <input id="campaign-search" v-model="search" placeholder="Buscar campanha" class="focus-ring w-full rounded-xl border border-sage-border bg-white px-4 py-3 text-sm text-brand-dark outline-none sm:w-56" />
+          <input id="campaign-search" v-model="search" placeholder="Buscar campanha" class="focus-ring w-full rounded-xl border border-sage-border bg-surface px-4 py-3 text-sm text-brand-dark outline-none sm:w-56" />
           <label class="sr-only" for="campaign-status-filter">Filtrar por estado</label>
-          <select id="campaign-status-filter" v-model="statusFilter" class="focus-ring rounded-xl border border-sage-border bg-white px-4 py-3 text-sm text-brand-dark outline-none">
+          <select id="campaign-status-filter" v-model="statusFilter" class="focus-ring rounded-xl border border-sage-border bg-surface px-4 py-3 text-sm text-brand-dark outline-none">
             <option value="ALL">Todos os estados</option>
             <option v-for="state in statusOptions" :key="state" :value="state">{{ formatCampaignState(state) }}</option>
           </select>
@@ -30,13 +30,13 @@
       <div v-else-if="loadError" class="mt-8 rounded-xl border border-danger/30 bg-danger-bg px-5 py-6" role="alert">
         <p class="font-bold text-danger-dark">Não foi possível consultar as campanhas.</p>
         <p class="mt-1 text-sm leading-6 text-danger-dark/80">{{ loadError }}</p>
-        <button type="button" class="focus-ring mt-4 rounded-full bg-danger px-4 py-2 text-sm font-bold text-white" @click="loadCampaigns">Tentar novamente</button>
+        <button type="button" class="focus-ring mt-4 rounded-full bg-danger px-4 py-2 text-sm font-bold text-on-status" @click="loadCampaigns">Tentar novamente</button>
       </div>
 
       <div v-else-if="campaigns.length === 0" class="mt-8 rounded-xl bg-sage-light px-5 py-8 text-center">
         <p class="font-bold text-brand-dark">Nenhuma campanha cadastrada.</p>
         <p class="mt-1 text-sm text-sage-muted">Crie a primeira campanha para começar a acompanhar suas regras.</p>
-        <RouterLink to="/campanhas/nova" class="focus-ring mt-4 inline-flex rounded-full bg-brand px-4 py-2 text-sm font-bold text-brand-dark">Criar campanha</RouterLink>
+        <RouterLink to="/campanhas/nova" class="focus-ring mt-4 inline-flex rounded-full bg-brand px-4 py-2 text-sm font-bold text-on-brand">Criar campanha</RouterLink>
       </div>
 
       <div v-else-if="filteredCampaigns.length === 0" class="mt-8 rounded-xl bg-sage-light px-5 py-8 text-center">

@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-6">
     <!-- 1. Seleção da Competência, Origem dos Dados e Período da Campanha ([FRONT-4]) -->
-    <section class="rounded-[24px] border border-sage-border-light bg-white p-6 shadow-sm sm:p-7" aria-labelledby="simulation-heading">
+    <section class="rounded-[24px] border border-sage-border-light bg-surface p-6 shadow-sm sm:p-7" aria-labelledby="simulation-heading">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div class="flex flex-wrap items-center gap-2.5">
@@ -66,7 +66,7 @@
                 id="simulation-competence-select"
                 :value="simulation.selectedCompetencia"
                 :disabled="simulation.isLoadingCompetences || simulation.isRunning || !competenceOptions.length"
-                class="focus-ring w-full rounded-xl border border-sage-border-dark bg-white px-4 py-3 text-sm font-extrabold text-brand-dark shadow-sm transition hover:border-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+                class="focus-ring w-full rounded-xl border border-sage-border-dark bg-surface px-4 py-3 text-sm font-extrabold text-brand-dark shadow-sm transition hover:border-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
                 @change="$emit('select-competence', $event.target.value)"
               >
                 <option v-if="!competenceOptions.length" value="">
@@ -89,7 +89,7 @@
         </div>
 
         <!-- Card 2: Recorte do Público Auditado (4 colunas) -->
-        <article class="rounded-2xl border border-sage-border-light bg-white p-5 shadow-sm lg:col-span-4 flex flex-col justify-between">
+        <article class="rounded-2xl border border-sage-border-light bg-surface p-5 shadow-sm lg:col-span-4 flex flex-col justify-between">
           <div class="flex items-center justify-between gap-2">
             <span class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">
               <Users class="h-4 w-4 text-brand-dark" aria-hidden="true" />
@@ -123,7 +123,7 @@
         </article>
 
         <!-- Card 3: Vigência e Projeção (3 colunas) -->
-        <article class="rounded-2xl border border-sage-border-light bg-white p-5 shadow-sm lg:col-span-3 flex flex-col justify-between">
+        <article class="rounded-2xl border border-sage-border-light bg-surface p-5 shadow-sm lg:col-span-3 flex flex-col justify-between">
           <div class="flex items-center justify-between gap-2">
             <span class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">
               <Calendar class="h-4 w-4 text-brand-dark" aria-hidden="true" />
@@ -173,7 +173,7 @@
         </div>
         <button
           type="button"
-          class="focus-ring shrink-0 self-start rounded-full bg-brand px-4 py-2 text-xs font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+          class="focus-ring shrink-0 self-start rounded-full bg-brand px-4 py-2 text-xs font-bold text-on-brand transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="!canRunSimulation || simulation.isRunning"
           @click="handleRunSimulation"
         >
@@ -185,7 +185,7 @@
     <!-- 3. Impedimento: Base Contratual Ausente (tabela de comissões) ([FRONT-4]) -->
     <section
       v-if="isMissingBaseBlocked"
-      class="rounded-[22px] border border-warning-border bg-white p-6 shadow-sm sm:p-7"
+      class="rounded-[22px] border border-warning-border bg-surface p-6 shadow-sm sm:p-7"
       aria-labelledby="simulation-blocked-heading"
       role="alert"
     >
@@ -220,7 +220,7 @@
 
         <RouterLink
           to="/dados"
-          class="focus-ring inline-flex items-center gap-2 self-start rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-brand-dark transition hover:bg-brand-hover"
+          class="focus-ring inline-flex items-center gap-2 self-start rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-on-brand transition hover:bg-brand-hover"
         >
           <UploadCloud class="h-4 w-4" aria-hidden="true" />
           <span>Ir para Gestão de Dados (Importar COMISS)</span>
@@ -239,7 +239,7 @@
     <!-- 4. Impedimento: Referência Insuficiente (0 vendas para o público) ([FRONT-4]) -->
     <section
       v-else-if="isInsufficientReference"
-      class="rounded-[22px] border border-warning-border bg-white p-6 shadow-sm sm:p-7"
+      class="rounded-[22px] border border-warning-border bg-surface p-6 shadow-sm sm:p-7"
       aria-labelledby="simulation-insufficient-heading"
       role="alert"
     >
@@ -298,7 +298,7 @@
         </div>
         <button
           type="button"
-          class="focus-ring shrink-0 self-start rounded-full border border-danger/30 bg-white px-4 py-2 text-xs font-bold text-danger-dark"
+          class="focus-ring shrink-0 self-start rounded-full border border-danger/30 bg-surface px-4 py-2 text-xs font-bold text-danger-dark"
           @click="$emit('back-to-rules')"
         >
           ← Voltar e revisar regras
@@ -309,7 +309,7 @@
     <!-- 6. Painel de Validação Pronta + Solicitação e Acompanhamento Assíncrono ([FRONT-4]) -->
     <section
       v-if="!isMissingBaseBlocked && !isInsufficientReference && !otherImpediments.length"
-      class="rounded-[22px] bg-white p-6 sm:p-7"
+      class="rounded-[22px] bg-surface p-6 sm:p-7"
       aria-labelledby="simulation-execution-heading"
     >
       <div class="flex flex-wrap items-center justify-between gap-4">
@@ -343,7 +343,7 @@
           <button
             type="button"
             data-testid="run-simulation-btn"
-            class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+            class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-on-brand transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="!canRunSimulation || simulation.isRunning || simulation.isValidatingReference"
             @click="handleRunSimulation"
           >
@@ -412,7 +412,7 @@
           <span>{{ userFacingText(simulation.error) }}</span>
           <button
             type="button"
-            class="focus-ring rounded-full bg-danger px-3.5 py-1.5 text-xs font-bold text-white"
+            class="focus-ring rounded-full bg-danger px-3.5 py-1.5 text-xs font-bold text-on-status"
             @click="handleRunSimulation"
           >
             Tentar novamente
@@ -425,7 +425,7 @@
     <template v-if="hasValidSimulationResult && !isMissingBaseBlocked && !isInsufficientReference">
       <!-- 7.1 HERO CARD EXECUTIVO: IMPACTO ORÇAMENTÁRIO DA PROPOSTA -->
       <section
-        class="relative overflow-hidden rounded-[26px] bg-brand-dark text-white p-6 sm:p-8 shadow-xl"
+        class="relative overflow-hidden rounded-[26px] bg-inverse text-on-inverse p-6 sm:p-8 shadow-xl"
         aria-labelledby="simulation-totals-heading"
       >
         <!-- Acentos de luz sutil no fundo (Glow Wise) -->
@@ -435,20 +435,20 @@
         <div class="relative z-10">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2.5">
-              <span class="grid h-8 w-8 place-items-center rounded-xl bg-brand text-brand-dark shadow-sm">
+              <span class="grid h-8 w-8 place-items-center rounded-xl bg-brand text-on-brand shadow-sm">
                 <TrendingUp class="h-4 w-4 stroke-[2.5]" aria-hidden="true" />
               </span>
               <div>
-                <span class="text-xs font-bold uppercase tracking-[0.14em] text-sage-border">
+                <span class="text-xs font-bold uppercase tracking-[0.14em] text-inverse-muted">
                   Projeção Orçamentária da Campanha
                 </span>
                 <p class="text-[11px] text-sage-muted">Impacto total sobre o público recortado</p>
               </div>
             </div>
 
-            <div class="flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-sage-border backdrop-blur-sm">
+            <div class="flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-inverse-muted backdrop-blur-sm">
               <Calendar class="h-3.5 w-3.5 text-brand" aria-hidden="true" />
-              <span>Vigência: <strong class="text-white">{{ simulationTotals.duracaoCampanhaDias }} dias</strong> (Fator {{ simulationTotals.fatorDuracaoTexto }})</span>
+              <span>Vigência: <strong class="text-on-inverse">{{ simulationTotals.duracaoCampanhaDias }} dias</strong> (Fator {{ simulationTotals.fatorDuracaoTexto }})</span>
             </div>
           </div>
 
@@ -458,11 +458,11 @@
               <p class="text-xs font-medium uppercase tracking-[0.08em] text-sage-muted">
                 Investimento Adicional Estimado (Impacto da Proposta)
               </p>
-              <h3 id="simulation-totals-heading" class="mt-1 text-4xl sm:text-5xl font-black tracking-[-0.04em] text-white">
+              <h3 id="simulation-totals-heading" class="mt-1 text-4xl sm:text-5xl font-black tracking-[-0.04em] text-on-inverse">
                 {{ signedCurrency(simulationTotals.projetado.diferenca) }}
               </h3>
             </div>
-            <div class="flex items-center gap-2 rounded-full bg-brand px-4 py-1.5 text-sm font-black text-brand-dark shadow-md">
+            <div class="flex items-center gap-2 rounded-full bg-brand px-4 py-1.5 text-sm font-black text-on-brand shadow-md">
               <span>{{ simulationTotals.projetado.diferenca >= 0 ? '▲ +' : '▼ ' }}{{ percent(simulationTotals.projetado.impactoPct) }}</span>
               <span class="text-xs font-bold opacity-80">vs. Base Contratual</span>
             </div>
@@ -473,10 +473,10 @@
             <!-- Sub-Card 1: Volume de Vendas -->
             <div class="rounded-2xl border border-white/10 bg-white/[0.06] p-4 sm:p-5 backdrop-blur-sm transition hover:bg-white/[0.08]">
               <p class="text-xs font-medium uppercase tracking-[0.06em] text-sage-muted">Volume de Vendas Projetado</p>
-              <p class="mt-2 text-2xl font-black text-white">
+              <p class="mt-2 text-2xl font-black text-on-inverse">
                 {{ currency(simulationTotals.projetado.totalVendas) }}
               </p>
-              <p class="mt-1 text-xs text-sage-border">
+              <p class="mt-1 text-xs text-inverse-muted">
                 {{ simulationTotals.totalVendasConsideradas }} vendas únicas consideradas
               </p>
             </div>
@@ -484,10 +484,10 @@
             <!-- Sub-Card 2: Comissão Base -->
             <div class="rounded-2xl border border-white/10 bg-white/[0.06] p-4 sm:p-5 backdrop-blur-sm transition hover:bg-white/[0.08]">
               <p class="text-xs font-medium uppercase tracking-[0.06em] text-sage-muted">Comissão Base (Sem Campanha)</p>
-              <p class="mt-2 text-2xl font-black text-white">
+              <p class="mt-2 text-2xl font-black text-on-inverse">
                 {{ currency(simulationTotals.projetado.comissaoBase) }}
               </p>
-              <p class="mt-1 text-xs text-sage-border">
+              <p class="mt-1 text-xs text-inverse-muted">
                 Taxa contratual de referência
               </p>
             </div>
@@ -507,7 +507,7 @@
       </section>
 
       <!-- 7.2 CENÁRIOS PROJETADOS DE SENSIBILIDADE (80%, 120%, 150%) -->
-      <section class="rounded-[24px] border border-sage-border-light bg-white p-6 shadow-sm sm:p-7">
+      <section class="rounded-[24px] border border-sage-border-light bg-surface p-6 shadow-sm sm:p-7">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
             <div class="flex items-center gap-2">
@@ -529,10 +529,10 @@
             class="flex flex-col justify-between rounded-2xl p-5 sm:p-6 transition hover:shadow-md"
             :class="[
               scenario.key === '80'
-                ? 'border border-amber-200/80 bg-gradient-to-b from-amber-50/40 via-white to-white'
+                ? 'border border-warning-border bg-gradient-to-b from-warning-bg/40 via-surface to-surface'
                 : scenario.key === '120'
-                  ? 'border-2 border-brand bg-gradient-to-b from-brand/[0.08] via-white to-white shadow-sm ring-1 ring-brand/30'
-                  : 'border border-emerald-200 bg-gradient-to-b from-emerald-50/40 via-white to-white'
+                  ? 'border-2 border-brand bg-gradient-to-b from-brand/[0.08] via-surface to-surface shadow-sm ring-1 ring-brand/30'
+                  : 'border border-success/30 bg-gradient-to-b from-success-bg/40 via-surface to-surface'
             ]"
           >
             <div>
@@ -542,10 +542,10 @@
                     class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-extrabold"
                     :class="[
                       scenario.key === '80'
-                        ? 'bg-amber-100 text-amber-900 border border-amber-300/60'
+                        ? 'bg-warning-light text-warning-text border border-warning-border'
                         : scenario.key === '120'
-                          ? 'bg-brand text-brand-dark font-black'
-                          : 'bg-emerald-100 text-emerald-900 border border-emerald-300/60'
+                          ? 'bg-brand text-on-brand font-black'
+                          : 'bg-success-surface text-success-dark border border-success/30'
                     ]"
                   >
                     {{ scenario.key === '120' ? '★ ' : '' }}{{ scenario.percentage }} do volume
@@ -626,7 +626,7 @@
           <!-- Conteúdo expandido das premissas e comparativo histórico -->
           <div v-if="showPremises" class="mt-4 rounded-2xl border border-sage-border-light bg-sage-light/50 p-5 space-y-4">
             <div class="grid gap-4 lg:grid-cols-2">
-              <article class="rounded-xl border border-sage-border-light bg-white p-4">
+              <article class="rounded-xl border border-sage-border-light bg-surface p-4">
                 <p class="text-xs font-bold uppercase tracking-[0.1em] text-sage-muted">
                   Totais históricos na competência {{ simulationResult.competencia }} (30 dias)
                 </p>
@@ -650,7 +650,7 @@
                 </dl>
               </article>
 
-              <article class="rounded-xl border border-sage-border-light bg-white p-4 text-xs leading-5 text-sage-muted">
+              <article class="rounded-xl border border-sage-border-light bg-surface p-4 text-xs leading-5 text-sage-muted">
                 <p class="font-bold uppercase tracking-[0.1em] text-brand-dark">Critérios e Premissas Auditáveis</p>
                 <ul class="mt-2 list-disc space-y-1 pl-4">
                   <li><strong>Mês comercial:</strong> Projeção padronizada em 30 dias corridos (dias inclusivos ÷ 30).</li>
@@ -664,7 +664,7 @@
       </section>
 
       <!-- 7.3 TABELA PAGINADA DE VENDAS DO PÚBLICO -->
-      <section class="rounded-[24px] border border-sage-border-light bg-white p-6 shadow-sm sm:p-7" aria-labelledby="simulation-table-heading">
+      <section class="rounded-[24px] border border-sage-border-light bg-surface p-6 shadow-sm sm:p-7" aria-labelledby="simulation-table-heading">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h3 id="simulation-table-heading" class="text-xl font-black tracking-[-0.03em] text-brand-dark">
@@ -681,7 +681,7 @@
             <select
               id="simulation-page-size"
               :value="simulation.pageSize"
-              class="focus-ring rounded-xl border border-sage-border-dark bg-white px-3 py-1.5 font-bold text-brand-dark shadow-sm"
+              class="focus-ring rounded-xl border border-sage-border-dark bg-surface px-3 py-1.5 font-bold text-brand-dark shadow-sm"
               @change="$emit('change-page-size', Number($event.target.value))"
             >
               <option :value="5">5</option>
@@ -703,7 +703,7 @@
                 <th scope="col" class="px-4 py-3.5 text-center">Memória</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-sage-border-light bg-white">
+            <tbody class="divide-y divide-sage-border-light bg-surface">
               <tr
                 v-for="row in paginatedRows"
                 :key="row.saleId"
@@ -804,7 +804,7 @@
           <div v-if="showDecisionActions" class="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              class="focus-ring rounded-full border border-sage-border-dark bg-white px-4 py-2.5 text-xs font-bold text-brand-dark shadow-sm transition hover:bg-sage-light"
+              class="focus-ring rounded-full border border-sage-border-dark bg-surface px-4 py-2.5 text-xs font-bold text-brand-dark shadow-sm transition hover:bg-sage-light"
               @click="$emit('back-to-rules')"
             >
               ← Voltar e ajustar regras
@@ -813,7 +813,7 @@
             <button v-else
               type="button"
               data-testid="accept-simulation-btn"
-              class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-6 py-2.5 text-sm font-black text-brand-dark shadow-md transition hover:bg-brand-hover hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-6 py-2.5 text-sm font-black text-on-brand shadow-md transition hover:bg-brand-hover hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="simulation.isRunning || hasInvalidation"
               @click="$emit('accept-simulation')"
             >
@@ -837,8 +837,8 @@
       @click.self="closeMemoryModal"
       @keydown.esc.prevent.stop="closeMemoryModal" @keydown.tab="trapMemoryFocus"
     >
-      <div ref="memoryPanel" class="flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-[22px] bg-white shadow-xl">
-        <div class="flex shrink-0 items-start justify-between gap-4 border-b border-sage-border-light bg-white px-6 py-5 sm:px-7">
+      <div ref="memoryPanel" class="flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-[22px] bg-surface shadow-xl">
+        <div class="flex shrink-0 items-start justify-between gap-4 border-b border-sage-border-light bg-surface px-6 py-5 sm:px-7">
           <div>
             <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">
               Memória do Cálculo Individual

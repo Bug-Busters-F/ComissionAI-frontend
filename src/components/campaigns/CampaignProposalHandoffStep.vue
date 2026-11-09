@@ -6,7 +6,7 @@
       <p class="mt-3 text-sm font-bold text-warning-text">{{ snapshot.propostas.length }} regras mantidas no resumo desta campanha.</p>
     </section>
     <CampaignProposalReviewSummary :campaign="campaign" :validation="validation" />
-    <div class="rounded-2xl border border-sage-border bg-white p-4 text-sm leading-6 text-sage-muted">
+    <div class="rounded-2xl border border-sage-border bg-surface p-4 text-sm leading-6 text-sage-muted">
       Esta etapa não salva, simula, aceita nem ativa uma campanha. Os dados ficam em memória enquanto esta página permanecer aberta.
     </div>
   </div>

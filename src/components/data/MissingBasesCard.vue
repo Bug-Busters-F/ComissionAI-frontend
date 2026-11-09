@@ -1,7 +1,7 @@
 <template>
   <section
     v-if="groups.length"
-    class="rounded-[22px] border border-warning-border bg-white p-6 shadow-sm sm:p-7"
+    class="rounded-[22px] border border-warning-border bg-surface p-6 shadow-sm sm:p-7"
     aria-labelledby="missing-bases-title"
     role="alert"
   >
@@ -26,7 +26,7 @@
       <div class="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          class="focus-ring inline-flex items-center gap-2 rounded-full border border-sage-border-dark bg-white px-5 py-2.5 text-sm font-bold text-brand-dark transition hover:bg-sage-light disabled:cursor-not-allowed disabled:opacity-60"
+          class="focus-ring inline-flex items-center gap-2 rounded-full border border-sage-border-dark bg-surface px-5 py-2.5 text-sm font-bold text-brand-dark transition hover:bg-sage-light disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="isProcessing"
           @click="openComissModalForCompetence(competenceKey)"
         >
@@ -35,7 +35,7 @@
         </button>
         <button
           type="button"
-          class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+          class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-on-brand transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="isProcessing"
           @click="$emit('recalculate')"
         >
@@ -98,7 +98,7 @@
             <td class="px-4 py-4 text-right">
               <button
                 type="button"
-                class="focus-ring inline-flex items-center gap-1.5 rounded-full border border-sage-border-dark px-3 py-1.5 text-xs font-bold text-brand-dark transition hover:bg-white"
+                class="focus-ring inline-flex items-center gap-1.5 rounded-full border border-sage-border-dark px-3 py-1.5 text-xs font-bold text-brand-dark transition hover:bg-surface"
                 @click="openComissModalForCompetence(group.competenciaKey || competenceKey)"
               >
                 <UploadCloud class="h-3.5 w-3.5" aria-hidden="true" />

@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <dialog ref="dialog" class="rule-review w-[calc(100%-2rem)] max-w-2xl rounded-[22px] bg-white p-0 text-brand-dark shadow-2xl" :aria-labelledby="titleId" @cancel.prevent="$emit('cancel')" @close="$emit('closed')" @keydown="trapFocus">
+    <dialog ref="dialog" class="rule-review w-[calc(100%-2rem)] max-w-2xl rounded-[22px] bg-surface p-0 text-brand-dark shadow-2xl" :aria-labelledby="titleId" @cancel.prevent="$emit('cancel')" @close="$emit('closed')" @keydown="trapFocus">
       <div class="max-h-[85dvh] overflow-y-auto px-5 pt-5 sm:px-7 sm:pt-7">
         <header class="flex items-start justify-between gap-4">
           <div>
@@ -28,7 +28,7 @@
             <div class="mt-2 grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
               <span class="break-words text-sm text-sage-muted">{{ displayValue(state.original.campos[field]) }}</span>
               <span aria-hidden="true" class="hidden text-sage-muted sm:block">→</span>
-              <select v-if="booleanFields.includes(field)" :id="titleId + '-' + field" :value="encodeBoolean(state.proposed[field])" class="focus-ring min-w-0 rounded-lg border border-sage-border bg-white p-2 text-sm" @change="$emit('correct', field, decodeBoolean($event.target.value))">
+              <select v-if="booleanFields.includes(field)" :id="titleId + '-' + field" :value="encodeBoolean(state.proposed[field])" class="focus-ring min-w-0 rounded-lg border border-sage-border bg-surface p-2 text-sm" @change="$emit('correct', field, decodeBoolean($event.target.value))">
                 <option v-if="field !== 'publicoTodasVendas'" value="null">Não informado</option>
                 <option value="true">Sim</option><option value="false">Não</option>
               </select>
@@ -44,7 +44,7 @@
           <p v-for="item in state.result.pendencias" :key="item.id" class="rounded-xl p-3 text-sm" :class="item.severidade === 'IMPEDITIVO' ? 'bg-danger-bg text-danger-dark' : 'bg-warning-bg text-warning-text'"><strong v-if="item.severidade">{{ item.severidade === 'IMPEDITIVO' ? 'Impeditiva: ' : 'Aviso: ' }}</strong>{{ userFacingText(item.mensagem) }}</p>
           <slot name="after-comparison" />
         </div>
-        <footer class="sticky bottom-0 mt-6 flex justify-end gap-3 border-t border-sage-border bg-white py-3">
+        <footer class="sticky bottom-0 mt-6 flex justify-end gap-3 border-t border-sage-border bg-surface py-3">
           <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold" @click="$emit('cancel')">Cancelar</button>
           <button type="button" class="focus-ring rounded-full bg-brand px-6 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50" :disabled="!canApply" @click="$emit('confirm')">{{ confirmLabel }}</button>
         </footer>

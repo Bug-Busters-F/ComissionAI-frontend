@@ -1,13 +1,13 @@
 <template>
   <div
     v-if="open"
-    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-brand-dark/60 p-4 backdrop-blur-sm"
+    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-overlay/60 p-4 backdrop-blur-sm"
     role="dialog"
     aria-modal="true"
     aria-labelledby="conflict-modal-title"
   >
     <div
-      class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border border-sage-border bg-white p-6 shadow-2xl transition-all sm:p-8 flex flex-col justify-between"
+      class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border border-sage-border bg-surface p-6 shadow-2xl transition-all sm:p-8 flex flex-col justify-between"
     >
       <!-- HEADER -->
       <div>
@@ -58,7 +58,7 @@
           >
             <div class="flex items-center justify-between gap-2 border-b border-sage-border-light pb-2">
               <div class="flex items-center gap-2">
-                <span class="rounded-md bg-white px-2 py-0.5 text-xs font-bold text-brand-dark shadow-sm">
+                <span class="rounded-md bg-surface px-2 py-0.5 text-xs font-bold text-brand-dark shadow-sm">
                   Marca {{ conflict.brandDesc || conflict.brandCode }}
                 </span>
                 <span class="text-xs font-bold text-sage-muted">
@@ -79,8 +79,8 @@
                 class="focus-ring flex flex-col justify-between rounded-xl border p-3 text-left transition"
                 :class="[
                   selectedResolutions[conflict.id] === optIdx
-                    ? 'border-brand bg-white shadow-sm ring-2 ring-brand/40'
-                    : 'border-sage-border-light bg-white/70 hover:bg-white hover:border-sage-border'
+                    ? 'border-brand bg-surface shadow-sm ring-2 ring-brand/40'
+                    : 'border-sage-border-light bg-surface/70 hover:bg-surface hover:border-sage-border'
                 ]"
                 @click="selectOption(conflict.id, optIdx)"
               >
@@ -95,8 +95,8 @@
                     class="h-4 w-4 shrink-0 rounded-full border flex items-center justify-center transition"
                     :class="[
                       selectedResolutions[conflict.id] === optIdx
-                        ? 'border-brand-dark bg-brand text-brand-dark'
-                        : 'border-sage-border bg-white'
+                        ? 'border-on-brand bg-brand text-on-brand'
+                        : 'border-sage-border bg-surface'
                     ]"
                   >
                     <Check v-if="selectedResolutions[conflict.id] === optIdx" class="h-2.5 w-2.5 stroke-[3]" />
@@ -125,7 +125,7 @@
 
         <button
           type="button"
-          class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-6 py-2.5 text-xs font-black text-brand-dark shadow-sm transition hover:bg-brand-hover hover:scale-[1.02] active:scale-[0.98]"
+          class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-6 py-2.5 text-xs font-black text-on-brand shadow-sm transition hover:bg-brand-hover hover:scale-[1.02] active:scale-[0.98]"
           @click="confirm"
         >
           <span>Higienizar Planilha e Continuar Envio →</span>

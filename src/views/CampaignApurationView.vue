@@ -5,7 +5,7 @@
       <div class="mt-7 flex flex-wrap items-end justify-between gap-4"><div><h1 class="text-4xl font-extrabold tracking-[-0.05em] sm:text-[42px]">Apurar campanha</h1><p class="mt-2 text-sm text-sage-muted">{{ campaign?.titulo || 'Campanha' }} · painel demonstrativo</p></div><span class="rounded-full bg-warning-light px-3 py-1.5 text-xs font-bold text-warning-dark">Demonstração</span></div>
     </header>
 
-    <div v-if="isLoading" class="rounded-[22px] bg-white px-6 py-14 text-center text-sm text-sage-muted" role="status">Carregando painel…</div>
+    <div v-if="isLoading" class="rounded-[22px] bg-surface px-6 py-14 text-center text-sm text-sage-muted" role="status">Carregando painel…</div>
     <section v-else-if="loadError" class="rounded-[22px] border border-danger/30 bg-danger-bg p-6" role="alert"><h2 class="text-xl font-extrabold text-danger-dark">Não foi possível abrir o painel</h2><p class="mt-2 text-sm leading-6 text-danger-dark/80">{{ loadError }}</p></section>
     <CampaignDemoApuration v-else :campaign-title="campaign?.titulo" @memory="isMemoryOpen = true" />
 

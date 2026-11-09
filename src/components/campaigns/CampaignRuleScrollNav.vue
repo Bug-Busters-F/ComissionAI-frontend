@@ -9,7 +9,7 @@
     </ol>
   </nav>
   <Teleport to="body">
-    <div v-if="previewIndex >= 0 && proposals[previewIndex]" :id="previewId" role="tooltip" class="rule-scroll-preview pointer-events-none fixed z-50 rounded-xl border border-sage-border bg-white p-3 shadow-lg" :style="{ left: previewPosition.left + 'px', top: previewPosition.top + 'px' }">
+    <div v-if="previewIndex >= 0 && proposals[previewIndex]" :id="previewId" role="tooltip" class="rule-scroll-preview pointer-events-none fixed z-50 rounded-xl border border-sage-border bg-surface p-3 shadow-lg" :style="{ left: previewPosition.left + 'px', top: previewPosition.top + 'px' }">
       <p class="text-xs font-bold text-brand-dark">Regra {{ previewIndex + 1 }}</p>
       <p class="mt-1 line-clamp-3 break-words text-xs leading-5 text-sage-muted">{{ proposals[previewIndex].textoOrigem || proposals[previewIndex].trechoOriginal || 'Regra adicionada manualmente. Selecione para conferir os campos.' }}</p>
     </div>
@@ -133,7 +133,7 @@ onBeforeUnmount(() => {
 .rule-scroll-list::-webkit-scrollbar { display: none; }
 .rule-scroll-preview { width: min(18rem, calc(100vw - 3rem)); }
 .rule-mark-line { transition: width 120ms ease, opacity 120ms ease, color 120ms ease; }
-.rule-mark[aria-current="location"], .rule-mark:hover, .rule-mark:focus-visible { color: var(--color-success-text); }
+.rule-mark[aria-current="location"], .rule-mark:hover, .rule-mark:focus-visible { color: rgb(var(--color-success-text)); }
 .rule-mark:hover .rule-mark-line, .rule-mark:focus-visible .rule-mark-line { width: 24px !important; opacity: 1 !important; }
 @media (prefers-reduced-motion: reduce) {
   .rule-mark-line { transition: none; }

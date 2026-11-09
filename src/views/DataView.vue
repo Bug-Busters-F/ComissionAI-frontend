@@ -6,14 +6,14 @@
           <button
             type="button"
             @click="store.openComissModal(store.competencias[0]?.competenciaCodigo || null)"
-            class="focus-ring rounded-full border border-sage-border-dark bg-white px-4 py-3 text-sm font-semibold text-brand-dark hover:bg-sage-light"
+            class="focus-ring rounded-full border border-sage-border-dark bg-surface px-4 py-3 text-sm font-semibold text-brand-dark hover:bg-sage-light"
           >
             Tabelas de Comissão
           </button>
           <button
             type="button"
             @click="store.openCicloModal(null)"
-            class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover"
+            class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover"
           >
             + Enviar ciclo (RH + Vendas)
           </button>
@@ -33,19 +33,19 @@
       </p>
     </section>
 
-    <section v-if="store.competenciasLoading" class="rounded-2xl bg-white px-6 py-12 text-center text-sm text-sage-muted" role="status">
+    <section v-if="store.competenciasLoading" class="rounded-2xl bg-surface px-6 py-12 text-center text-sm text-sage-muted" role="status">
       Consultando as competências disponíveis…
     </section>
 
     <section v-else-if="store.competenciasError" class="rounded-2xl border border-danger/30 bg-danger-bg p-6" role="alert">
       <h2 class="text-xl font-extrabold text-danger-dark">Não foi possível carregar as competências</h2>
       <p class="mt-2 text-sm leading-6 text-danger-dark/80">{{ store.competenciasError }}</p>
-      <button type="button" class="focus-ring mt-5 rounded-full bg-danger px-5 py-3 text-sm font-bold text-white" @click="store.loadCompetenciasFromSales()">
+      <button type="button" class="focus-ring mt-5 rounded-full bg-danger px-5 py-3 text-sm font-bold text-on-status" @click="store.loadCompetenciasFromSales()">
         Tentar novamente
       </button>
     </section>
 
-    <section v-else-if="!store.competencias.length" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
+    <section v-else-if="!store.competencias.length" class="rounded-2xl border border-sage-border bg-surface p-6" role="status">
       <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma competência disponível</h2>
       <p class="mt-2 text-sm leading-6 text-sage-muted">Importe uma base de vendas válida para habilitar o cálculo por competência.</p>
     </section>
@@ -54,7 +54,7 @@
       <article
         v-for="period in store.competencias"
         :key="period.competenciaCodigo || period.name"
-        class="flex flex-col justify-between rounded-2xl bg-white p-6 shadow-sm border border-sage-border-light relative overflow-hidden"
+        class="flex flex-col justify-between rounded-2xl bg-surface p-6 shadow-sm border border-sage-border-light relative overflow-hidden"
       >
         <!-- Borda superior animada quando em processamento de background -->
         <div
@@ -140,7 +140,7 @@
           <RouterLink
             v-if="period.vendasCount > 0"
             :to="{ name: 'dados-calculo', params: { competencia: period.competencia } }"
-            class="focus-ring flex items-center justify-between rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-brand-hover"
+            class="focus-ring flex items-center justify-between rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-on-brand hover:bg-brand-hover"
           >
             <span>Calcular comissões</span>
             <span>→</span>
@@ -174,7 +174,7 @@
     </section>
 
     <!-- SEÇÃO DE CONSULTA INTEGRADA: DADOS EFETIVADOS & HISTÓRICO DE ENVIOS -->
-    <section class="rounded-2xl bg-white p-6 sm:p-7 shadow-sm border border-sage-border-light space-y-6">
+    <section class="rounded-2xl bg-surface p-6 sm:p-7 shadow-sm border border-sage-border-light space-y-6">
       <!-- Abas Principais de Navegação -->
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-sage-border-light pb-4">
         <div class="flex items-center gap-2">
@@ -184,7 +184,7 @@
             :class="[
               'focus-ring flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition',
               store.tabAtiva === 'EFETIVADOS'
-                ? 'bg-brand text-brand-dark shadow-sm'
+                ? 'bg-brand text-on-brand shadow-sm'
                 : 'bg-sage-light text-sage-muted hover:text-brand-dark'
             ]"
           >
@@ -198,7 +198,7 @@
             :class="[
               'focus-ring flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition',
               store.tabAtiva === 'ENVIOS'
-                ? 'bg-brand text-brand-dark shadow-sm'
+                ? 'bg-brand text-on-brand shadow-sm'
                 : 'bg-sage-light text-sage-muted hover:text-brand-dark'
             ]"
           >

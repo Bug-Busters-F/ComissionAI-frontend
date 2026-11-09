@@ -1,5 +1,5 @@
 <template>
-  <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="interpretation-heading">
+  <section class="rounded-[22px] bg-surface p-6 sm:p-7" aria-labelledby="interpretation-heading">
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
         <h2 id="interpretation-heading" class="text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">Confira a interpretação</h2>
@@ -12,7 +12,7 @@
       {{ interpretation.isProcessing ? 'Interpretando campanha… processando regras.' : stale ? 'O texto ou o contexto mudou desde a última interpretação. Interprete novamente para atualizar as regras.' : sourceMessage }}
     </div>
 
-    <div v-if="interpretation.isProcessing" class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-white px-4 py-3 text-sm text-brand-dark" role="status" aria-live="polite">
+    <div v-if="interpretation.isProcessing" class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-surface px-4 py-3 text-sm text-brand-dark" role="status" aria-live="polite">
       <span>Interpretando campanha…</span>
       <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-3 py-2 text-xs font-bold" @click="$emit('cancel-interpretation')">Cancelar</button>
     </div>
@@ -35,7 +35,7 @@
               <StatusBadge label="Bloqueio de Cobertura" tone="warning" />
             </div>
             <p class="mt-1 text-xs leading-5 text-sage-muted">
-              A proposta atinge público sem taxa padrão contratual aplicável em <span class="rounded bg-white px-1.5 py-0.5 text-xs font-semibold text-brand-dark">tabela de comissões</span>. A simulação financeira permanecerá bloqueada até a carga da tabela.
+              A proposta atinge público sem taxa padrão contratual aplicável em <span class="rounded bg-surface px-1.5 py-0.5 text-xs font-semibold text-brand-dark">tabela de comissões</span>. A simulação financeira permanecerá bloqueada até a carga da tabela.
             </p>
             <ul class="mt-2.5 list-disc space-y-1 pl-4 text-xs font-semibold text-warning-dark">
               <li v-for="msg in coveragePendingMessages" :key="msg">{{ msg }}</li>
@@ -45,7 +45,7 @@
 
         <RouterLink
           to="/dados"
-          class="focus-ring inline-flex items-center gap-1.5 self-start rounded-full border border-sage-border-dark bg-white px-4 py-2 text-xs font-bold text-brand-dark transition hover:bg-sage-light"
+          class="focus-ring inline-flex items-center gap-1.5 self-start rounded-full border border-sage-border-dark bg-surface px-4 py-2 text-xs font-bold text-brand-dark transition hover:bg-sage-light"
         >
           <UploadCloud class="h-3.5 w-3.5" aria-hidden="true" />
           <span>Importar base (COMISS)</span>
@@ -165,7 +165,7 @@ function formatConfidence(value) {
 
 <style scoped>
 .campaign-label { @apply mb-2 block text-sm font-bold text-brand-dark; }
-.campaign-control { @apply focus-ring w-full rounded-xl border border-sage-border bg-white px-4 py-3 text-sm text-brand-dark outline-none transition placeholder:text-sage-muted; }
+.campaign-control { @apply focus-ring w-full rounded-xl border border-sage-border bg-surface px-4 py-3 text-sm text-brand-dark outline-none transition placeholder:text-sage-muted; }
 .campaign-control-error { @apply border-danger; }
 .campaign-help { @apply mt-2 text-xs leading-5 text-sage-muted; }
 .campaign-error { @apply mt-2 text-xs font-semibold leading-5 text-danger-dark; }

@@ -6,7 +6,7 @@
     aria-modal="true"
   >
     <div
-      class="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl transition-all"
+      class="w-full max-w-md overflow-hidden rounded-2xl bg-surface shadow-2xl transition-all"
     >
       <div class="p-6">
         <div class="flex items-start gap-4">
@@ -47,7 +47,7 @@
             type="button"
             @click="store.confirmarExclusao"
             :disabled="store.modalExclusao.loading"
-            class="focus-ring flex items-center gap-2 rounded-xl bg-danger px-5 py-2.5 text-xs font-bold text-white hover:bg-danger-dark transition disabled:opacity-50"
+            class="focus-ring flex items-center gap-2 rounded-xl bg-danger px-5 py-2.5 text-xs font-bold text-on-status hover:bg-danger-dark transition disabled:opacity-50"
           >
             <Loader2 v-if="store.modalExclusao.loading" class="h-3.5 w-3.5 animate-spin" />
             <span>{{ store.modalExclusao.loading ? 'Excluindo...' : 'Confirmar exclusão' }}</span>

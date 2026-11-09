@@ -4,7 +4,8 @@
       <p class="text-xs font-medium text-sage-muted">Workspace / {{ currentLabel }}</p>
 
       <div class="flex items-center gap-3">
-        <span v-if="isCampaignDemoEnabled" class="rounded-full border border-sage-border-dark bg-white px-3.5 py-1.5 text-xs font-semibold text-sage-subtle">Ambiente demonstrativo</span>
+        <ThemeToggle class="md:hidden" />
+        <span v-if="isCampaignDemoEnabled" class="rounded-full border border-sage-border-dark bg-surface px-3.5 py-1.5 text-xs font-semibold text-sage-subtle">Ambiente demonstrativo</span>
 
         <button
           v-if="calculationStore.isProcessing"
@@ -99,7 +100,7 @@
         :to="item.to"
         :class="[
           'focus-ring whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold',
-          route.meta.section === item.section ? 'bg-brand text-brand-dark' : 'bg-white text-sage-muted'
+          route.meta.section === item.section ? 'bg-brand text-on-brand' : 'bg-surface text-sage-muted'
         ]"
       >
         {{ item.label }}
@@ -116,6 +117,7 @@ import { useDataStore } from '@/stores/dataStore'
 import { useCalculationStore } from '@/stores/calculationStore'
 import { isCampaignDemoEnabled } from '@/services/campaignDemo'
 import { formatCompetenceLabel } from '@/services/competenceUtils'
+import ThemeToggle from './ThemeToggle.vue'
 
 const route = useRoute()
 const router = useRouter()

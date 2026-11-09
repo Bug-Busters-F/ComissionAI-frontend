@@ -549,15 +549,27 @@ The brand uses surface contrast (`{colors.canvas-soft}` background vs `{colors.c
 
 The design language is implemented in the Vue 3 codebase using a decoupled **CSS Variables + Tailwind CSS** architecture. All color tokens are centralized in `:root` inside `src/assets/main.css` and mapped to semantic utility classes in `tailwind.config.js`.
 
+Tokens are stored as **space-separated RGB channels** (`--color-brand: 159 232 112;`), not hex. `tailwind.config.js` wraps them as `rgb(var(--color-x) / <alpha-value>)`, which is what makes opacity modifiers such as `border-danger/30` or `bg-overlay/50` compile. When reading a token directly in CSS, wrap it: `color: rgb(var(--color-success-text));`.
+
 ### 1. Token Mapping & Utility Classes
+
+Hex values below are the light theme. Dark theme values are listed in section 3.
 
 | Token Group | CSS Variable (`main.css`) | Default Hex | Tailwind Class (`tailwind.config.js`) | Role |
 |---|---|---|---|---|
 | **Brand** | `--color-brand` | `#9fe870` | `bg-brand`, `text-brand` | Primary CTA and signature lime-green accent |
 | | `--color-brand-hover` | `#8fe25f` | `hover:bg-brand-hover` | Interactive hover state for primary buttons |
 | | `--color-brand-ring` | `#8dd95f` | `focus-visible:ring-brand-ring` | Accessible focus ring outline |
-| | `--color-brand-dark` | `#0e0f0c` | `bg-brand-dark`, `text-brand-dark` | Deep charcoal for headings, body text and dark buttons |
-| | `--color-brand-dark-hover` | `#252824` | `hover:bg-brand-dark-hover` | Hover state for dark charcoal buttons |
+| | `--color-brand-dark` | `#0e0f0c` | `text-brand-dark` | Primary text (headings and body). **Inverts in dark mode** — do not use it as a background or as text on the green |
+| | `--color-brand-dark-hover` | `#252824` | `hover:text-brand-dark-hover` | Hover state for primary text |
+| | `--color-on-brand` | `#0e0f0c` | `text-on-brand`, `border-on-brand` | Text, icons and spinners on top of `bg-brand`. Always dark |
+| **Surfaces** | `--color-surface` | `#ffffff` | `bg-surface` | Cards, inputs, sidebar and modals. Replaces `bg-white` |
+| | `--color-inverse` | `#0e0f0c` | `bg-inverse` | Featured dark surfaces (impact card, Python code, toast action, dark buttons). Stays dark in both themes |
+| | `--color-inverse-hover` | `#252824` | `bg-inverse-hover`, `hover:bg-inverse-hover` | Nested panels and hover on inverse surfaces |
+| | `--color-inverse-border` | `#0e0f0c` | `border-inverse-border` | Outline of inverse surfaces (visible only in dark mode) |
+| | `--color-on-inverse` | `#ffffff` | `text-on-inverse` | Primary text on inverse surfaces |
+| | `--color-inverse-muted` | `#f1f4ef` | `text-inverse-muted` | Secondary text on inverse surfaces |
+| | `--color-overlay` | `#0e0f0c` | `bg-overlay/50`, `bg-overlay/60` | Modal backdrops (always used with opacity) |
 | **Sage / Canvas** | `--color-sage` | `#e8ebe6` | `bg-sage` | Soft sage page canvas background |
 | | `--color-sage-light` | `#f1f4ef` | `bg-sage-light` | Secondary card background and neutral panels |
 | | `--color-sage-pill` | `#eef1ec` | `bg-sage-pill` | Table headers (`thead`), badge backgrounds and pills |
@@ -566,6 +578,7 @@ The design language is implemented in the Vue 3 codebase using a decoupled **CSS
 | | `--color-sage-border` | `#dfe4dd` | `border-sage-border` | Standard card and form input borders |
 | | `--color-sage-border-light` | `#edf0eb` | `border-sage-border-light` | Subtle horizontal dividers and table borders |
 | | `--color-sage-border-dark` | `#d7dcd5` | `border-sage-border-dark` | High-contrast borders and badge outlines |
+| | `--color-sage-surface` | `#f6f8f5` | `bg-sage-surface` | Table footers and soft info panels |
 | **Success** | `--color-success` | `#2ead4b` | `text-success`, `border-success` | Green indicator for valid entries and approved cycles |
 | | `--color-success-bg` | `#eef8e6` | `bg-success-bg` | Soft tinted background for dropzones and valid cards |
 | | `--color-success-surface` | `#e3f6d8` | `bg-success-surface` | Badge and notification fill |
@@ -579,27 +592,49 @@ The design language is implemented in the Vue 3 codebase using a decoupled **CSS
 | | `--color-danger-bg` | `#fce8e8` | `bg-danger-bg` | Error banner background |
 | | `--color-danger-light` | `#fffbfb` | `bg-danger-light` | Highlighted error rows in diagnostic tables |
 | | `--color-danger-dark` | `#a7000d` | `text-danger-dark` | Critical rejection headline text |
+| **Status fill text** | `--color-on-status` | `#ffffff` | `text-on-status`, `hover:text-on-status` | Text and icons on solid `bg-danger`, `bg-success` or `bg-warning`. Turns dark in dark mode, where status fills are lighter |
 
 ### 2. Live HMR & Hot Theming
 - **Zero Restart**: Editing any variable in `src/assets/main.css` triggers instant Hot Module Replacement (HMR) in Vite without restarting the development server.
 - **DevTools Live Preview**: Designers and developers can inspect `<html>` / `:root` in browser DevTools and interactively modify any `--color-*` property with the native color picker to test adjustments live.
 
 ### 3. Dark Mode Architecture
-Dark mode is natively supported by overriding the CSS variables under `.dark` in `src/assets/main.css`. No modifications to Vue templates or Tailwind utility classes are required:
+The theme is selected by a `data-theme="light" | "dark"` attribute on `<html>`. The dark palette overrides the same variables under `:root[data-theme="dark"]` in `src/assets/main.css`, together with `color-scheme: dark` so native controls (date/month inputs, checkboxes, scrollbars, `<dialog>`) follow the theme. Components only use token classes, so the switch needs no `dark:` variants. Tailwind is configured with `darkMode: ['selector', '[data-theme="dark"]']` in case a one-off `dark:` override is ever needed.
 
-```css
-/* src/assets/main.css */
-.dark {
-  --color-sage: #121411;
-  --color-sage-light: #1c1f1a;
-  --color-sage-pill: #252923;
-  --color-brand-dark: #f3f5f1;
-  --color-sage-muted: #9aa098;
-  --color-sage-border: #2e332c;
-  --color-sage-border-light: #1f231d;
-  --color-sage-border-dark: #3a4038;
-}
-```
+**Runtime pieces**
+- `src/services/useTheme.js` — singleton composable. Preference is `system` (default), `light` or `dark`, stored in `localStorage` under `comissionai:theme` (`system` removes the key). It follows `prefers-color-scheme` changes while the preference is `system` and updates `<meta name="theme-color">`. Initialized in `src/main.js`.
+- Inline script in `index.html` `<head>` — applies `data-theme` before Vue mounts, so a dark user never sees a light flash. Its key and resolution logic must stay in sync with `useTheme.js`.
+- `src/components/layout/ThemeToggle.vue` — three-option radiogroup (sun / moon / monitor). Rendered at the bottom of `SidebarNav.vue` on desktop and in `Topbar.vue` below `md`.
+
+**Dark palette** — same brand green, neutrals keep the olive cast of the charcoal ink.
+
+| Token | Light | Dark |
+|---|---|---|
+| `sage` (page) | `#e8ebe6` | `#111310` |
+| `surface` | `#ffffff` | `#1a1d18` |
+| `sage-light` / `sage-pill` / `sage-surface` | `#f1f4ef` / `#eef1ec` / `#f6f8f5` | `#21251f` / `#262a24` / `#1e211c` |
+| `sage-border` / `-light` / `-dark` | `#dfe4dd` / `#edf0eb` / `#d7dcd5` | `#30352d` / `#262a24` / `#3b4137` |
+| `sage-muted` / `sage-subtle` | `#646862` / `#454745` | `#a2a79e` / `#c6cac2` |
+| `brand-dark` (text) | `#0e0f0c` | `#e8ebe6` |
+| `brand` / `brand-hover` | `#9fe870` / `#8fe25f` | `#9fe870` / `#b2f08a` |
+| `on-brand` | `#0e0f0c` | `#0e0f0c` |
+| `inverse` / `inverse-hover` / `inverse-border` | `#0e0f0c` / `#252824` / `#0e0f0c` | `#080907` / `#21251f` / `#3b4137` |
+| `on-inverse` / `inverse-muted` | `#ffffff` / `#f1f4ef` | `#e8ebe6` / `#c6cac2` |
+| `on-status` | `#ffffff` | `#0e0f0c` |
+| `success` / `-bg` / `-surface` / `-dark` / `-text` | `#2ead4b` / `#eef8e6` / `#e3f6d8` / `#054d28` / `#47872b` | `#4cc766` / `#16271a` / `#1b3320` / `#8fe0a0` / `#8fd46f` |
+| `warning` / `-bg` / `-light` / `-border` / `-dark` / `-text` | `#b86700` / `#fff7d9` / `#fff0bb` / `#eadca9` / `#8c6e1e` / `#4a3b1c` | `#e8a23a` / `#2b2312` / `#3a2e14` / `#5a4a22` / `#e3b453` / `#f2dfac` |
+| `danger` / `-bg` / `-light` / `-dark` | `#d03238` / `#fce8e8` / `#fffbfb` / `#a7000d` | `#ff6b70` / `#351517` / `#2a1314` / `#ff8f94` |
+
+Every text pair in the dark palette meets WCAG AA (≥ 4.5:1) — e.g. `sage-muted` on `surface` 6.9:1, `danger` on `surface` 6.2:1, `on-status` on `danger` 7.0:1.
+
+**Color rules for components**
+- Never use `bg-white`, `text-white` or Tailwind palette colors (`gray-*`, `emerald-*`, `amber-*`…) in `.vue` files. Use `bg-surface`, `text-on-*` and the semantic families.
+- Text on the green is `text-on-brand`, never `text-brand-dark` — the latter turns light in dark mode.
+- Dark featured blocks use `bg-inverse` + `text-on-inverse` / `text-inverse-muted`. Inside them, do not use `text-sage-border` or `text-sage-light` as text; those become dark in dark mode.
+- Solid status fills (`bg-danger`, `bg-success`, `bg-warning`) take `text-on-status`.
+- Modal backdrops use `bg-overlay/50` or `/60`. Native `<dialog>::backdrop` keeps a literal `rgb()` because custom properties are not reliably inherited by `::backdrop`.
+- Translucent white (`bg-white/10`, `border-white/10`) is allowed only inside `bg-inverse` blocks, which stay dark in both themes.
+- `.focus-ring` draws its offset with `ring-offset-surface`, so the gap matches the background in both themes.
 
 ### 4. Data Ingestion & Closed Cycle UI Patterns
 - **Closed Cycle Cards**: Visual representation of monthly competencies (`Dezembro`, `Novembro`, `Outubro`) with dual-base requirements (RH + Vendas).
@@ -615,7 +650,7 @@ Dark mode is natively supported by overriding the CSS variables under `.dark` in
     - **Error**: Rose error pill (`border-danger/30 bg-danger-bg text-danger`) with warning icon and direct link to diagnosis.
 - **Modal In-Progress Step Checklist (`UploadBaseModal.vue`)**:
   - Step-by-step visual tracker inside the modal separating Stage 1 (RH) and Stage 2 (Vendas), with dynamic status (`Aguardando`, `Em validação...`, `Concluída`).
-  - Button **"Continuar navegando em segundo plano"** (`bg-brand-dark hover:bg-brand-dark-hover`) allowing the user to unmount the modal without aborting the background promise.
+  - Button **"Continuar navegando em segundo plano"** (`bg-inverse text-on-inverse hover:bg-inverse-hover`) allowing the user to unmount the modal without aborting the background promise.
 - **Reactive Competency Card Progress (`DataView.vue`)**:
   - When a background ingestion is active for a specific month, the card renders a top pulsating accent line (`bg-brand animate-pulse`) and an inline progress bar with real-time percentage and status copy.
 - **Global Toast Notification Surface (`ToastContainer.vue`, `notificationStore.js`)**:

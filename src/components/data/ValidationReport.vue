@@ -9,7 +9,7 @@
       role="alert"
     >
       <div class="flex items-start gap-4">
-        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-danger text-white">
+        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-danger text-on-status">
           <AlertCircle class="h-6 w-6" />
         </div>
         <div class="flex-1">
@@ -44,7 +44,7 @@
       role="alert"
     >
       <div class="flex items-start gap-4">
-        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-warning text-white">
+        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-warning text-on-status">
           <AlertTriangle class="h-6 w-6" />
         </div>
         <div class="flex-1">
@@ -65,7 +65,7 @@
       role="alert"
     >
       <div class="flex items-start gap-4">
-        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-success text-white">
+        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-success text-on-status">
           <CheckCircle2 class="h-6 w-6" />
         </div>
         <div class="flex-1">
@@ -84,14 +84,14 @@
       </div>
     </div>
 
-    <div v-if="report.mensagens?.length" class="rounded-xl border border-sage-border bg-white p-4 text-sm text-sage-muted">
+    <div v-if="report.mensagens?.length" class="rounded-xl border border-sage-border bg-surface p-4 text-sm text-sage-muted">
       <p class="font-bold text-brand-dark">Mensagens do processamento</p>
       <ul class="mt-2 list-disc space-y-1 pl-5"><li v-for="(message, index) in report.mensagens" :key="index">{{ userFacingText(message) }}</li></ul>
     </div>
 
     <!-- RESUMO NUMÉRICO DA VALIDAÇÃO -->
     <div v-if="report.isCiclo" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <div class="rounded-xl border border-sage-border-light bg-white p-4">
+      <div class="rounded-xl border border-sage-border-light bg-surface p-4">
         <p class="text-xs font-semibold uppercase tracking-wider text-sage-muted">Base de RH</p>
         <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">
           {{ report.rh?.linhasValidas || 0 }} <span class="text-xs font-normal text-sage-muted">/ {{ report.rh?.totalLinhas || 0 }}</span>
@@ -99,7 +99,7 @@
         <p class="mt-0.5 text-[11px] font-semibold text-success">Linhas de RH processadas</p>
       </div>
 
-      <div class="rounded-xl border border-sage-border-light bg-white p-4">
+      <div class="rounded-xl border border-sage-border-light bg-surface p-4">
         <p class="text-xs font-semibold uppercase tracking-wider text-sage-muted">Base de Vendas</p>
         <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">
           {{ report.vendas?.linhasValidas || 0 }} <span class="text-xs font-normal text-sage-muted">/ {{ report.vendas?.totalLinhas || 0 }}</span>
@@ -109,7 +109,7 @@
 
       <div
         class="rounded-xl border p-4"
-        :class="totalImpeditivos > 0 ? 'border-danger bg-danger-bg/50' : 'border-sage-border-light bg-white'"
+        :class="totalImpeditivos > 0 ? 'border-danger bg-danger-bg/50' : 'border-sage-border-light bg-surface'"
       >
         <p class="text-xs font-semibold uppercase tracking-wider text-sage-muted">Impeditivos</p>
         <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em]" :class="totalImpeditivos > 0 ? 'text-danger' : 'text-brand-dark'">
@@ -118,7 +118,7 @@
         <p class="mt-0.5 text-[11px] font-semibold text-sage-muted">Bloqueios no ciclo</p>
       </div>
 
-      <div class="rounded-xl border border-sage-border-light bg-white p-4">
+      <div class="rounded-xl border border-sage-border-light bg-surface p-4">
         <p class="text-xs font-semibold uppercase tracking-wider text-sage-muted">Avisos</p>
         <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em]" :class="totalAvisos > 0 ? 'text-warning' : 'text-brand-dark'">
           {{ totalAvisos }}
@@ -129,19 +129,19 @@
 
     <!-- RESUMO PADRÃO (BASE AVULSA / COMISS) -->
     <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <div class="rounded-xl border border-sage-border-light bg-white p-4">
+      <div class="rounded-xl border border-sage-border-light bg-surface p-4">
         <p class="text-xs font-semibold uppercase tracking-wider text-sage-muted">Total de linhas</p>
         <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">{{ report.totalLinhas }}</p>
       </div>
 
-      <div class="rounded-xl border border-sage-border-light bg-white p-4">
+      <div class="rounded-xl border border-sage-border-light bg-surface p-4">
         <p class="text-xs font-semibold uppercase tracking-wider text-sage-muted">Linhas válidas</p>
         <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-success">{{ report.linhasValidas }}</p>
       </div>
 
       <div
         class="rounded-xl border p-4"
-        :class="totalImpeditivos > 0 ? 'border-danger bg-danger-bg/50' : 'border-sage-border-light bg-white'"
+        :class="totalImpeditivos > 0 ? 'border-danger bg-danger-bg/50' : 'border-sage-border-light bg-surface'"
       >
         <p class="text-xs font-semibold uppercase tracking-wider text-sage-muted">Impeditivos</p>
         <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em]" :class="totalImpeditivos > 0 ? 'text-danger' : 'text-brand-dark'">
@@ -149,7 +149,7 @@
         </p>
       </div>
 
-      <div class="rounded-xl border border-sage-border-light bg-white p-4">
+      <div class="rounded-xl border border-sage-border-light bg-surface p-4">
         <p class="text-xs font-semibold uppercase tracking-wider text-sage-muted">Avisos</p>
         <p class="mt-2 text-2xl font-extrabold tracking-[-0.04em]" :class="totalAvisos > 0 ? 'text-warning' : 'text-brand-dark'">
           {{ totalAvisos }}
@@ -158,7 +158,7 @@
     </div>
 
     <!-- RELATÓRIO DE INCONSISTÊNCIAS TABULAR -->
-    <div class="rounded-xl border border-sage-border-light bg-white p-5 sm:p-6">
+    <div class="rounded-xl border border-sage-border-light bg-surface p-5 sm:p-6">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h4 class="text-base font-extrabold tracking-[-0.02em] text-brand-dark">
@@ -181,7 +181,7 @@
             @click="filtroAtual = 'TODOS'"
             :class="[
               'whitespace-nowrap rounded-full px-3 py-1.5 transition',
-              filtroAtual === 'TODOS' ? 'bg-white text-brand-dark shadow-sm' : 'text-sage-muted hover:text-brand-dark'
+              filtroAtual === 'TODOS' ? 'bg-surface text-brand-dark shadow-sm' : 'text-sage-muted hover:text-brand-dark'
             ]"
           >
             Todas ({{ listaInconsistencias.length }})
@@ -191,7 +191,7 @@
             @click="filtroAtual = 'IMPEDITIVO'"
             :class="[
               'whitespace-nowrap rounded-full px-3 py-1.5 transition',
-              filtroAtual === 'IMPEDITIVO' ? 'bg-danger text-white shadow-sm' : 'text-sage-muted hover:text-brand-dark'
+              filtroAtual === 'IMPEDITIVO' ? 'bg-danger text-on-status shadow-sm' : 'text-sage-muted hover:text-brand-dark'
             ]"
           >
             Impeditivos ({{ totalImpeditivos }})
@@ -212,7 +212,7 @@
             @click="filtroAtual = 'CRUZAMENTO'"
             :class="[
               'whitespace-nowrap rounded-full px-3 py-1.5 transition',
-              filtroAtual === 'CRUZAMENTO' ? 'bg-brand-dark text-white shadow-sm' : 'text-sage-muted hover:text-brand-dark'
+              filtroAtual === 'CRUZAMENTO' ? 'bg-inverse text-on-inverse shadow-sm' : 'text-sage-muted hover:text-brand-dark'
             ]"
           >
             Cruzamento ({{ totalCruzamento }})
@@ -242,7 +242,7 @@
               <td v-if="report.isCiclo" class="px-4 py-3">
                 <span
                   v-if="item.base === 'CRUZAMENTO'"
-                  class="inline-flex items-center rounded-md bg-brand-dark px-2 py-0.5 text-[11px] font-bold text-white"
+                  class="inline-flex items-center rounded-md bg-inverse px-2 py-0.5 text-[11px] font-bold text-on-inverse"
                 >
                   RH ↔ Vendas
                 </span>
@@ -294,7 +294,7 @@
         <button
           type="button"
           @click="$emit('reenviar')"
-          class="focus-ring flex w-full items-center justify-center gap-2 rounded-full bg-brand-dark px-6 py-3 text-sm font-bold text-white transition hover:bg-brand-dark-hover sm:w-auto"
+          class="focus-ring flex w-full items-center justify-center gap-2 rounded-full bg-inverse px-6 py-3 text-sm font-bold text-on-inverse transition hover:bg-inverse-hover sm:w-auto"
         >
           <RefreshCw class="h-4 w-4" />
           <span>{{ report.isCiclo ? 'Substituir planilhas e reenviar ciclo' : 'Substituir e reenviar planilha' }}</span>
@@ -306,14 +306,14 @@
         <button
           type="button"
           @click="$emit('reenviar')"
-          class="focus-ring w-full rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-semibold text-brand-dark transition hover:bg-sage-light sm:w-auto"
+          class="focus-ring w-full rounded-full border border-sage-border-dark bg-surface px-5 py-3 text-sm font-semibold text-brand-dark transition hover:bg-sage-light sm:w-auto"
         >
           Enviar novamente
         </button>
         <button
           type="button"
           @click="$emit('concluir')"
-          class="focus-ring flex w-full items-center justify-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover sm:w-auto"
+          class="focus-ring flex w-full items-center justify-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover sm:w-auto"
         >
           <CheckCircle2 class="h-4 w-4" />
           <span>{{ report.isCiclo ? 'Concluir e fechar ciclo' : 'Concluir importação' }}</span>

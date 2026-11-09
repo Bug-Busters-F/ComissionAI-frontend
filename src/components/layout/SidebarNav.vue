@@ -1,5 +1,5 @@
 <template>
-  <aside class="fixed inset-y-0 left-0 z-30 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto bg-white px-5 py-8 overscroll-contain md:flex">
+  <aside class="fixed inset-y-0 left-0 z-30 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto bg-surface px-5 py-8 overscroll-contain md:flex">
     <RouterLink to="/home" class="focus-ring flex items-center gap-3 rounded-xl" aria-label="ComissionAI - Home">
       <img :src="comissionaiIcon" alt="" class="h-10 w-10 rounded-xl object-cover" />
       <span class="text-[20px] font-extrabold tracking-[-0.04em] text-brand-dark">ComissionAI</span>
@@ -13,7 +13,7 @@
         :class="[
           'focus-ring flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-colors',
           route.meta.section === item.section
-            ? 'bg-brand text-brand-dark font-bold'
+            ? 'bg-brand text-on-brand font-bold'
             : 'text-sage-muted hover:bg-sage-light hover:text-brand-dark'
         ]"
       >
@@ -22,6 +22,10 @@
       </RouterLink>
     </nav>
 
+    <div class="mt-auto flex items-center justify-between gap-3 pt-8">
+      <span class="text-xs font-medium text-sage-muted">Tema</span>
+      <ThemeToggle />
+    </div>
   </aside>
 </template>
 
@@ -29,6 +33,7 @@
 import { useRoute } from 'vue-router'
 import { CalendarCheck, Database, House } from 'lucide-vue-next'
 import comissionaiIcon from '@/assets/images/comissionai-icon.png'
+import ThemeToggle from './ThemeToggle.vue'
 
 const route = useRoute()
 

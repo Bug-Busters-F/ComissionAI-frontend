@@ -4,7 +4,7 @@
       <template #action>
         <RouterLink
           to="/campanhas/nova"
-          class="focus-ring inline-flex items-center rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover"
+          class="focus-ring inline-flex items-center rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover"
         >
           + Nova campanha
         </RouterLink>
@@ -15,7 +15,7 @@
       <article
         v-for="card in metrics"
         :key="card.label"
-        :class="['rounded-2xl p-6', card.highlight ? 'bg-success-bg ring-1 ring-inset ring-success/20' : 'bg-white']"
+        :class="['rounded-2xl p-6', card.highlight ? 'bg-success-bg ring-1 ring-inset ring-success/20' : 'bg-surface']"
       >
         <p class="text-sm font-medium" :class="card.highlight ? 'text-success-dark' : 'text-sage-muted'">{{ card.label }}</p>
         <p class="mt-6 text-4xl font-extrabold tracking-[-0.05em]" :class="card.highlight ? 'text-success-dark' : 'text-brand-dark'">{{ card.value }}</p>
@@ -24,7 +24,7 @@
     </section>
 
     <section class="grid gap-5 xl:grid-cols-[1.45fr_0.9fr]">
-      <article class="rounded-2xl bg-white p-6 sm:p-7">
+      <article class="rounded-2xl bg-surface p-6 sm:p-7">
         <div class="flex items-center justify-between gap-4">
           <h2 class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Campanhas recentes</h2>
           <RouterLink to="/campanhas" class="focus-ring text-sm font-semibold underline underline-offset-4 text-brand-dark">Ver todas →</RouterLink>
@@ -59,7 +59,7 @@
         </div>
       </article>
 
-      <article class="rounded-2xl bg-white p-6 sm:p-7">
+      <article class="rounded-2xl bg-surface p-6 sm:p-7">
         <h2 class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Do dado ao resultado</h2>
         <ol class="mt-6 space-y-5">
           <li v-for="step in process" :key="step.number" class="flex gap-4">

@@ -1,6 +1,6 @@
 <template>
   <div class="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-    <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="proposal-heading">
+    <section class="rounded-[22px] bg-surface p-6 sm:p-7" aria-labelledby="proposal-heading">
       <div>
         <h2 id="proposal-heading" class="text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">Proposta</h2>
         <p class="mt-2 text-sm text-sage-muted">Informe o incentivo, o público e as condições da campanha.</p>
@@ -22,7 +22,7 @@
       </div>
     </section>
 
-    <aside class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="proposal-sidebar-heading">
+    <aside class="rounded-[22px] bg-surface p-6 sm:p-7" aria-labelledby="proposal-sidebar-heading">
       <h2 id="proposal-sidebar-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Uma campanha, várias regras</h2>
       <div class="mt-6 space-y-5">
         <div class="flex gap-3">
@@ -69,7 +69,7 @@ function errorClass(field) {
 
 <style scoped>
 .campaign-label { @apply mb-2 block text-sm font-bold text-brand-dark; }
-.campaign-control { @apply focus-ring w-full rounded-xl border border-sage-border bg-white px-4 py-3 text-sm text-brand-dark outline-none transition placeholder:text-sage-muted; }
+.campaign-control { @apply focus-ring w-full rounded-xl border border-sage-border bg-surface px-4 py-3 text-sm text-brand-dark outline-none transition placeholder:text-sage-muted; }
 .campaign-control-error { @apply border-danger; }
 .campaign-error { @apply mt-2 text-xs font-semibold leading-5 text-danger-dark; }
 </style>

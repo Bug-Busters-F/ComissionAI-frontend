@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <dialog ref="dialog" class="campaign-reinterpret-confirm w-[calc(100%-2rem)] max-w-md rounded-[22px] bg-white p-6 text-brand-dark shadow-2xl sm:p-7" :aria-labelledby="titleId" :aria-describedby="titleId + '-description'" @cancel.prevent="$emit('cancel')">
+    <dialog ref="dialog" class="campaign-reinterpret-confirm w-[calc(100%-2rem)] max-w-md rounded-[22px] bg-surface p-6 text-brand-dark shadow-2xl sm:p-7" :aria-labelledby="titleId" :aria-describedby="titleId + '-description'" @cancel.prevent="$emit('cancel')">
       <h2 :id="titleId" class="text-xl font-extrabold">Reinterpretar toda a campanha?</h2>
       <p :id="titleId + '-description'" class="mt-3 text-sm leading-6 text-sage-muted">O texto completo será interpretado novamente. Todas as regras atuais, inclusive os ajustes manuais, e a vigência serão substituídos pelo novo resultado. O título e o texto informado serão mantidos.</p>
       <p class="mt-4 rounded-xl bg-sage-light p-3 text-sm leading-6 text-brand-dark">Para alterações pontuais, use o lápis no bloco da regra que deseja modificar.</p>

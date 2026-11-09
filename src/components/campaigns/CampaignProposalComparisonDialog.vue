@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <dialog ref="dialog" class="comparison-dialog w-[calc(100%-2rem)] max-w-6xl rounded-[22px] bg-white p-0 text-brand-dark shadow-2xl" :aria-labelledby="titleId" @cancel.prevent="$emit('cancel')">
+    <dialog ref="dialog" class="comparison-dialog w-[calc(100%-2rem)] max-w-6xl rounded-[22px] bg-surface p-0 text-brand-dark shadow-2xl" :aria-labelledby="titleId" @cancel.prevent="$emit('cancel')">
       <div v-if="review" class="max-h-[88dvh] overflow-y-auto p-5 sm:p-7">
         <h2 :id="titleId" class="text-xl font-extrabold">{{ title }}</h2>
         <p class="mt-2 text-sm text-sage-muted">{{ review.kind === 'campaign' ? 'Confira o conjunto atual e o proposto. Confirmar substituirá todas as regras atuais, incluindo valores editados manualmente.' : 'Somente o bloco selecionado será substituído. As demais regras serão preservadas.' }}</p>
@@ -29,7 +29,7 @@
             <CampaignProposalReviewSummary :collapsible="true" :campaign="review.after" :validation="afterValidation" />
           </section>
         </div>
-        <footer class="sticky bottom-0 mt-5 flex flex-wrap justify-end gap-3 border-t border-sage-border bg-white py-4">
+        <footer class="sticky bottom-0 mt-5 flex flex-wrap justify-end gap-3 border-t border-sage-border bg-surface py-4">
           <button type="button" autofocus class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold" @click="$emit('cancel')">Cancelar</button>
           <button type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold disabled:opacity-50" :disabled="!canApply" @click="$emit('confirm')">{{ review.kind === 'campaign' ? 'Aplicar novo conjunto' : review.after.propostas.length > 1 ? 'Confirmar divisão' : 'Aplicar mudanças' }}</button>
         </footer>

@@ -3,23 +3,23 @@
     <PageHeader :title="campaign?.titulo || 'Detalhes da campanha'" description="Consulte os valores salvos da campanha e da regra vinculada.">
       <template #action>
         <div class="flex flex-wrap gap-3">
-          <RouterLink to="/campanhas" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-white">Voltar</RouterLink>
-          <RouterLink v-if="campaign" :to="`/campanhas/${campaign.id}/editar`" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover">Editar</RouterLink>
+          <RouterLink to="/campanhas" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-surface">Voltar</RouterLink>
+          <RouterLink v-if="campaign" :to="`/campanhas/${campaign.id}/editar`" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-hover">Editar</RouterLink>
         </div>
       </template>
     </PageHeader>
 
-    <div v-if="isLoading" class="rounded-2xl bg-white px-5 py-10 text-center text-sm text-sage-muted" role="status">Carregando detalhes…</div>
+    <div v-if="isLoading" class="rounded-2xl bg-surface px-5 py-10 text-center text-sm text-sage-muted" role="status">Carregando detalhes…</div>
 
     <section v-else-if="loadError" class="rounded-2xl border border-danger/30 bg-danger-bg p-6 sm:p-7" role="alert">
       <h2 class="text-xl font-extrabold text-danger-dark">Campanha não encontrada</h2>
       <p class="mt-2 text-sm leading-6 text-danger-dark/80">{{ loadError }}</p>
-      <RouterLink to="/campanhas" class="focus-ring mt-5 inline-flex rounded-full bg-danger px-5 py-3 text-sm font-bold text-white">Voltar para campanhas</RouterLink>
+      <RouterLink to="/campanhas" class="focus-ring mt-5 inline-flex rounded-full bg-danger px-5 py-3 text-sm font-bold text-on-status">Voltar para campanhas</RouterLink>
     </section>
 
     <template v-else-if="campaign">
       <section class="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
-        <article class="rounded-2xl bg-white p-6 sm:p-7">
+        <article class="rounded-2xl bg-surface p-6 sm:p-7">
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">Estado da campanha</p>
@@ -34,17 +34,17 @@
           </div>
         </article>
 
-        <article class="rounded-2xl bg-brand-dark p-6 text-white sm:p-7">
-          <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-border">Vigência</p>
+        <article class="rounded-2xl bg-inverse p-6 text-on-inverse sm:p-7">
+          <p class="text-xs font-bold uppercase tracking-[0.12em] text-inverse-muted">Vigência</p>
           <p class="mt-4 text-2xl font-extrabold tracking-[-0.03em] text-brand">{{ formatPeriod(campaign.dataInicio, campaign.dataFim) }}</p>
           <dl class="mt-7 space-y-4 text-sm">
-            <div><dt class="text-sage-border">Criada em</dt><dd class="mt-1 font-semibold">{{ formatDateTime(campaign.criadoEm) }}</dd></div>
-            <div><dt class="text-sage-border">Atualizada em</dt><dd class="mt-1 font-semibold">{{ formatDateTime(campaign.atualizadoEm) }}</dd></div>
+            <div><dt class="text-inverse-muted">Criada em</dt><dd class="mt-1 font-semibold">{{ formatDateTime(campaign.criadoEm) }}</dd></div>
+            <div><dt class="text-inverse-muted">Atualizada em</dt><dd class="mt-1 font-semibold">{{ formatDateTime(campaign.atualizadoEm) }}</dd></div>
           </dl>
         </article>
       </section>
 
-      <section class="rounded-2xl bg-white p-6 sm:p-7" aria-labelledby="campaign-rule-details-heading">
+      <section class="rounded-2xl bg-surface p-6 sm:p-7" aria-labelledby="campaign-rule-details-heading">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id="campaign-rule-details-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Parâmetros da regra</h2>

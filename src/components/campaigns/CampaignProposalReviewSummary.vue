@@ -1,6 +1,6 @@
 <template>
   <section class="space-y-5" :aria-labelledby="hideCampaignSummary ? undefined : headingId">
-    <div v-if="!hideCampaignSummary" class="rounded-[22px] bg-white p-5 sm:p-6">
+    <div v-if="!hideCampaignSummary" class="rounded-[22px] bg-surface p-5 sm:p-6">
       <h2 :id="headingId" class="text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">Conferência das regras</h2>
       <p class="mt-2 text-sm leading-6 text-sage-muted">Confira os campos atuais, as origens disponíveis e os avisos de todas as regras.</p>
       <dl class="mt-5 grid gap-4 sm:grid-cols-2">
@@ -10,8 +10,8 @@
       </dl>
     </div>
 
-    <div v-if="!campaign.propostas.length" class="rounded-[22px] bg-white p-6 text-sm text-sage-muted">Nenhuma regra para conferir.</div>
-    <component :is="showPython || collapsible ? 'details' : 'article'" v-for="(proposal, index) in campaign.propostas" :key="proposal.clientId" class="group rounded-[22px] border p-5 sm:p-6" :class="showPython || collapsible ? 'border-sage-border-dark bg-gradient-to-br from-sage-light to-white hover:border-brand-ring motion-safe:transition-colors' : 'border-transparent bg-white'">
+    <div v-if="!campaign.propostas.length" class="rounded-[22px] bg-surface p-6 text-sm text-sage-muted">Nenhuma regra para conferir.</div>
+    <component :is="showPython || collapsible ? 'details' : 'article'" v-for="(proposal, index) in campaign.propostas" :key="proposal.clientId" class="group rounded-[22px] border p-5 sm:p-6" :class="showPython || collapsible ? 'border-sage-border-dark bg-gradient-to-br from-sage-light to-surface hover:border-brand-ring motion-safe:transition-colors' : 'border-transparent bg-surface'">
       <component :is="showPython || collapsible ? 'summary' : 'div'" class="flex items-start justify-between gap-4 rounded" :class="showPython || collapsible ? 'focus-ring cursor-pointer list-none [&::-webkit-details-marker]:hidden' : ''">
         <div class="min-w-0">
           <h3 class="text-lg font-extrabold text-brand-dark">Regra {{ index + 1 }}</h3>
