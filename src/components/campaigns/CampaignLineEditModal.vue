@@ -14,7 +14,7 @@
             Editar Linha #{{ line?.numeroLinha }} (Versão {{ line?.versao }})
           </h3>
           <p class="text-xs text-sage-muted">
-            Corrija inconsistências de dados. Ao salvar, a linha será revalidada imediatamente pelo backend.
+            Corrija inconsistências de dados. Ao salvar, a linha será revalidada imediatamente automaticamente.
           </p>
         </div>
         <button
@@ -34,10 +34,18 @@
           Conflito de Concorrência (409)
         </p>
         <p class="text-xs text-warning-text leading-5">
-          A linha foi alterada por outro usuário ou versão no servidor. Atualizamos a versão para <strong>{{ form.versao }}</strong> preservando o que você preencheu. Revise os campos e clique em salvar novamente.
+          Esta linha foi alterada por outra pessoa. Seus valores foram preservados. Compare com a versão atual antes de decidir como continuar.
         </p>
       </div>
 
+      <div v-if="conflitoConcorrencia" class="space-y-3 text-xs">
+        <p v-if="!linhaAtual">Não é possível salvar até consultar a versão atual. Se a consulta falhar, feche e abra a edição novamente.</p>
+        <template v-else>
+          <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr><th>Campo</th><th>Seus valores</th><th>Versão atual {{ linhaAtual.versao }}</th></tr></thead>
+          <tbody><tr v-for="diff in diferencasConflito" :key="diff.campo"><td class="py-2">{{ diff.campo }}</td><td>{{ diff.local ?? '—' }}</td><td>{{ diff.atual ?? '—' }}</td></tr></tbody></table></div>
+          <div class="flex flex-wrap gap-3"><button type="button" class="focus-ring rounded-lg border p-2" @click="usarAtual">Usar valores atuais</button><button type="button" class="focus-ring rounded-lg bg-brand p-2" @click="confirmarMeusValores">Manter meus valores após comparar</button></div>
+        </template>
+      </div>
       <!-- Erros Atuais da Linha -->
       <div v-if="line?.erros?.length" class="rounded-xl border border-danger/30 bg-danger-bg/40 p-4 space-y-2">
         <p class="text-xs font-extrabold text-danger-dark">Inconsistências identificadas nesta linha:</p>
@@ -195,6 +203,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { X, AlertTriangle, RefreshCw } from 'lucide-vue-next'
+import { createLineConflictReview } from '@/services/lineConflictReview'
 import { parseCurrencyPtBr, formatCurrencyPtBr } from '@/services/currencyUtils'
 
 const props = defineProps({
@@ -223,35 +232,36 @@ const form = ref({
 })
 
 const formErro = ref('')
-const conflitoConcorrencia = ref(false)
+const { conflict: conflitoConcorrencia, currentLine: linhaAtual, register: registrarConflito, confirmLocal: confirmarMeusValores } = createLineConflictReview(form)
 
-function inicializarFormulario() {
+function inicializarFormulario(line = props.line) {
   conflitoConcorrencia.value = false
   formErro.value = ''
-  if (!props.line) return
+  if (!line) return
 
-  const d = props.line.dadosInterpretados || {}
+  const d = line.dadosInterpretados || {}
   form.value = {
-    versao: props.line.versao ?? 1,
+    versao: line.versao ?? 1,
     matricula: d.matricula || '',
     descrCargo: d.descrCargo || '',
     codCargo: d.codCargo ?? null,
     codLoja: d.codLoja ?? null,
     descrMarca: d.descrMarca || '',
+    descrLoja: d.descrLoja || '',
     codMarca: d.codMarca ?? null,
     valorVendaTexto: d.valorVenda != null ? formatCurrencyPtBr(d.valorVenda) : '',
     dataReferencia: d.dataReferencia || '',
     dataAdmissao: d.dataAdmissao || '',
     dataDemissao: d.dataDemissao || '',
-    ignorarNaEfetivacao: Boolean(props.line.ignorarNaEfetivacao),
+    ignorarNaEfetivacao: Boolean(line.ignorarNaEfetivacao),
     motivo: ''
   }
 }
 
-watch(() => props.line, inicializarFormulario, { immediate: true })
+watch(() => props.line, () => inicializarFormulario(), { immediate: true })
 
 const podeSalvar = computed(() => {
-  return form.value.motivo.trim().length >= 5
+  return !conflitoConcorrencia.value && form.value.motivo.trim().length >= 5
 })
 
 function salvar() {
@@ -286,12 +296,18 @@ function salvar() {
   emit('save', { numeroLinha: props.line.numeroLinha, payload })
 }
 
-function registrarConflito(novaVersao) {
-  conflitoConcorrencia.value = true
-  if (novaVersao) {
-    form.value.versao = novaVersao
-  }
+const diferencasConflito = computed(() => {
+  if (!linhaAtual.value) return []
+  const current = { ...linhaAtual.value.dadosInterpretados, ignorarNaEfetivacao: linhaAtual.value.ignorarNaEfetivacao }
+  return Object.entries(form.value).filter(([key]) => !['motivo', 'versao'].includes(key)).map(([key, value]) => ({
+    campo: ({ matricula: 'Matrícula', descrCargo: 'Cargo', codCargo: 'Código do cargo', codLoja: 'Código da loja', descrLoja: 'Loja', descrMarca: 'Marca', codMarca: 'Código da marca', valorVendaTexto: 'Valor da venda', dataReferencia: 'Data de referência', dataAdmissao: 'Admissão', dataDemissao: 'Demissão', ignorarNaEfetivacao: 'Ignorar linha' })[key] || key, local: value,
+    atual: key === 'valorVendaTexto' ? formatCurrencyPtBr(current.valorVenda) : current[key]
+  }))
+})
+function usarAtual() {
+  const reason = form.value.motivo
+  inicializarFormulario(linhaAtual.value)
+  form.value.motivo = reason
 }
-
 defineExpose({ registrarConflito })
 </script>

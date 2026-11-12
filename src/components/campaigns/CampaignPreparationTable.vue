@@ -285,6 +285,7 @@
       </div>
     </div>
 
+    <p v-if="operationError" role="alert" class="rounded-xl bg-danger-bg p-4 text-sm text-danger-dark">{{ operationError }}</p>
     <!-- Modais de Suporte do FRONT-5 -->
     <CampaignLineEditModal
       ref="editModalRef"
@@ -336,6 +337,7 @@ import {
   ShieldCheck,
   CheckCircle2
 } from 'lucide-vue-next'
+import { userFacingText } from '@/services/userFacingText'
 import { useSafeAuthStore } from '@/stores/authStore'
 import { campaignPreparationService } from '@/services/campaignPreparationService'
 import { formatCurrencyPtBr } from '@/services/currencyUtils'
@@ -353,6 +355,8 @@ const props = defineProps({
 const emit = defineEmits(['batch-committed', 'batch-discarded', 'batch-updated'])
 
 const authStore = useSafeAuthStore()
+const operationError = ref('')
+function showError(error) { operationError.value = userFacingText(error.response?.data?.message || error.message || 'Não foi possível concluir a operação.') }
 
 const linhas = ref([])
 const totalElements = ref(0)
@@ -402,6 +406,7 @@ async function carregarLinhas() {
     totalElements.value = res.totalElements || 0
     totalPaginas.value = res.totalPages || 0
   } catch (err) {
+    showError(err)
     console.error('Falha ao carregar linhas de preparação:', err)
   } finally {
     carregando.value = false
@@ -424,6 +429,8 @@ function abrirEdicao(line) {
 }
 
 async function salvarEdicaoLinha({ numeroLinha, payload }) {
+  if (!authStore.canModifyBases) return
+  operationError.value = ''
   salvandoLinha.value = true
   try {
     const atualizada = await campaignPreparationService.editBatchLine(
@@ -439,10 +446,14 @@ async function salvarEdicaoLinha({ numeroLinha, payload }) {
     await carregarLinhas()
     emit('batch-updated')
   } catch (err) {
+    showError(err)
     if (err.response?.status === 409) {
       // Conflito de concorrência detectado
-      const novaVersao = err.response?.data?.versaoAtual || (linhaSelecionada.value.versao + 1)
-      editModalRef.value?.registrarConflito(novaVersao)
+      editModalRef.value?.registrarConflito(null)
+      try {
+        const current = await campaignPreparationService.getBatchLine(props.campanhaId, props.preparacaoId, numeroLinha)
+        editModalRef.value?.registrarConflito(current)
+      } catch (refreshError) { showError(refreshError) }
     } else {
       console.error('Erro ao salvar linha:', err)
     }
@@ -462,6 +473,7 @@ async function abrirHistorico(line) {
       line.numeroLinha
     )
   } catch (err) {
+    showError(err)
     console.error('Falha ao obter histórico da linha:', err)
   } finally {
     carregandoHistorico.value = false
@@ -475,7 +487,7 @@ function temInconsistencia(line) {
 
 function abrirAceiteRisco(line) {
   const erros = line.erros || line.inconsistencias || []
-  const primeiroErro = erros[0]
+  const primeiroErro = erros.find(item => !['ADVERTENCIA', 'AVISO'].includes(String(item.severidade).toUpperCase())) || erros[0]
   pendenciaSelecionada.value = {
     linha: line.numeroLinha,
     campo: primeiroErro?.campo || 'geral',
@@ -486,6 +498,8 @@ function abrirAceiteRisco(line) {
 }
 
 async function confirmarAceiteRisco({ pendencia, motivo }) {
+  if (!authStore.canModifyBases) return
+  operationError.value = ''
   processandoRisco.value = true
   try {
     await campaignPreparationService.acceptRisk(props.campanhaId, {
@@ -499,6 +513,7 @@ async function confirmarAceiteRisco({ pendencia, motivo }) {
     modalRiscoAberto.value = false
     await carregarLinhas()
   } catch (err) {
+    showError(err)
     console.error('Falha ao registrar aceite de risco:', err)
   } finally {
     processandoRisco.value = false
@@ -506,6 +521,8 @@ async function confirmarAceiteRisco({ pendencia, motivo }) {
 }
 
 async function revalidarTudo() {
+  if (!authStore.canModifyBases) return
+  operationError.value = ''
   revalidando.value = true
   try {
     await campaignPreparationService.revalidateBatch(
@@ -516,6 +533,7 @@ async function revalidarTudo() {
     await carregarLinhas()
     emit('batch-updated')
   } catch (err) {
+    showError(err)
     console.error('Falha ao revalidar lote:', err)
   } finally {
     revalidando.value = false
@@ -523,6 +541,7 @@ async function revalidarTudo() {
 }
 
 async function abrirPreviaImpacto() {
+  previaImpacto.value = null
   modalImpactoAberto.value = true
   carregandoPrevia.value = true
   erroEfetivacao.value = ''
@@ -532,6 +551,7 @@ async function abrirPreviaImpacto() {
       props.preparacaoId
     )
   } catch (err) {
+    showError(err)
     erroEfetivacao.value = err.response?.data?.message || err.message || 'Erro ao calcular prévia de impacto.'
   } finally {
     carregandoPrevia.value = false
@@ -539,6 +559,8 @@ async function abrirPreviaImpacto() {
 }
 
 async function efetivarLoteConfirmado({ motivo, confirmarPropagacaoImpacto }) {
+  if (!authStore.canModifyBases || !previaImpacto.value || carregandoPrevia.value) return
+  operationError.value = ''
   efetivandoLote.value = true
   erroEfetivacao.value = ''
   try {
@@ -550,6 +572,7 @@ async function efetivarLoteConfirmado({ motivo, confirmarPropagacaoImpacto }) {
     modalImpactoAberto.value = false
     emit('batch-committed', res)
   } catch (err) {
+    showError(err)
     erroEfetivacao.value = err.response?.data?.message || err.message || 'Falha ao efetivar lote na base geral.'
   } finally {
     efetivandoLote.value = false
@@ -557,6 +580,8 @@ async function efetivarLoteConfirmado({ motivo, confirmarPropagacaoImpacto }) {
 }
 
 async function descartar() {
+  if (!authStore.canModifyBases) return
+  operationError.value = ''
   if (!confirm('Deseja realmente descartar este lote de preparação? Todas as alterações não salvas serão perdidas.')) {
     return
   }
@@ -567,11 +592,15 @@ async function descartar() {
     })
     emit('batch-discarded')
   } catch (err) {
+    showError(err)
     console.error('Falha ao descartar lote:', err)
   }
 }
 
 watch(() => props.preparacaoId, carregarLinhas)
 
-onMounted(carregarLinhas)
+onMounted(async () => {
+  try { await authStore.refreshSession() } catch (error) { showError(error) }
+  await carregarLinhas()
+})
 </script>

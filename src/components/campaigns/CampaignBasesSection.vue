@@ -3,7 +3,8 @@
     class="rounded-[24px] border border-sage-border-light bg-white p-6 shadow-sm sm:p-7 space-y-6"
     aria-labelledby="campaign-bases-heading"
   >
-    <!-- Header: Título, Badge de Perfil e Seletor de Simulação de Papel (Apenas em DEV) -->
+    <p v-if="pageError" role="alert" class="rounded-xl bg-danger-bg p-4 text-sm text-danger-dark">{{ pageError }}</p>
+    <!-- Identidade confirmada na sessão atual -->
     <div class="flex flex-wrap items-start justify-between gap-4 border-b border-sage-border-light pb-5">
       <div>
         <div class="flex flex-wrap items-center gap-2.5">
@@ -29,34 +30,7 @@
         </p>
       </div>
 
-      <!-- Seletor Rápido de Perfil e Acesso à Área de Correção (Apenas visível em modo DEV) -->
-      <div v-if="isDev" class="flex flex-wrap items-center gap-2 rounded-xl bg-sage-light/70 p-2 border border-sage-border">
-        <label for="role-simulator-select" class="text-xs font-bold text-sage-muted flex items-center gap-1">
-          <ShieldAlert class="h-3.5 w-3.5" />
-          <span>Simular perfil:</span>
-        </label>
-        <select
-          id="role-simulator-select"
-          :value="authStore.currentUser?.papel"
-          @change="authStore.setRole($event.target.value)"
-          class="focus-ring rounded-lg border border-sage-border-dark bg-white px-2 py-1 text-xs font-bold text-brand-dark"
-        >
-          <option value="GERENTE_VENDAS">Gerente de Vendas (Permitido)</option>
-          <option value="ADMINISTRADOR">Administrador (Permitido)</option>
-          <option value="ANALISTA_NEGOCIOS">Analista de Negócios (Bloqueado)</option>
-          <option value="ANALISTA_CODIGO">Analista de Código (Bloqueado)</option>
-          <option value="AUDITOR">Auditor (Bloqueado)</option>
-        </select>
 
-        <button
-          type="button"
-          @click="alternarDemonstracaoPreparacao"
-          class="focus-ring inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1 text-xs font-black text-brand-dark hover:bg-brand-hover shadow-sm transition"
-        >
-          <SlidersHorizontal class="h-3.5 w-3.5" />
-          <span>{{ lotePreparacaoAtivo ? 'Fechar Área de Correção' : 'Área de Correção de Bases' }}</span>
-        </button>
-      </div>
     </div>
 
     <!-- 1. Alerta de Bases Corporativas Globais & Impacto em Outras Campanhas (BACK-5 / BACK-6) -->
@@ -180,7 +154,7 @@
               {{ baseExistente ? 'Base Consolidada Disponível no Sistema' : 'Nenhuma Base Consolidada no Período' }}
             </h4>
             <p v-if="baseExistente" class="mt-1 text-xs text-brand-dark/80">
-              A competência <strong>{{ selectedCompetenciaFormatada }}</strong> já possui <strong>{{ baseExistente.totalVendas }} vendas</strong> cadastradas com integridade de RH. Você pode associar esta base imediatamente sem upload duplicado.
+              A competência <strong>{{ selectedCompetenciaFormatada }}</strong> possui <strong>{{ baseExistente.totalVendas }} vendas</strong> cadastradas. Selecione abaixo um lote disponível para associar sem novo envio.
             </p>
             <p v-else class="mt-1 text-xs text-sage-muted">
               Envie conjuntamente as planilhas de RH e Vendas para registrar esta competência no sistema.
@@ -198,15 +172,15 @@
         <!-- Botão de Ação: Associar Base Existente (Deduplicação de Cargas) -->
         <div class="mt-4 flex flex-wrap items-center gap-3">
           <button
-            v-if="baseExistente && !jaAnexadoNaCampanha"
+            v-for="lote in lotesDisponiveis" :key="lote.reportId"
             type="button"
             :disabled="!authStore.canModifyBases || isAssociating"
-            @click="associarBaseExistente"
+            @click="associarBaseExistente(lote)"
             class="focus-ring inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-xs font-extrabold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
             title="Associa a base já cadastrada à campanha sem novo upload"
           >
             <LinkIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': isAssociating }" />
-            <span>{{ isAssociating ? 'Associando...' : 'Associar Base Existente à Campanha' }}</span>
+            <span>{{ isAssociating ? 'Associando...' : `Associar ${lote.tipoBase === 'HR' ? 'RH' : 'Vendas'}: ${lote.nomeArquivoOriginal || 'Lote ' + lote.reportId}` }}</span>
           </button>
 
           <span v-if="!authStore.canModifyBases && baseExistente && !jaAnexadoNaCampanha" class="text-xs text-danger font-semibold">
@@ -249,7 +223,7 @@
               v-if="authStore.canModifyBases"
               type="button"
               @click="desanexarBase(anexo.id)"
-              :disabled="isDetaching === anexo.id"
+              :disabled="!authStore.canModifyBases || isDetaching === anexo.id"
               class="focus-ring text-sage-muted hover:text-danger p-1 rounded-lg transition"
               title="Desanexar este lote da campanha"
             >
@@ -262,7 +236,7 @@
             <button
               type="button"
               @click="abrirPreparacaoLote(anexo.reportId)"
-              :disabled="abrindoLote === anexo.reportId"
+              :disabled="!authStore.canModifyBases || abrindoLote === anexo.reportId"
               class="focus-ring inline-flex items-center gap-1.5 text-xs font-extrabold text-brand-dark hover:underline"
             >
               <SlidersHorizontal class="h-3.5 w-3.5 text-brand" :class="{ 'animate-spin': abrindoLote === anexo.reportId }" />
@@ -401,9 +375,9 @@
       </div>
 
       <!-- Alerta de Falha de Associação com Botão de Recuperação (Crítico 4 do Review) -->
-      <div v-if="pendenteAssociacaoLoteId" class="rounded-xl border border-warning-border bg-warning-bg p-4 flex flex-wrap items-center justify-between gap-3">
+      <div v-if="pendenteAssociacaoLoteId.length" class="rounded-xl border border-warning-border bg-warning-bg p-4 flex flex-wrap items-center justify-between gap-3">
         <div class="max-w-xl">
-          <p class="text-xs font-bold text-warning-text">Lote #{{ pendenteAssociacaoLoteId }} gerado com sucesso, mas a associação automática falhou.</p>
+          <p class="text-xs font-bold text-warning-text">Arquivos importados. Falta associar os lotes {{ pendenteAssociacaoLoteId.join(', ') }} à campanha.</p>
           <p v-if="mensagemFalhaAssociacao" class="text-[11px] text-danger font-semibold mt-0.5">
             Motivo do servidor: {{ mensagemFalhaAssociacao }}
           </p>
@@ -519,6 +493,9 @@ import {
 } from 'lucide-vue-next'
 import { useSafeAuthStore } from '@/stores/authStore'
 import { dataService } from '@/services/dataService'
+import api from '@/services/api'
+import { userFacingText } from '@/services/userFacingText'
+import { associateReports, availableCoverageLots, uploadReportIds } from '@/services/campaignBaseAssociation'
 import { campaignCoverageService } from '@/services/campaignCoverageService'
 import { campaignPreparationService } from '@/services/campaignPreparationService'
 import { findAffectedCampaigns } from '@/services/campaignBasesImpactService'
@@ -530,7 +507,6 @@ import {
 } from '@/services/competenceUtils'
 import CampaignPreparationTable from './CampaignPreparationTable.vue'
 
-const isDev = Boolean(import.meta.env?.DEV)
 
 const props = defineProps({
   campanhaId: { type: [Number, String], default: null },
@@ -541,6 +517,10 @@ const props = defineProps({
 const emit = defineEmits(['competence-selected', 'base-associated', 'base-uploaded'])
 
 const authStore = useSafeAuthStore()
+const pageError = ref('')
+const cobertura = ref(null)
+const lotesDisponiveis = computed(() => availableCoverageLots(cobertura.value, selectedCompetencia.value))
+function showError(error) { pageError.value = userFacingText(error.response?.data?.message || error.message || 'Não foi possível concluir a operação.') }
 
 const selectedCompetencia = ref(props.competencia || '')
 const competenceOptions = ref([])
@@ -555,7 +535,7 @@ const isUploading = ref(false)
 const uploadProgress = ref(0)
 const uploadStageMessage = ref('')
 const diagnosticoEnvio = ref(null)
-const pendenteAssociacaoLoteId = ref(null)
+const pendenteAssociacaoLoteId = ref([])
 const mensagemFalhaAssociacao = ref('')
 
 const isAssociating = ref(false)
@@ -609,6 +589,7 @@ async function carregarCompetencias() {
       emit('competence-selected', selectedCompetencia.value)
     }
   } catch (err) {
+    showError(err)
     console.warn('Erro ao carregar competências de referência:', err)
   }
 }
@@ -616,9 +597,10 @@ async function carregarCompetencias() {
 async function carregarCampanhas() {
   if (campaigns.value.length > 0) return
   try {
-    const response = await fetch('/api/v1/campanhas').then((r) => (r.ok ? r.json() : []))
+    const { data: response } = await api.get('/campanhas')
     if (Array.isArray(response)) campaigns.value = response
   } catch (err) {
+    showError(err)
     console.warn('Não foi possível carregar lista global de campanhas:', err)
   }
 }
@@ -626,8 +608,14 @@ async function carregarCampanhas() {
 async function carregarAnexos() {
   if (!props.campanhaId) return
   try {
-    anexosAtivos.value = await campaignCoverageService.listAttachments(props.campanhaId)
+    const [anexos, diagnostico] = await Promise.all([
+      campaignCoverageService.listAttachments(props.campanhaId),
+      campaignCoverageService.getCoverage(props.campanhaId)
+    ])
+    anexosAtivos.value = anexos
+    cobertura.value = diagnostico
   } catch (err) {
+    showError(err)
     console.warn('Erro ao carregar anexos ativos:', err)
   }
 }
@@ -665,15 +653,16 @@ function formatFileSize(bytes) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
-async function associarBaseExistente() {
-  if (!baseExistente.value || !props.campanhaId || isAssociating.value) return
+async function associarBaseExistente(lote) {
+  if (!authStore.canModifyBases || !lotesDisponiveis.value.some(item => item.reportId === lote?.reportId) || !props.campanhaId || isAssociating.value) return
   isAssociating.value = true
   try {
-    const reportId = baseExistente.value.reportId || 10042
+    const reportId = lote.reportId
     await campaignCoverageService.attachBase(props.campanhaId, { reportId })
     await carregarAnexos()
     emit('base-associated', { reportId, competencia: selectedCompetencia.value })
   } catch (err) {
+    showError(err)
     console.error('Falha ao associar base existente:', err)
   } finally {
     isAssociating.value = false
@@ -681,63 +670,45 @@ async function associarBaseExistente() {
 }
 
 async function tentarAssociarLotePendente() {
-  if (!pendenteAssociacaoLoteId.value || !props.campanhaId) return
+  if (!authStore.canModifyBases || !pendenteAssociacaoLoteId.value.length || !props.campanhaId) return
   isAssociating.value = true
+  const ids = [...pendenteAssociacaoLoteId.value]
   try {
-    await campaignCoverageService.attachBase(props.campanhaId, {
-      reportId: pendenteAssociacaoLoteId.value
-    })
-    pendenteAssociacaoLoteId.value = null
+    await associateReports(campaignCoverageService, props.campanhaId, ids)
+    pendenteAssociacaoLoteId.value = []
     mensagemFalhaAssociacao.value = ''
     await carregarAnexos()
-    emit('base-associated', { reportId: pendenteAssociacaoLoteId.value, competencia: selectedCompetencia.value })
+    emit('base-associated', { reportIds: ids, competencia: selectedCompetencia.value })
   } catch (err) {
-    console.error('Falha na tentativa de recuperação de associação:', err)
-    mensagemFalhaAssociacao.value = err.response?.data?.message || err.message || 'Falha ao vincular lote à campanha.'
-  } finally {
-    isAssociating.value = false
-  }
+    pendenteAssociacaoLoteId.value = err.pendingReportIds || ids
+    mensagemFalhaAssociacao.value = err.message
+    showError(err)
+  } finally { isAssociating.value = false }
 }
 
 async function desanexarBase(anexoId) {
-  if (!props.campanhaId || !anexoId) return
+  if (!authStore.canModifyBases || !props.campanhaId || !anexoId) return
   isDetaching.value = anexoId
   try {
     await campaignCoverageService.detachBase(props.campanhaId, anexoId)
     await carregarAnexos()
   } catch (err) {
+    showError(err)
     console.error('Falha ao desanexar base:', err)
   } finally {
     isDetaching.value = null
   }
 }
 
-function alternarDemonstracaoPreparacao() {
-  if (lotePreparacaoAtivo.value) {
-    lotePreparacaoAtivo.value = null
-  } else {
-    lotePreparacaoAtivo.value = {
-      id: 'prep-demo-jul25',
-      campanhaId: props.campanhaId || 3,
-      tipoBase: 'SALES',
-      competencia: selectedCompetencia.value || '2025-07',
-      status: 'EM_PREPARACAO',
-      totalLinhas: 4,
-      linhasValidas: 1,
-      linhasInvalidas: 3,
-      origem: 'MANUAL'
-    }
-  }
-}
-
 // FRONT-5: Abertura de lote em preparação para edição de linhas
 async function abrirPreparacaoLote(reportId) {
-  if (!props.campanhaId || !reportId) return
+  if (!authStore.canModifyBases || !props.campanhaId || !reportId) return
   abrindoLote.value = reportId
   try {
     const lote = await campaignPreparationService.openFromBatch(props.campanhaId, reportId)
     lotePreparacaoAtivo.value = lote
   } catch (err) {
+    showError(err)
     console.error('Falha ao abrir lote em preparação:', err)
   } finally {
     abrindoLote.value = null
@@ -748,10 +719,11 @@ function onBatchCommitted() {
   lotePreparacaoAtivo.value = null
   carregarAnexos()
   carregarCompetencias()
+  emit('base-uploaded')
 }
 
 async function executarUploadCiclo() {
-  if (!rhFile.value || !vendasFile.value || isUploading.value) return
+  if (!authStore.canUploadBases || !rhFile.value || !vendasFile.value || isUploading.value) return
 
   const targetCompetencia = competenciaDetectadaNosArquivos.value || selectedCompetencia.value
   selectedCompetencia.value = targetCompetencia
@@ -760,7 +732,7 @@ async function executarUploadCiclo() {
   uploadProgress.value = 10
   uploadStageMessage.value = 'Iniciando validação...'
   diagnosticoEnvio.value = null
-  pendenteAssociacaoLoteId.value = null
+  pendenteAssociacaoLoteId.value = []
   mensagemFalhaAssociacao.value = ''
 
   try {
@@ -775,30 +747,23 @@ async function executarUploadCiclo() {
     })
 
     uploadProgress.value = 100
-    uploadStageMessage.value = 'Carga concluída com sucesso!'
     diagnosticoEnvio.value = res
 
-    if (props.campanhaId && res?.reportId) {
-      try {
-        await campaignCoverageService.attachBase(props.campanhaId, {
-          reportId: res.reportId
-        })
-        await carregarAnexos()
-      } catch (attachErr) {
-        console.warn('Lote processado, mas não foi possível auto-anexar à campanha:', attachErr)
-        pendenteAssociacaoLoteId.value = res.reportId
-        mensagemFalhaAssociacao.value =
-          attachErr.response?.data?.message ||
-          attachErr.message ||
-          'Lote importado no banco corporativo, mas não pôde ser vinculado à vigência desta campanha.'
-      }
+    if (res.status !== 'SUCESSO') throw new Error(res.mensagem || res.mensagens?.join(' ') || 'O envio contém pendências. Verifique o diagnóstico dos arquivos.')
+    uploadStageMessage.value = 'Arquivos importados. Associando à campanha…'
+    if (props.campanhaId) {
+      const ids = uploadReportIds(res)
+      pendenteAssociacaoLoteId.value = ids
+      await tentarAssociarLotePendente()
     }
 
+    uploadStageMessage.value = pendenteAssociacaoLoteId.value.length ? 'Arquivos importados; associação pendente.' : 'Envio e associação concluídos.'
     await carregarCompetencias()
     emit('base-uploaded', res)
   } catch (err) {
+    showError(err)
     console.error('Erro no upload sequencial de bases:', err)
-    diagnosticoEnvio.value = {
+    diagnosticoEnvio.value = diagnosticoEnvio.value || {
       status: 'FALHOU',
       mensagem: err.message || 'Falha durante o envio de bases.',
       inconsistencias: [{ motivo: err.message || 'Erro inesperado no servidor.' }]
@@ -825,6 +790,7 @@ watch(
 )
 
 onMounted(async () => {
+  try { await authStore.refreshSession() } catch (err) { showError(err) }
   await carregarCompetencias()
   await carregarCampanhas()
   if (props.campanhaId) {

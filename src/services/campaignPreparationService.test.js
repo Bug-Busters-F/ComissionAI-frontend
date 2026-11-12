@@ -161,3 +161,22 @@ describe('campaignPreparationService — Correção de Bases e Aceite de Riscos 
     expect(aceito.aceito).toBe(true)
   })
 })
+
+describe('real errors and concurrent editions', () => {
+  it.each([404, 403, 500])('does not fabricate risk acceptance or revocation on HTTP %s', async status => {
+    const failure = Object.assign(new Error('Operation rejected'), { response: { status } })
+    const service = createCampaignPreparationService({ post: vi.fn().mockRejectedValue(failure) })
+    await expect(service.acceptRisk(1, { pendenciaIdentificador: 'linha-5-data', severidade: 'ADVERTENCIA', motivo: 'Justificativa válida' })).rejects.toBe(failure)
+    await expect(service.revokeRisk(1, 8, { motivo: 'Justificativa válida' })).rejects.toBe(failure)
+  })
+  it('propagates list failures instead of presenting an empty batch list', async () => {
+    const service = createCampaignPreparationService({ get: vi.fn().mockRejectedValue(new Error('offline')) })
+    await expect(service.listBatches(1)).rejects.toThrow('offline')
+  })
+  it('finds the current line version across server pages, without guessing the version', async () => {
+    const http = { get: vi.fn().mockResolvedValueOnce({ data: { content: [{ numeroLinha: 1 }], totalPages: 2 } }).mockResolvedValueOnce({ data: { content: [{ numeroLinha: 200, versao: 17 }], totalPages: 2 } }) }
+    const service = createCampaignPreparationService(http)
+    expect((await service.getBatchLine(1, 'prep-1', 200)).versao).toBe(17)
+    expect(http.get.mock.calls[1][1].params.page).toBe(1)
+  })
+})

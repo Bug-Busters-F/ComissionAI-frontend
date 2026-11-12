@@ -169,7 +169,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Globe2, X, AlertOctagon, RefreshCw } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -186,8 +186,10 @@ const motivo = ref('')
 const confirmado = ref(false)
 
 const podeEfetivar = computed(() => {
-  return confirmado.value && motivo.value.trim().length >= 5
+  return props.preview != null && !props.carregando && !props.erroEfetivacao && !props.preview.possuiBloqueioFechamento && confirmado.value && motivo.value.trim().length >= 5
 })
+
+watch(() => props.open, () => { motivo.value = ''; confirmado.value = false })
 
 function efetivar() {
   if (!podeEfetivar.value) return
