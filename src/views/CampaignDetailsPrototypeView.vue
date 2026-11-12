@@ -19,6 +19,13 @@
       <CampaignSummary v-if="isDemo" :title="'Revisão consolidada'" :subtitle="isDemo ? 'Regra vinculada à campanha.' : 'Dados salvos da regra vinculada à campanha.'" :badge="formatCampaignState(campaign.estado)" :summary-items="summaryItems" :original-text="campaign.textoOriginal" />
 
       <CampaignProposalReviewSummary v-if="!isDemo && campaign.versaoVigente == null && proposalCampaign" :campaign="proposalCampaign" :validation="proposalValidation" :show-python="true" hide-impact />
+      
+      <!-- Seção de Bases e Cobertura da Campanha ([FRONT-4]) -->
+      <CampaignBasesSection
+        v-if="!isDemo && campaign?.id"
+        :campanha-id="campaign.id"
+      />
+
       <section class="rounded-[22px] bg-white p-6 sm:p-7 text-sm">
         <h2 class="text-xl font-extrabold">Registro da campanha</h2>
         <p class="mt-3">Criada em: {{ dateTime(campaign.criadoEm) }}</p>
@@ -40,6 +47,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CampaignDeleteDialog from '@/components/common/CampaignDeleteDialog.vue'
 import CampaignProposalReviewSummary from '@/components/campaigns/CampaignProposalReviewSummary.vue'
+import CampaignBasesSection from '@/components/campaigns/CampaignBasesSection.vue'
 import { persistedCampaignToProposal } from '@/services/campaignProposalPersistence'
 import { validateCampaignProposalSet } from '@/services/campaignProposalValidation'
 import CampaignSummary from '@/components/common/CampaignSummary.vue'
