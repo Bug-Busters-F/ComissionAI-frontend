@@ -3,7 +3,7 @@
     <PageHeader title="Visão geral" description="Acompanhe os dados e o ciclo das suas campanhas.">
       <template #action>
         <RouterLink
-          to="/campanhas/nova"
+          v-if="access.can('createCampaign')" to="/campanhas/nova"
           class="focus-ring inline-flex items-center rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover"
         >
           + Nova campanha
@@ -15,11 +15,11 @@
       <article
         v-for="card in metrics"
         :key="card.label"
-        :class="['rounded-2xl p-6', card.highlight ? 'bg-success-bg ring-1 ring-inset ring-success/20' : 'bg-white']"
+        class="rounded-2xl bg-white p-6"
       >
-        <p class="text-sm font-medium" :class="card.highlight ? 'text-success-dark' : 'text-sage-muted'">{{ card.label }}</p>
-        <p class="mt-6 text-4xl font-extrabold tracking-[-0.05em]" :class="card.highlight ? 'text-success-dark' : 'text-brand-dark'">{{ card.value }}</p>
-        <p class="mt-2 text-xs" :class="card.highlight ? 'text-success-dark' : 'text-sage-muted'">{{ card.detail }}</p>
+        <p class="text-sm font-medium text-sage-muted">{{ card.label }}</p>
+        <p class="mt-6 text-4xl font-extrabold tracking-[-0.05em] text-brand-dark">{{ card.value }}</p>
+        <p class="mt-2 text-xs text-sage-muted">{{ card.detail }}</p>
       </article>
     </section>
 
@@ -79,12 +79,14 @@
       <p class="text-xs font-bold uppercase tracking-[0.12em] text-warning-dark">Atenção aos dados</p>
       <h2 class="mt-3 text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Dezembro tem pendências para revisão</h2>
       <p class="mt-2 max-w-2xl text-sm leading-6 text-sage-muted">Acompanhe as pendências e certifique-se de que os ciclos mensais foram validados antes da apuração.</p>
-      <RouterLink to="/dados" class="focus-ring mt-5 inline-flex font-semibold underline underline-offset-4 text-brand-dark">Revisar competência →</RouterLink>
+      <RouterLink v-if="access.can('viewData')" to="/dados" class="focus-ring mt-5 inline-flex font-semibold underline underline-offset-4 text-brand-dark">Revisar competência →</RouterLink>
     </section>
   </div>
 </template>
 
 <script setup>
+import { useAccessPolicy } from '@/services/useAccessPolicy'
+const access = useAccessPolicy()
 import { onMounted, ref } from 'vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -93,7 +95,7 @@ import { campaignService, normalizeCampaignError } from '@/services/campaignServ
 import { campaignStateTone, formatCampaignState, formatPeriod } from '@/services/campaignMappers'
 
 const metrics = [
-  { label: 'Competências cadastradas', value: '3', detail: 'RH, Vendas e Comissão', highlight: true },
+  { label: 'Competências cadastradas', value: '3', detail: 'RH, Vendas e Comissão' },
   { label: 'Campanhas', value: '2', detail: 'Regras e campanhas aprovadas' },
   { label: 'Aguardando apuração', value: '1', detail: 'Campanhas com vigência encerrada' },
   { label: 'Pendências nos dados', value: '3', detail: 'Revisão antes dos cálculos' }

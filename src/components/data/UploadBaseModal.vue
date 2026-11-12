@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="store.uploadModal.isOpen"
-    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-brand-dark/60 p-4 backdrop-blur-sm transition-opacity"
+    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm transition-opacity"
     @click.self="store.closeUploadModal"
   >
     <div

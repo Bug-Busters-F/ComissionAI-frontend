@@ -6,11 +6,11 @@ import { createCampaignProposalLifecycle } from './campaignProposalLifecycle'
 function deferred() { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
 const scenario = { totalVendas: '1000', totalComissaoBase: '20', totalComissaoProposta: '40', deltaComissao: '20', deltaPercentual: '100', comissaoProjetada: '40', deltaProjetado: '20', qtdVendasComMudancaFaixa: 0 }
 function simulationRaw(id = 'sim-id') { return { id, protocolo: 'protocol', campanhaId: 42, competencia: '2026-09', totalVendasRecortadas: 1, fatorProjecao: '1', diasInclusivos: 30, cenario100: scenario, cenario80: scenario, cenario120: scenario, cenario150: scenario, vendas: [], avisosGerais: [] } }
-function setup(overrides = {}) {
+function setup(overrides = {}, permissions = {}) {
   const campaign = reactive(campaignFixture()); const scope = effectScope()
   campaign.propostas[2].campos.taxaPercentual = '4'; campaign.propostas[2].pendenciasRemotas = []; campaign.propostas[2].metadadosRecebidos.validacaoPendente = false
   const api = { load: vi.fn(async () => savedResponse(campaign)), save: vi.fn(async () => savedResponse(campaign)), competences: vi.fn(async () => [{ competencia: '2026-09', totalVendas: 1 }]), cut: vi.fn(async () => ({ competencia: '2026-09', totalVendasRecortadas: 1, totalVendasComImpedimento: 0, impedimentosGerais: [], possuiAmbiguidadeCritica: false })), simulate: vi.fn(async () => simulationRaw()), sales: vi.fn(async (id, page) => ({ simulacaoId: id, paginaAtual: page - 1, totalElementos: 1, totalPaginas: 1, vendas: [] })), accept: vi.fn(async () => ({ simulacaoId: 'sim-id', campanhaId: 42, statusAceite: 'ACEITA', aceitoPor: 'Pessoa teste' })), readiness: vi.fn(async () => ({ aptaParaAtivacao: true, simulacaoId: 'sim-id', aceitoPor: 'Pessoa teste' })), activate: vi.fn(async () => ({ ...savedResponse(campaign), estado: 'ATIVA' })), simulation: vi.fn(async () => simulationRaw()), ...overrides }
-  const flow = scope.run(() => createCampaignProposalLifecycle({ campaign, api }))
+  const flow = scope.run(() => createCampaignProposalLifecycle({ campaign, api, ...permissions }))
   return { campaign, api, flow, scope }
 }
 async function ready(s) { expect(await s.flow.save()).toBe(true); await s.flow.selectCompetence('2026-09'); expect(await s.flow.runSimulation()).toBe(true); s.flow.simulation.aceitoPor = 'Pessoa teste'; expect(await s.flow.accept()).toBe(true) }
@@ -93,7 +93,7 @@ describe('draft, persisted simulation, formal acceptance and activation lifecycl
   it('uses the saved campaign id and real protocol and never saves between acceptance and activation', async () => {
     const s = setup(); await ready(s)
     expect(s.api.simulate).toHaveBeenCalledWith(42, '2026-09')
-    expect(s.api.accept).toHaveBeenCalledWith('sim-id', { campanhaId: 42, aceitoPor: 'Pessoa teste', motivo: null })
+    expect(s.api.accept).toHaveBeenCalledWith('sim-id', { campanhaId: 42, motivo: null })
     expect(s.flow.simulation.result.protocolo).toBe('protocol'); expect(s.flow.canReview.value).toBe(true)
     expect(await s.flow.activate()).toBe(true); expect(s.api.activate).toHaveBeenCalledWith(42, null, null)
     expect(s.api.save).toHaveBeenCalledOnce(); expect(s.flow.state.estado).toBe('ATIVA'); s.scope.stop()
@@ -120,10 +120,10 @@ describe('draft, persisted simulation, formal acceptance and activation lifecycl
     const s = setup(); await ready(s); await s.flow.selectCompetence('2026-08')
     expect(s.flow.simulation.accepted).toBe(false); expect(s.flow.canActivate.value).toBeFalsy(); s.scope.stop()
   })
-  it('requires explicit responsible identity and backend confirmation of the acceptance', async () => {
+  it('uses server identity and requires backend confirmation of the acceptance', async () => {
     const s = setup({ accept: vi.fn(async () => ({ statusAceite: 'INVALIDADA', simulacaoId: 'sim-id', campanhaId: 42 })) }); await s.flow.save(); await s.flow.selectCompetence('2026-09'); await s.flow.runSimulation()
-    expect(await s.flow.accept()).toBe(false); expect(s.api.accept).not.toHaveBeenCalled()
-    s.flow.simulation.aceitoPor = 'Responsável'; expect(await s.flow.accept()).toBe(false); expect(s.flow.simulation.accepted).toBe(false); s.scope.stop()
+    expect(await s.flow.accept()).toBe(false); expect(s.api.accept).toHaveBeenCalledWith('sim-id', { campanhaId: 42, motivo: null });
+    expect(s.api.accept.mock.calls[0][1]).not.toHaveProperty('aceitoPor'); expect(s.flow.simulation.accepted).toBe(false); s.scope.stop()
   })
   it('preserves an accepted result after activation rejection while displaying the backend reason', async () => {
     const s = setup({ activate: vi.fn(async () => { throw { response: { status: 409, data: { message: 'Proposta desatualizada' } } } }) }); await ready(s)
@@ -182,8 +182,8 @@ it('adapta impedimentos de cobertura para o bloqueio da tela da dev, preservando
 
 describe('published campaign edit sessions', () => {
   const copyJson = (value) => JSON.parse(JSON.stringify(value))
-  function publishedSetup() {
-    const s = setup()
+  function publishedSetup(permissions = {}) {
+    const s = setup({}, permissions)
     const base = { ...savedResponse(s.campaign), estado: 'ATIVA', versaoVigente: 1, versaoProposta: null, revisaoControle: 4 }
     let remote = copyJson(base)
     s.api.load.mockImplementation(async () => copyJson(remote))
@@ -256,6 +256,13 @@ describe('published campaign edit sessions', () => {
     expect(s.api.cancelProposal).not.toHaveBeenCalled()
     s.scope.stop()
   })
+  it('does not create a published edit proposal when the profile cannot initiate one', async () => {
+    const s = publishedSetup({ canStartProposal: () => false })
+    expect(await s.flow.load(42)).toBe(true)
+    expect(s.api.startProposal).not.toHaveBeenCalled()
+    expect(s.flow.readOnly.value).toBe(true)
+    s.scope.stop()
+  })
   it('opens closed campaigns for consultation and does not create an edit proposal', async () => {
     const s = publishedSetup()
     s.setRemote({ ...s.remote(), motivoBloqueioEdicao: 'Competência fechada.' })
@@ -264,6 +271,26 @@ describe('published campaign edit sessions', () => {
     expect(s.api.startProposal).not.toHaveBeenCalled()
     expect(await s.flow.save()).toBe(false)
     expect(await s.flow.runSimulation()).toBe(false)
+    s.scope.stop()
+  })
+})
+
+describe('profile-aware lifecycle callbacks', () => {
+  it('lets the manager review without sending a forbidden draft update', async () => {
+    const s = setup({}, { canSave: () => false })
+    expect(await s.flow.save()).toBe(false)
+    expect(s.api.save).not.toHaveBeenCalled()
+    s.scope.stop()
+  })
+  it('keeps denied profiles read-only and never writes progress on consultation', async () => {
+    const s = setup({ progress: vi.fn() }, { canWrite: () => false, canRecordProgress: () => false })
+    expect(await s.flow.load(42)).toBe(true)
+    expect(await s.flow.save()).toBe(false)
+    expect(await s.flow.runSimulation()).toBe(false)
+    expect(await s.flow.recordProgress(2)).toBe(false)
+    expect(s.api.save).not.toHaveBeenCalled()
+    expect(s.api.simulate).not.toHaveBeenCalled()
+    expect(s.api.progress).not.toHaveBeenCalled()
     s.scope.stop()
   })
 })

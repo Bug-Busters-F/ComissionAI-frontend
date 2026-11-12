@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="fixed inset-0 z-50 grid place-items-center bg-brand-dark/50 px-5 py-8" role="presentation" @click.self="$emit('cancel')">
+    <div v-if="open" class="fixed inset-0 z-50 grid place-items-center bg-black/50 px-5 py-8" role="presentation" @click.self="$emit('cancel')">
       <section ref="dialog" class="w-full max-w-md rounded-[22px] bg-white p-6 shadow-2xl sm:p-7" role="alertdialog" aria-modal="true" aria-labelledby="remove-proposal-title" aria-describedby="remove-proposal-description" @keydown.esc="$emit('cancel')" @keydown="trapFocus">
         <h2 id="remove-proposal-title" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Remover regra {{ index }}?</h2>
         <p id="remove-proposal-description" class="mt-3 text-sm leading-6 text-sage-muted">Este bloco será removido desta campanha. As outras regras serão mantidas.</p>
