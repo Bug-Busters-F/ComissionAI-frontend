@@ -99,7 +99,7 @@
         <template v-if="store.dadosEfetivados.tipoBaseAtiva === 'VENDAS'">
           <!-- Excluir Vendas da Competência Selecionada -->
           <button
-            v-if="store.dadosEfetivados.competenciaFiltro !== 'TODAS'"
+            v-if="access.can('manageData') && (store.dadosEfetivados.competenciaFiltro !== 'TODAS')"
             type="button"
             @click="store.abrirModalExclusaoBase(store.dadosEfetivados.competenciaFiltro)"
             class="focus-ring flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger-bg px-3 py-2 text-xs font-bold text-danger hover:bg-danger hover:text-white transition"
@@ -110,7 +110,7 @@
           </button>
 
           <!-- Excluir Todas as Vendas -->
-          <button
+          <button v-if="access.can('manageData')"
             type="button"
             @click="store.abrirModalExclusaoTodasVendas"
             class="focus-ring flex items-center gap-1.5 rounded-xl border border-sage-border bg-white px-3 py-2 text-xs font-semibold text-sage-muted hover:text-danger hover:border-danger/30 hover:bg-danger-bg/50 transition"
@@ -123,7 +123,7 @@
 
         <template v-else-if="store.dadosEfetivados.tipoBaseAtiva === 'RH'">
           <!-- Excluir Todas as Matrículas (quando sem vendas) -->
-          <button
+          <button v-if="access.can('manageData')"
             type="button"
             @click="store.abrirModalExclusaoTodasMatriculas"
             class="focus-ring flex items-center gap-1.5 rounded-xl border border-sage-border bg-white px-3 py-2 text-xs font-semibold text-sage-muted hover:text-danger hover:border-danger/30 hover:bg-danger-bg/50 transition"
@@ -136,7 +136,7 @@
 
         <template v-else-if="store.dadosEfetivados.tipoBaseAtiva === 'COMISS'">
           <!-- Excluir Todas as Comissões Base -->
-          <button
+          <button v-if="access.can('manageData')"
             type="button"
             @click="store.abrirModalExclusaoTodasComissoes"
             class="focus-ring flex items-center gap-1.5 rounded-xl border border-sage-border bg-white px-3 py-2 text-xs font-semibold text-sage-muted hover:text-danger hover:border-danger/30 hover:bg-danger-bg/50 transition"
@@ -232,7 +232,7 @@
               {{ item.demissDate ? formatarData(item.demissDate) : '— (Ativo)' }}
             </td>
             <td class="px-5 py-3.5 text-right">
-              <button
+              <button v-if="access.can('manageData')"
                 type="button"
                 @click="store.abrirModalExclusaoRegistro('RH', item)"
                 class="focus-ring inline-flex items-center rounded-lg p-1.5 text-sage-muted hover:bg-danger-bg hover:text-danger transition"
@@ -298,7 +298,7 @@
               </span>
             </td>
             <td class="px-5 py-3.5 text-right">
-              <button
+              <button v-if="access.can('manageData')"
                 type="button"
                 @click="store.abrirModalExclusaoRegistro('VENDAS', item)"
                 class="focus-ring inline-flex items-center rounded-lg p-1.5 text-sage-muted hover:bg-danger-bg hover:text-danger transition"
@@ -350,7 +350,7 @@
               {{ formatarData(item.vigenciaInicio) }} até {{ formatarData(item.vigenciaFim) }}
             </td>
             <td class="px-5 py-3.5 text-right">
-              <button
+              <button v-if="access.can('manageData')"
                 type="button"
                 @click="store.abrirModalExclusaoRegistro('COMISS', item)"
                 class="focus-ring inline-flex items-center rounded-lg p-1.5 text-sage-muted hover:bg-danger-bg hover:text-danger transition"
@@ -422,6 +422,8 @@
 </template>
 
 <script setup>
+import { useAccessPolicy } from '@/services/useAccessPolicy'
+const access = useAccessPolicy()
 import { userFacingText } from '@/services/userFacingText'
 import { onMounted } from 'vue'
 import {

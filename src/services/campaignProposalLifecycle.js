@@ -18,13 +18,13 @@ function message(error) {
   return error?.message || normalizeCampaignError(error).message
 }
 
-export function createCampaignProposalLifecycle({ campaign, enabled = true, api = createCampaignLifecycleApi(), processing = () => false, onLoaded = () => {}, currentStep = () => 1 }) {
+export function createCampaignProposalLifecycle({ campaign, enabled = true, api = createCampaignLifecycleApi(), processing = () => false, onLoaded = () => {}, currentStep = () => 1, canWrite = () => true, canSave = () => true, canStartProposal = () => true, canRecordProgress = () => true }) {
   const state = reactive({ id: null, estado: 'DRAFT', loading: false, saving: false, working: false, error: '', notice: '', baseline: null, defaultsOpen: false, activationOpen: false, uncertainCreate: false, readiness: null, savedAt: null, remoteChanged: false, serverSnapshot: null, ultimaEtapa: 1, etapaMaisAvancada: 1, versaoProposta: null, progressError: '', versaoVigente: null, versaoOrigem: null, revisaoControle: null, motivoBloqueioEdicao: '', published: null, editingPublished: false })
   const simulation = reactive({ competences: [], selectedCompetencia: '', referenceValidation: null, isLoadingCompetences: false, isValidatingReference: false, isRunning: false, error: '', result: null, page: 1, pageSize: 10, totalItems: 0, totalPages: 1, executionId: '', status: '', progress: 0, stageMessage: '', accepted: false, acceptance: null, invalidationReasons: [], acceptOpen: false, aceitoPor: '', motivo: '', loadingSales: false, pageError: '' })
   const fingerprint = computed(() => draftFingerprint(campaign))
   const dirty = computed(() => state.baseline === null ? hasCampaignContent(campaign) : fingerprint.value !== state.baseline)
   const busy = computed(() => state.loading || state.saving || state.working || simulation.isRunning || simulation.isValidatingReference)
-  const readOnly = computed(() => Boolean(state.motivoBloqueioEdicao || state.remoteChanged || !['DRAFT', 'ATIVA', 'INATIVA'].includes(state.estado) || (state.estado !== 'DRAFT' && !state.editingPublished)))
+  const readOnly = computed(() => Boolean(!canWrite() || state.motivoBloqueioEdicao || state.remoteChanged || !['DRAFT', 'ATIVA', 'INATIVA'].includes(state.estado) || (state.estado !== 'DRAFT' && !state.editingPublished)))
   let requestSequence = 0
   let referenceSequence = 0
   let pageSequence = 0
@@ -82,11 +82,11 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     return true
   }
   function recordProgress(step) {
-    if (!enabled || !api.progress || !state.id || !state.versaoProposta || readOnly.value || state.loading) return Promise.resolve(false)
+    if (!canRecordProgress(step) || !enabled || !api.progress || !state.id || !state.versaoProposta || readOnly.value || state.loading) return Promise.resolve(false)
     const id = state.id, version = state.versaoProposta
     // Serialize writes: a slow earlier response must not restore an older last stage.
     progressQueue = progressQueue.catch(() => {}).then(async () => {
-      if (disposed || id !== state.id || version !== state.versaoProposta) return false
+      if (!canRecordProgress(step) || disposed || id !== state.id || version !== state.versaoProposta) return false
       try {
         const raw = await api.progress(id, { ultimaEtapa: step, etapaMaisAvancada: Math.max(step, state.etapaMaisAvancada), versaoProposta: version })
         if (disposed || id !== state.id || version !== state.versaoProposta) return false
@@ -112,7 +112,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
         state.published = await api.version(id, raw.versaoVigente)
         if (disposed || request !== requestSequence) return false
       }
-      if (raw.versaoVigente && !raw.versaoProposta && !raw.motivoBloqueioEdicao && ['ATIVA', 'INATIVA'].includes(raw.estado) && api.startProposal) {
+      if (canStartProposal() && raw.versaoVigente && !raw.versaoProposta && !raw.motivoBloqueioEdicao && ['ATIVA', 'INATIVA'].includes(raw.estado) && api.startProposal) {
         raw = await api.startProposal(id, raw.revisaoControle)
         if (disposed || request !== requestSequence) return false
       }
@@ -137,7 +137,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     finally { if (request === requestSequence) state.loading = false }
   }
   async function save({ confirmDefaults = false } = {}) {
-    if (!enabled || busy.value || processing() || readOnly.value || state.uncertainCreate) return false
+    if (!enabled || !canSave() || busy.value || processing() || readOnly.value || state.uncertainCreate) return false
     state.error = ''; state.notice = ''
     const errors = validateDraftForPersistence(campaign)
     if (errors.length) { state.error = errors.join(' '); return false }
@@ -243,12 +243,11 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
   }
   async function accept() {
     if (busy.value || processing() || !currentSimulation.value || readOnly.value) return false
-    if (!simulation.aceitoPor.trim()) { simulation.error = 'Informe o responsável pelo aceite.'; return false }
     const before = fingerprint.value, id = simulation.result.id, competence = simulation.selectedCompetencia
     state.working = true; simulation.error = ''
     try {
       if (!await verifySavedVersion()) return false
-      const accepted = await api.accept(id, { campanhaId: state.id, aceitoPor: simulation.aceitoPor.trim(), motivo: simulation.motivo.trim() || null, ...(state.versaoVigente == null ? {} : { versaoEsperada: state.versaoVigente }) })
+      const accepted = await api.accept(id, { campanhaId: state.id, motivo: simulation.motivo.trim() || null, ...(state.versaoVigente == null ? {} : { versaoEsperada: state.versaoVigente }) })
       if (disposed || before !== fingerprint.value || simulation.result?.id !== id || competence !== simulation.selectedCompetencia) return false
       if (accepted.statusAceite !== 'ACEITA' || String(accepted.simulacaoId) !== String(id) || String(accepted.campanhaId) !== String(state.id)) throw new Error('O backend não confirmou o aceite desta simulação.')
       const readiness = await api.readiness(state.id)

@@ -5,7 +5,7 @@
       <div v-if="isLoading" class="mt-7 rounded-[22px] bg-white px-6 py-12 text-sm text-sage-muted" role="status">Carregando detalhes…</div>
       <section v-else-if="loadError" class="mt-7 rounded-[22px] border border-danger/30 bg-danger-bg p-6" role="alert"><h1 class="text-xl font-extrabold text-danger-dark">Não foi possível abrir a campanha</h1><p class="mt-2 text-sm leading-6 text-danger-dark/80">{{ loadError }}</p><div class="mt-5 flex flex-wrap gap-3"><button type="button" class="focus-ring rounded-full bg-danger px-5 py-3 text-sm font-bold text-white" @click="loadCampaign">Tentar novamente</button><RouterLink to="/campanhas" class="focus-ring rounded-full border border-danger/30 px-5 py-3 text-sm font-bold text-danger-dark">Voltar para campanhas</RouterLink></div></section>
       <template v-else-if="campaign">
-        <div class="mt-7 flex flex-wrap items-end justify-between gap-5"><div><h1 class="text-4xl font-extrabold tracking-[-0.05em] sm:text-[42px]">{{ campaign.titulo }}</h1><p class="mt-2 text-sm text-sage-muted">{{ formatPeriodArrow(campaign.dataInicio, campaign.dataFim) }}</p><div v-if="!isDemo" class="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold"><span v-if="campaign.versaoVigente != null" class="rounded-full bg-success-bg px-3 py-1 text-success-dark">Versão atual: {{ campaign.versaoVigente }}</span><span v-else class="rounded-full bg-sage-pill px-3 py-1 text-sage-muted">Ainda não publicada</span><span v-if="campaign.versaoProposta != null && campaign.versaoVigente != null" class="rounded-full bg-warning-bg px-3 py-1 text-warning-text">Proposta de alteração: {{ campaign.versaoProposta }}</span></div></div><div class="flex flex-wrap items-center gap-3"><StatusBadge :label="formatCampaignState(campaign.estado)" :tone="campaignStateTone(campaign.estado)" /><RouterLink v-if="['DRAFT', 'ATIVA', 'INATIVA'].includes(campaign.estado) && !campaign.motivoBloqueioEdicao" :to="`/campanhas/${campaign.id}/editar`" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover">{{ campaign.estado === 'DRAFT' ? 'Continuar rascunho' : 'Editar campanha' }}</RouterLink><button type="button" class="focus-ring rounded-full border border-danger/30 px-5 py-3 text-sm font-bold text-danger-dark" @click="isDeleteOpen = true">Remover</button></div></div>
+        <div class="mt-7 flex flex-wrap items-end justify-between gap-5"><div><h1 class="text-4xl font-extrabold tracking-[-0.05em] sm:text-[42px]">{{ campaign.titulo }}</h1><p class="mt-2 text-sm text-sage-muted">{{ formatPeriodArrow(campaign.dataInicio, campaign.dataFim) }}</p><div v-if="!isDemo" class="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold"><span v-if="campaign.versaoVigente != null" class="rounded-full bg-success-bg px-3 py-1 text-success-dark">Versão atual: {{ campaign.versaoVigente }}</span><span v-else class="rounded-full bg-sage-pill px-3 py-1 text-sage-muted">Ainda não publicada</span><span v-if="campaign.versaoProposta != null && campaign.versaoVigente != null" class="rounded-full bg-warning-bg px-3 py-1 text-warning-text">Proposta de alteração: {{ campaign.versaoProposta }}</span></div></div><div class="flex flex-wrap items-center gap-3"><StatusBadge :label="formatCampaignState(campaign.estado)" :tone="campaignStateTone(campaign.estado)" /><RouterLink v-if="access.can('editCampaign') && ['DRAFT', 'ATIVA', 'INATIVA'].includes(campaign.estado) && !campaign.motivoBloqueioEdicao" :to="`/campanhas/${campaign.id}/editar`" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover">{{ campaign.estado === 'DRAFT' ? 'Continuar rascunho' : 'Editar campanha' }}</RouterLink><button v-if="access.can('removeCampaign')" type="button" class="focus-ring rounded-full border border-danger/30 px-5 py-3 text-sm font-bold text-danger-dark" @click="isDeleteOpen = true">Remover</button></div></div>
       </template>
     </header>
 
@@ -34,6 +34,8 @@
 </template>
 
 <script setup>
+import { useAccessPolicy } from '@/services/useAccessPolicy'
+const access = useAccessPolicy()
 import { createCampaignLifecycleApi } from '@/services/campaignLifecycleApi'
 import CampaignVersionHistory from '@/components/campaigns/CampaignVersionHistory.vue'
 import { computed, onMounted, ref } from 'vue'
@@ -114,7 +116,7 @@ function closeDelete() {
 }
 
 async function removeCampaign() {
-  if (!campaign.value || isRemoving.value) return
+  if (!access.can('removeCampaign') || !campaign.value || isRemoving.value) return
   isRemoving.value = true
   deleteError.value = ''
   try {

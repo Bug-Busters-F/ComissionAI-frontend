@@ -6,7 +6,11 @@ export default {
   ],
   theme: {
     extend: {
+      textColor: { white: '#ffffff', 'brand-dark': 'var(--color-text-primary)' },
+      borderColor: { white: '#ffffff' },
+      ringOffsetColor: { DEFAULT: 'rgb(var(--color-surface-rgb))' },
       colors: {
+        white: 'rgb(var(--color-surface-rgb) / <alpha-value>)',
         brand: {
           DEFAULT: 'var(--color-brand)',
           hover: 'var(--color-brand-hover)',

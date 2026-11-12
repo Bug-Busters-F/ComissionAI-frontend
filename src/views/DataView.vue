@@ -1,16 +1,17 @@
 <template>
   <div class="space-y-7">
+    <p v-if="!access.can('manageData')" class="rounded-xl bg-white p-4 text-sm text-sage-muted">Modo consulta. Somente gerente e administrador podem importar, alterar ou excluir bases.</p>
     <PageHeader title="Dados da empresa" description="Organize e feche os ciclos mensais de dados de cada competência.">
       <template #action>
         <div class="flex items-center gap-3">
-          <button
+          <button v-if="access.can('manageData')"
             type="button"
             @click="store.openComissModal(store.competencias[0]?.competenciaCodigo || null)"
             class="focus-ring rounded-full border border-sage-border-dark bg-white px-4 py-3 text-sm font-semibold text-brand-dark hover:bg-sage-light"
           >
             Tabelas de Comissão
           </button>
-          <button
+          <button v-if="access.can('manageData')"
             type="button"
             @click="store.openCicloModal(null)"
             class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover"
@@ -122,7 +123,7 @@
           <li v-for="(message, index) in period.mensagens" :key="index">{{ userFacingText(message) }}</li>
         </ul>
         <div class="mt-7 pt-4 border-t border-sage-border-light flex flex-col gap-2">
-          <button
+          <button v-if="access.can('manageData')"
             type="button"
             @click="store.openCicloModal(period.competenciaCodigo)"
             class="focus-ring flex items-center justify-between rounded-xl bg-sage-light px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-sage-border transition"
@@ -142,7 +143,7 @@
             :to="{ name: 'dados-calculo', params: { competencia: period.competencia } }"
             class="focus-ring flex items-center justify-between rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-brand-hover"
           >
-            <span>Calcular comissões</span>
+            <span>{{ access.can('calculate') ? 'Calcular comissões' : 'Consultar cálculos' }}</span>
             <span>→</span>
           </RouterLink>
           <span v-else class="rounded-xl bg-sage-light px-4 py-2.5 text-xs font-semibold text-sage-muted text-center">
@@ -150,7 +151,7 @@
           </span>
 
           <div class="flex items-center justify-between pt-1 text-[11px]">
-            <button
+            <button v-if="access.can('manageData')"
               type="button"
               @click="store.openComissModal(period.competenciaCodigo)"
               class="font-semibold text-sage-muted hover:text-brand-dark hover:underline"
@@ -159,7 +160,7 @@
             </button>
 
             <button
-              v-if="period.cicloFechado || period.status !== 'Ciclo Pendente'"
+              v-if="access.can('manageData') && (period.cicloFechado || period.status !== 'Ciclo Pendente')"
               type="button"
               @click="store.abrirModalExclusaoBase(period.competenciaCodigo)"
               class="text-sage-muted hover:text-danger hover:underline transition flex items-center gap-1 font-semibold"
@@ -217,12 +218,14 @@
     </section>
 
     <!-- Modais de Suporte -->
-    <ConfirmDeleteModal />
+    <ConfirmDeleteModal v-if="access.can('manageData')" />
     <EnvioReportModal />
   </div>
 </template>
 
 <script setup>
+import { useAccessPolicy } from '@/services/useAccessPolicy'
+const access = useAccessPolicy()
 import { userFacingText } from '@/services/userFacingText'
 import { onMounted } from 'vue'
 import { RefreshCw, Trash2, Database, FileSpreadsheet } from 'lucide-vue-next'
