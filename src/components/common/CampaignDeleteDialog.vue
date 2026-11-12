@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="fixed inset-0 z-50 grid place-items-center bg-brand-dark/50 px-5 py-8" role="presentation" @click.self="cancel">
+    <div v-if="open" class="fixed inset-0 z-50 grid place-items-center bg-black/50 px-5 py-8" role="presentation" @click.self="cancel">
       <section ref="dialog" class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description" @keydown.esc="cancel" @keydown="trapFocus">
         <h2 id="delete-dialog-title" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Remover campanha?</h2>
         <p id="delete-dialog-description" class="mt-3 text-sm leading-6 text-sage-muted">

@@ -27,7 +27,7 @@
           type="button"
           class="focus-ring inline-flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="!canCalculate"
-          @click="handleCalculation"
+          v-if="access.can('calculate')" @click="handleCalculation"
         >
           <RefreshCw v-if="isCalculating" class="h-4 w-4 animate-spin" aria-hidden="true" />
           <span>{{ isCalculating ? (recalculationRequested ? 'Recalculando…' : 'Calculando…') : hasPreviousCalculation ? 'Recalcular comissões' : 'Calcular comissões' }}</span>
@@ -365,7 +365,7 @@
       Nenhum cálculo foi executado nesta sessão. Use o botão acima para iniciar o processamento.
     </p>
 
-    <div v-if="showRecalculateConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-brand-dark/40 px-4" role="presentation" @click.self="showRecalculateConfirm = false">
+    <div v-if="showRecalculateConfirm && access.can('calculate')" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" role="presentation" @click.self="showRecalculateConfirm = false">
       <section class="w-full max-w-lg rounded-[22px] bg-white p-6 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="recalculate-confirm-title">
         <h2 id="recalculate-confirm-title" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Recalcular comissões?</h2>
         <p class="mt-3 text-sm leading-6 text-sage-muted">
@@ -385,6 +385,8 @@
 </template>
 
 <script setup>
+import { useAccessPolicy } from '@/services/useAccessPolicy'
+const access = useAccessPolicy()
 import { computed, defineComponent, h, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { RefreshCw } from 'lucide-vue-next'
@@ -470,7 +472,7 @@ const recalculationRequested = computed(() => isCalculating.value && calculation
 const anotherCalculationProcessing = computed(() => calculationStore.isProcessing && calculationStore.competencia && calculationStore.competencia !== competenceKey.value)
 const calculationErrorMessage = computed(() => calculationStore.competencia === competenceKey.value ? calculationStore.mensagemErro : '')
 const previousResultAfterFailure = computed(() => calculationStore.competencia === competenceKey.value && calculationStore.hasError && Boolean(result.value))
-const canCalculate = computed(() => isCalculationReady({
+const canCalculate = computed(() => access.can('calculate') && isCalculationReady({
   competencia: competenceKey.value,
   consultaVendas: salesQueryState.value,
   vendasEncontradas: salesCount.value,

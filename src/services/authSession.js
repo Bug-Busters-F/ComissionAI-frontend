@@ -5,13 +5,11 @@ const browserStorage = () => { try { return window.sessionStorage } catch { retu
 export function createAuthSession({ storage = browserStorage, now = () => Date.now() } = {}) {
   let session = null, revision = 0, loaded = false, listener = null, timer = null, lastReason = null
   const pending = new Set()
-  const subscribers = new Set()
   const getStorage = () => typeof storage === 'function' ? storage() : storage
   function cancel() { for (const controller of pending) controller.abort(); pending.clear() }
   function clear(reason = null, notify = false) {
     ++revision; lastReason = reason; cancel(); clearTimeout(timer); timer = null; session = null; loaded = true
     try { getStorage()?.removeItem(AUTH_SESSION_KEY) } catch {}
-    for (const callback of subscribers) callback(reason)
     if (notify) listener?.(reason)
   }
   function schedule() {
@@ -37,7 +35,6 @@ export function createAuthSession({ storage = browserStorage, now = () => Date.n
   }
   return {
     load, set, clear,
-    subscribe(callback) { subscribers.add(callback); return () => subscribers.delete(callback) },
     get reason() { return lastReason },
     get token() { const current = load(); if (current && Date.parse(current.expiresAt) <= now()) { clear('expired', true); return null } return current?.token || null },
     get revision() { return revision },

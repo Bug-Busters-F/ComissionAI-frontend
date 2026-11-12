@@ -1,30 +1,23 @@
-import { defineStore } from 'pinia'
-import { ref, computed, getCurrentInstance, onScopeDispose } from 'vue'
-import api from '@/services/api'
-import { authSession } from '@/services/authSession'
+import { computed, reactive, getCurrentInstance } from 'vue'
+import { useAccountStore } from '@/stores/accountStore'
+import { canAccess } from '@/services/accessPolicy'
 
-// Adapter for the bases area. Identity is always confirmed by /auth/me.
-// Uses the same authSession as the login flow; it never creates its own session.
-export const useAuthStore = defineStore('bases-auth', () => {
-  const currentUser = ref(null)
-  const sessionRevision = ref(-1)
-  const unsubscribe = authSession.subscribe(() => { currentUser.value = null; sessionRevision.value = -1 })
-  onScopeDispose(unsubscribe)
-  const isAuthenticated = computed(() => Boolean(currentUser.value?.ativo && sessionRevision.value === authSession.revision && authSession.token))
-  const canModifyBases = computed(() => isAuthenticated.value && ['ADMINISTRADOR', 'GERENTE_VENDAS'].includes(currentUser.value?.papel))
+// Compatibility adapter for the bases components, backed by the application's
+// existing account store. No second identity, token, storage or role simulation.
+export function useAuthStore() {
+  const account = useAccountStore()
+  const currentUser = computed(() => account.user ? {
+    id: account.user.id, nome: account.user.name, email: account.user.email,
+    papel: account.user.role, nomePerfil: account.user.roleName,
+    ativo: account.user.active
+  } : null)
+  const canModifyBases = computed(() => account.user?.active === true && canAccess(account.user.role, 'manageData', account.user.permissions || []))
   async function refreshSession() {
-    currentUser.value = null
-    if (!authSession.token) return
-    const revision = authSession.revision
-    const { data } = await api.get('/auth/me')
-    authSession.assertCurrent(revision)
-    if (data?.ativo && data?.id && data?.papel) {
-      currentUser.value = data
-      sessionRevision.value = revision
-    }
+    const result = await account.restore({ force: true })
+    if (result.reason === 'connection') throw new Error('Não foi possível confirmar sua sessão. Tente novamente.')
   }
-  return { currentUser, isAuthenticated, canModifyBases, canUploadBases: canModifyBases, refreshSession }
-})
+  return reactive({ currentUser, isAuthenticated: computed(() => Boolean(account.user?.active)), canModifyBases, canUploadBases: canModifyBases, refreshSession })
+}
 
 export function useSafeAuthStore() {
   if (getCurrentInstance()?.appContext?.config?.globalProperties?.$pinia) return useAuthStore()

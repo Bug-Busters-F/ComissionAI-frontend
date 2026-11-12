@@ -7,7 +7,7 @@
 
     <nav class="mt-12 space-y-2" aria-label="Navegação principal">
       <RouterLink
-        v-for="item in navigation"
+        v-for="item in visibleNavigation"
         :key="item.to"
         :to="item.to"
         :class="[
@@ -21,20 +21,33 @@
         <span>{{ item.label }}</span>
       </RouterLink>
     </nav>
+    <div class="mt-auto border-t border-sage-border-light pt-5">
+      <AccountMenu placement="sidebar" class="mb-3" />
+      <ThemeSelector />
+    </div>
 
   </aside>
 </template>
 
 <script setup>
+import ThemeSelector from '@/components/common/ThemeSelector.vue'
+import AccountMenu from '@/components/accounts/AccountMenu.vue'
+import { computed } from 'vue'
+import { useAccessPolicy } from '@/services/useAccessPolicy'
+import { useAccountStore } from '@/stores/accountStore'
 import { useRoute } from 'vue-router'
-import { CalendarCheck, Database, House } from 'lucide-vue-next'
+import { CalendarCheck, Database, House, UsersRound } from 'lucide-vue-next'
 import comissionaiIcon from '@/assets/images/comissionai-icon.png'
 
 const route = useRoute()
+const account = useAccountStore()
+const access = useAccessPolicy()
 
 const navigation = [
   { label: 'Home', to: '/home', section: 'home', icon: House },
-  { label: 'Dados', to: '/dados', section: 'dados', icon: Database },
-  { label: 'Campanhas', to: '/campanhas', section: 'campanhas', icon: CalendarCheck }
+  { label: 'Dados', to: '/dados', section: 'dados', permission: 'viewData', icon: Database },
+  { label: 'Campanhas', to: '/campanhas', section: 'campanhas', icon: CalendarCheck },
+  { label: 'Gerenciamento', to: '/gerenciamento', section: 'gerenciamento', icon: UsersRound, adminOnly: true }
 ]
+const visibleNavigation = computed(() => navigation.filter(item => (!item.adminOnly || account.isAdmin) && (!item.permission || access.can(item.permission))))
 </script>

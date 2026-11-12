@@ -3,11 +3,11 @@
     <div class="flex min-h-11 items-center justify-between gap-4">
       <p class="text-xs font-medium text-sage-muted">Workspace / {{ currentLabel }}</p>
 
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center justify-end gap-3">
         <span v-if="isCampaignDemoEnabled" class="rounded-full border border-sage-border-dark bg-white px-3.5 py-1.5 text-xs font-semibold text-sage-subtle">Ambiente demonstrativo</span>
 
         <button
-          v-if="calculationStore.isProcessing"
+          v-if="calculationStore.isProcessing && access.can('viewData')"
           type="button"
           class="focus-ring flex items-center gap-2 rounded-full border border-warning-border bg-warning-bg px-3.5 py-1.5 text-xs font-bold text-brand-dark shadow-sm transition hover:bg-warning-bg/80"
           title="Abrir a competência em apuração"
@@ -24,7 +24,7 @@
         </button>
 
         <!-- WIDGET DE PROCESSAMENTO EM SEGUNDO PLANO -->
-        <div v-if="store.activeJob.isActive" class="flex items-center gap-2">
+        <div v-if="store.activeJob.isActive && access.can('manageData')" class="flex items-center gap-2">
         <!-- Em processamento -->
         <button
           v-if="store.activeJob.status === 'PROCESSING'"
@@ -94,7 +94,7 @@
 
     <nav class="mt-4 flex gap-2 overflow-x-auto md:hidden" aria-label="Navegação móvel">
       <RouterLink
-        v-for="item in navigation"
+        v-for="item in visibleNavigation"
         :key="item.to"
         :to="item.to"
         :class="[
@@ -105,10 +105,14 @@
         {{ item.label }}
       </RouterLink>
     </nav>
+    <div class="mt-3 md:hidden"><AccountMenu /></div>
   </header>
 </template>
 
 <script setup>
+import AccountMenu from '@/components/accounts/AccountMenu.vue'
+import { useAccessPolicy } from '@/services/useAccessPolicy'
+import { useAccountStore } from '@/stores/accountStore'
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { RefreshCw, CheckCircle2, AlertOctagon, X } from 'lucide-vue-next'
@@ -120,14 +124,19 @@ import { formatCompetenceLabel } from '@/services/competenceUtils'
 const route = useRoute()
 const router = useRouter()
 const store = useDataStore()
+const account = useAccountStore()
+const access = useAccessPolicy()
 const calculationStore = useCalculationStore()
-onMounted(() => { calculationStore.recoverExecution() })
+onMounted(() => { if (access.can('viewData')) calculationStore.recoverExecution() })
 
 const navigation = [
   { label: 'Home', to: '/home', section: 'home' },
-  { label: 'Dados', to: '/dados', section: 'dados' },
-  { label: 'Campanhas', to: '/campanhas', section: 'campanhas' }
+  { label: 'Dados', to: '/dados', section: 'dados', permission: 'viewData' },
+  { label: 'Campanhas', to: '/campanhas', section: 'campanhas' },
+  { label: 'Gerenciamento', to: '/gerenciamento', section: 'gerenciamento', adminOnly: true }
 ]
+
+const visibleNavigation = computed(() => navigation.filter(item => (!item.adminOnly || account.isAdmin) && (!item.permission || access.can(item.permission))))
 
 const currentLabel = computed(() => route.meta.label || 'Home')
 

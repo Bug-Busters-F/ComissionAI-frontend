@@ -32,4 +32,4 @@ function trapFocus(event) {
 }
 onBeforeUnmount(() => dialog.value?.close())
 </script>
-<style scoped>.lifecycle-dialog::backdrop { background: rgb(20 35 25 / 45%); }</style>
+<style scoped>.lifecycle-dialog::backdrop { background: rgb(0 0 0 / 45%); }</style>
