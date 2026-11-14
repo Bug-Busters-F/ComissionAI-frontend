@@ -506,13 +506,13 @@ const canExecuteClosing = computed(() => {
 })
 
 watch(result, (newResult) => {
-  if (newResult && !newResult.resumoExecucao) {
+  if (newResult) {
     previewTotals.value = {
       totalVendasProcessadas: newResult.totalVendasProcessadas ?? 0,
       totalCalculados: newResult.totalCalculados ?? 0,
       totalImpedimentos: newResult.totalImpedimentos ?? 0,
-      valorTotalVendas: newResult.valorTotalVendas ?? 0,
-      valorTotalComissao: newResult.valorTotalComissao ?? 0
+      valorTotalVendas: newResult.valorTotalVendas,
+      valorTotalComissao: newResult.valorTotalComissao
     }
     backupPreviewImpediments.value = [...(newResult.impedimentos || [])]
   }
@@ -698,8 +698,9 @@ async function handleConfirmClosing({ motivo, executadoPor }) {
       const closedTotalCents = Math.round((Number(response.valorTotalComissao) || 0) * 100)
       const prevVendas = Number(previewTotals.value.totalCalculados) || 0
       const closedVendas = Number(response.totalCalculados) || 0
-      if (prevTotalCents !== closedTotalCents || prevVendas !== closedVendas) {
-        divergenceWarning.value = `Os valores consolidados (R$ ${(closedTotalCents / 100).toFixed(2)}, ${closedVendas} vendas) diferem da prévia recalculada (R$ ${(prevTotalCents / 100).toFixed(2)}, ${prevVendas} vendas). Verifique se regras ou vendas foram alteradas durante o processo.`
+      const hasFinancialPreview = previewTotals.value.valorTotalComissao !== null && previewTotals.value.valorTotalComissao !== undefined
+      if ((hasFinancialPreview && prevTotalCents !== closedTotalCents) || prevVendas !== closedVendas) {
+        divergenceWarning.value = `Os valores consolidados (R$ ${(closedTotalCents / 100).toFixed(2)}, ${closedVendas} vendas) diferem da prévia recalculada (${prevVendas} vendas${hasFinancialPreview ? `, R$ ${(prevTotalCents / 100).toFixed(2)}` : ''}). Verifique se regras ou vendas foram alteradas durante o processo.`
       }
     }
 
