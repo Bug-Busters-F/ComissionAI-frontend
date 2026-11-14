@@ -262,7 +262,7 @@ import EnviosList from '@/components/data/EnviosList.vue'
 import ConfirmDeleteModal from '@/components/data/ConfirmDeleteModal.vue'
 import EnvioReportModal from '@/components/data/EnvioReportModal.vue'
 import { useDataStore } from '@/stores/dataStore'
-import { listClosings, normalizeCompetenceKey } from '@/services/closingService'
+import { listClosings, mapClosedCompetences } from '@/services/closingService'
 
 const store = useDataStore()
 const closedCompetences = ref({})
@@ -270,14 +270,7 @@ const closedCompetences = ref({})
 async function loadClosings() {
   try {
     const data = await listClosings({ size: 100 })
-    const list = data?.content || (Array.isArray(data) ? data : [])
-    const map = {}
-    for (const item of list) {
-      if (item.status === 'CONCLUIDO' && item.competencia) {
-        map[normalizeCompetenceKey(item.competencia)] = item
-      }
-    }
-    closedCompetences.value = map
+    closedCompetences.value = mapClosedCompetences(data)
   } catch {
     // Tratamento resiliente caso perfil não tenha permissão de fechamento (ex: 403 para analista)
   }

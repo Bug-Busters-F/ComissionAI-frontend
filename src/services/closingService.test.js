@@ -7,7 +7,8 @@ import {
   executeClosing,
   downloadClosingProof,
   saveClosingToSession,
-  getClosingFromSession
+  getClosingFromSession,
+  mapClosedCompetences
 } from './closingService'
 
 vi.mock('./api', () => ({
@@ -80,6 +81,31 @@ describe('closingService', () => {
         params: { competencia: '2026-10', page: 0, size: 10 }
       })
       expect(res).toEqual(mockPage)
+    })
+  })
+
+  describe('mapClosedCompetences', () => {
+    it('mapeia apenas competências com status CONCLUIDO e ignora FALHOU ou PROCESSANDO', () => {
+      const response = {
+        content: [
+          { competencia: '2026-10', status: 'CONCLUIDO', protocolo: 'p-1' },
+          { competencia: '2026-09', status: 'FALHOU', motivoFalha: 'Erro' },
+          { competencia: '2026-08', status: 'PROCESSANDO' },
+          { competencia: '11/2026', status: 'CONCLUIDO', protocolo: 'p-2' }
+        ]
+      }
+
+      const result = mapClosedCompetences(response)
+      expect(Object.keys(result)).toEqual(['2026-10', '2026-11'])
+      expect(result['2026-10'].protocolo).toBe('p-1')
+      expect(result['2026-11'].protocolo).toBe('p-2')
+      expect(result['2026-09']).toBeUndefined()
+      expect(result['2026-08']).toBeUndefined()
+    })
+
+    it('retorna objeto vazio para lista vazia ou nula', () => {
+      expect(mapClosedCompetences(null)).toEqual({})
+      expect(mapClosedCompetences([])).toEqual({})
     })
   })
 

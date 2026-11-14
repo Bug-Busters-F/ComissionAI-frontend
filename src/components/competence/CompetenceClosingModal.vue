@@ -67,9 +67,14 @@
           </div>
           <div>
             <span class="text-[11px] font-semibold text-sage-muted uppercase">Total Comissões</span>
-            <p class="font-extrabold text-brand-dark">{{ formatCurrency(previewTotals.valorTotalComissao) }}</p>
+            <p class="font-extrabold text-brand-dark">
+              {{ previewTotals.valorTotalComissao != null ? formatCurrency(previewTotals.valorTotalComissao) : 'Consolidado no fechamento' }}
+            </p>
           </div>
         </div>
+        <p v-if="previewTotals.valorTotalComissao == null" class="text-[11px] text-sage-muted italic pt-1 border-t border-sage-border/50">
+          Contagens confirmadas na prévia assíncrona. O valor contábil final será consolidado pelo motor síncrono de fechamento.
+        </p>
       </div>
 
       <!-- Identificação do Usuário e Justificativa -->

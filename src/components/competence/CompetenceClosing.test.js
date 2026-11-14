@@ -49,9 +49,41 @@ describe('CompetenceClosing Components — [FRONT-10]', () => {
       expect(html).toContain('Não é possível prosseguir sem usuário identificado na sessão')
       expect(html).toContain('disabled')
     })
+
+    it('renderiza contagens da prévia assíncrona quando valorTotalComissao é nulo', async () => {
+      const app = createSSRApp(CompetenceClosingModal, {
+        open: true,
+        competencia: '2026-10',
+        currentUser: 'gerente@empresa.com',
+        previewTotals: {
+          totalVendasProcessadas: 82,
+          totalCalculados: 0,
+          totalImpedimentos: 82,
+          valorTotalComissao: null
+        }
+      })
+
+      const html = await renderToString(app)
+      expect(html).toContain('Consolidado no fechamento')
+      expect(html).toContain('Contagens confirmadas na prévia assíncrona')
+      expect(html).toContain('82')
+    })
   })
 
   describe('CompetenceClosingStatusCard', () => {
+    it('habilita o botão de fechamento definitivo quando a prévia foi realizada e perfil tem permissão', async () => {
+      const app = createSSRApp(CompetenceClosingStatusCard, {
+        competencia: '2026-10',
+        statusData: { status: 'ABERTA', bloqueada: false },
+        canExecuteClosing: true,
+        hasPreviewCalculated: true,
+        isRecalculating: false
+      })
+
+      const html = await renderToString(app)
+      expect(html).toContain('Executar Fechamento Definitivo')
+      expect(html).not.toMatch(/<button[^>]*\sdisabled[\s=>]/i)
+    })
     it('renderiza status CONCLUIDO com protocolo, valores consolidados e botão de download', async () => {
       const app = createSSRApp(CompetenceClosingStatusCard, {
         competencia: '2026-10',

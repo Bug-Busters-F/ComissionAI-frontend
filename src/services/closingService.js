@@ -39,6 +39,25 @@ export async function listClosings(params = {}) {
 }
 
 /**
+ * Mapeia uma lista de fechamentos para um dicionário indexado por competência normalizada (YYYY-MM),
+ * considerando exclusivamente registros com status 'CONCLUIDO'.
+ * Usado para badges e travas na listagem de competências e campanhas.
+ * @param {object|Array} closingsResponse - Resposta paginada ou lista de fechamentos
+ * @returns {Record<string, object>}
+ */
+export function mapClosedCompetences(closingsResponse) {
+  const list = closingsResponse?.content || (Array.isArray(closingsResponse) ? closingsResponse : [])
+  const map = {}
+  for (const item of list) {
+    if (item && item.status === 'CONCLUIDO' && item.competencia) {
+      const key = normalizeCompetenceKey(item.competencia)
+      if (key) map[key] = item
+    }
+  }
+  return map
+}
+
+/**
  * Executa o Fechamento Definitivo de Competência (BACK-11).
  * 
  * Regras estritas:
