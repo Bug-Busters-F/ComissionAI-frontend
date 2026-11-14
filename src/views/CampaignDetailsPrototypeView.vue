@@ -37,6 +37,7 @@
       </div>
       <p v-if="campaign.motivoBloqueioEdicao" class="rounded-xl bg-warning-bg p-4 text-sm text-warning-text">{{ campaign.motivoBloqueioEdicao }}</p>
       <p v-if="campaign.versaoProposta && campaign.versaoVigente" class="rounded-xl bg-sage-light p-4 text-sm">Existe uma proposta de alteração separada (versão {{ campaign.versaoProposta }}). A versão vigente é {{ campaign.versaoVigente }}. Use o seletor abaixo para consultar as versões publicadas.</p>
+      <CampaignApprovalGovernanceCard v-if="!isDemo && campaign.id && codeApproval" :approval="codeApproval" :can-approve="canApproveCode" :loading="isApproving" @approve="handleApproveCode" @reject="handleRejectCode" />
       <CampaignVersionHistory v-if="!isDemo && campaign.versaoVigente != null" :campaign-id="campaign.id" :current-version="campaign.versaoVigente" />
       <div v-if="isDemo" class="rounded-[22px] border border-success/20 bg-success-bg p-5"><p class="font-bold text-success-dark">Campanha pronta para consulta</p><p class="mt-1 text-sm leading-6 text-success-dark/80">Confira os dados da regra vinculada.</p></div>
       <div v-else-if="campaign.versaoVigente == null" class="rounded-[22px] border border-success/20 bg-success-bg p-5"><p class="font-bold text-success-dark">Campanha salva como {{ formatCampaignState(campaign.estado).toLocaleLowerCase() }}</p><p class="mt-1 text-sm leading-6 text-success-dark/80">Texto original, vigência e todas as regras abaixo são os dados salvos.</p></div>
@@ -66,10 +67,13 @@
 </template>
 
 <script setup>
+import { useAccountStore } from '@/stores/accountStore'
 import { useAccessPolicy } from '@/services/useAccessPolicy'
 const access = useAccessPolicy()
+const account = useAccountStore()
 import { createCampaignLifecycleApi } from '@/services/campaignLifecycleApi'
 import CampaignVersionHistory from '@/components/campaigns/CampaignVersionHistory.vue'
+import CampaignApprovalGovernanceCard from '@/components/campaigns/CampaignApprovalGovernanceCard.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Lock, Info } from 'lucide-vue-next'
@@ -119,6 +123,38 @@ const summaryItems = computed(() => {
   ]
 })
 
+const codeApproval = ref(null)
+const isApproving = ref(false)
+const canApproveCode = computed(() => access.can('approveCode'))
+
+async function handleApproveCode() {
+  if (!campaign.value?.id) return
+  isApproving.value = true
+  try {
+    const user = account.user?.email || account.user?.name || 'analista.codigo'
+    await createCampaignLifecycleApi().approveCode(campaign.value.id, { aprovado: true, aprovadoPor: user })
+    codeApproval.value = await createCampaignLifecycleApi().getCodeApproval(campaign.value.id)
+  } catch (err) {
+    console.error('Erro ao aprovar código:', err)
+  } finally {
+    isApproving.value = false
+  }
+}
+
+async function handleRejectCode() {
+  if (!campaign.value?.id) return
+  isApproving.value = true
+  try {
+    const user = account.user?.email || account.user?.name || 'analista.codigo'
+    await createCampaignLifecycleApi().approveCode(campaign.value.id, { aprovado: false, aprovadoPor: user, motivo: 'Rejeitado pelo analista' })
+    codeApproval.value = await createCampaignLifecycleApi().getCodeApproval(campaign.value.id)
+  } catch (err) {
+    console.error('Erro ao rejeitar código:', err)
+  } finally {
+    isApproving.value = false
+  }
+}
+
 onMounted(loadCampaign)
 
 async function loadCampaign() {
@@ -134,7 +170,14 @@ async function loadCampaign() {
     }
     campaign.value = current
     if (!campaign.value) loadError.value = 'A campanha não foi encontrada ou já foi removida.'
-    else if (!isDemo) void checkVigenciaClosings(campaign.value)
+    else if (!isDemo) {
+      void checkVigenciaClosings(campaign.value)
+      try {
+        codeApproval.value = await createCampaignLifecycleApi().getCodeApproval(campaign.value.id)
+      } catch {
+        codeApproval.value = null
+      }
+    }
   } catch (error) {
     loadError.value = normalizeCampaignError(error).message
   } finally {

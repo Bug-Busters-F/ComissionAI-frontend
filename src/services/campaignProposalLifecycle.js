@@ -19,7 +19,7 @@ function message(error) {
 }
 
 export function createCampaignProposalLifecycle({ campaign, enabled = true, api = createCampaignLifecycleApi(), processing = () => false, onLoaded = () => {}, currentStep = () => 1, canWrite = () => true, canSave = () => true, canStartProposal = () => true, canRecordProgress = () => true }) {
-  const state = reactive({ id: null, estado: 'DRAFT', loading: false, saving: false, working: false, error: '', notice: '', baseline: null, defaultsOpen: false, activationOpen: false, uncertainCreate: false, readiness: null, savedAt: null, remoteChanged: false, serverSnapshot: null, ultimaEtapa: 1, etapaMaisAvancada: 1, versaoProposta: null, progressError: '', versaoVigente: null, versaoOrigem: null, revisaoControle: null, motivoBloqueioEdicao: '', published: null, editingPublished: false })
+  const state = reactive({ id: null, estado: 'DRAFT', loading: false, saving: false, working: false, error: '', notice: '', baseline: null, defaultsOpen: false, activationOpen: false, uncertainCreate: false, readiness: null, savedAt: null, remoteChanged: false, serverSnapshot: null, ultimaEtapa: 1, etapaMaisAvancada: 1, versaoProposta: null, progressError: '', versaoVigente: null, versaoOrigem: null, revisaoControle: null, motivoBloqueioEdicao: '', published: null, editingPublished: false, codeApproval: null, orcamento: null, orcamentoConfirmado: false, encaminhadaGerente: false })
   const simulation = reactive({ competences: [], selectedCompetencia: '', referenceValidation: null, isLoadingCompetences: false, isValidatingReference: false, isRunning: false, error: '', result: null, page: 1, pageSize: 10, totalItems: 0, totalPages: 1, executionId: '', status: '', progress: 0, stageMessage: '', accepted: false, acceptance: null, invalidationReasons: [], acceptOpen: false, aceitoPor: '', motivo: '', loadingSales: false, pageError: '' })
   const fingerprint = computed(() => draftFingerprint(campaign))
   const dirty = computed(() => state.baseline === null ? hasCampaignContent(campaign) : fingerprint.value !== state.baseline)
@@ -35,7 +35,24 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
   const rulesReady = computed(() => validateCampaignProposalSet(campaign).canAdvanceLocally && campaign.propostas.every((p) => ruleArtifactsCurrent(p, campaign)))
   const currentSimulation = computed(() => Boolean(rulesReady.value && simulation.result && simulationFingerprint === fingerprint.value && !dirty.value && simulation.result.competencia === simulation.selectedCompetencia))
   const canReview = computed(() => !busy.value && !processing() && !state.remoteChanged && currentSimulation.value && simulation.accepted && state.readiness?.aptaParaAtivacao === true)
-  const canActivate = computed(() => canReview.value && !readOnly.value && state.id)
+
+  const isCodeApproved = computed(() => {
+    if (!state.codeApproval) return true
+    if (state.codeApproval.statusAprovacaoCodigo !== 'APROVADO') return false
+    const hasInvalidRule = state.codeApproval.regras?.some((r) => r.statusAprovacaoCodigo === 'INVALIDADO') === true
+    return !hasInvalidRule
+  })
+
+  const isBudgetWithinLimit = computed(() => {
+    const c100 = simulation.result?.cenario100
+    if (!c100) return true
+    if (c100.dentroDoOrcamento === false) return false
+    if (c100.statusEnquadramento === 'ACIMA_DO_TETO') return false
+    if (c100.excedenteOrcamento && Number(c100.excedenteOrcamento) > 0) return false
+    return true
+  })
+
+  const canActivate = computed(() => canReview.value && !readOnly.value && Boolean(state.id) && isCodeApproved.value && isBudgetWithinLimit.value)
   watch(fingerprint, (value) => {
     if (simulationFingerprint && simulationFingerprint !== value) {
       simulation.accepted = false; state.readiness = null
@@ -56,6 +73,9 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     state.revisaoControle = raw.revisaoControle ?? null
     state.motivoBloqueioEdicao = raw.motivoBloqueioEdicao || ''
     state.editingPublished = Boolean(raw.versaoVigente && raw.versaoProposta)
+    state.orcamento = raw.orcamento ?? null
+    state.orcamentoConfirmado = Boolean(raw.orcamentoConfirmado)
+    state.encaminhadaGerente = Boolean(raw.encaminhadaGerente)
     if (!previous && state.editingPublished && campaign.propostas.length && state.etapaMaisAvancada < 2) {
       state.ultimaEtapa = 2; state.etapaMaisAvancada = 2
     }
@@ -117,6 +137,13 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
         if (disposed || request !== requestSequence) return false
       }
       applySaved(raw)
+      if (raw.id && api.getCodeApproval) {
+        try {
+          state.codeApproval = await api.getCodeApproval(id)
+        } catch {
+          state.codeApproval = null
+        }
+      }
       if (raw.simulacaoAceitaId && raw.statusAceite === 'ACEITA') {
         try {
           const [savedSimulation, readiness] = await Promise.all([api.simulation(raw.simulacaoAceitaId), api.readiness(id)])
@@ -291,5 +318,76 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     } catch (error) { state.error = message(error); if (error?.response?.status === 409) state.remoteChanged = true; return false }
     finally { state.working = false }
   }
-  return { state, simulation, cancelProposal, dirty, busy, readOnly, currentSimulation, canReview, canActivate, load, save, recordProgress, loadCompetences, selectCompetence, runSimulation, changePage, accept, activate, dispose() { disposed = true; ++requestSequence; ++referenceSequence; ++pageSequence } }
+
+  async function loadCodeApproval() {
+    if (!state.id || !api.getCodeApproval) return null
+    try {
+      const res = await api.getCodeApproval(state.id)
+      state.codeApproval = res
+      return res
+    } catch {
+      state.codeApproval = null
+      return null
+    }
+  }
+
+  async function approveCode(aprovadoPor) {
+    if (!state.id || !api.approveCode) return false
+    state.working = true; state.error = ''
+    try {
+      const res = await api.approveCode(state.id, { aprovado: true, aprovadoPor })
+      state.codeApproval = res
+      return true
+    } catch (error) {
+      state.error = message(error)
+      return false
+    } finally {
+      state.working = false
+    }
+  }
+
+  async function rejectCode(motivo, aprovadoPor) {
+    if (!state.id || !api.approveCode) return false
+    state.working = true; state.error = ''
+    try {
+      const res = await api.approveCode(state.id, { aprovado: false, aprovadoPor, motivo })
+      state.codeApproval = res
+      return true
+    } catch (error) {
+      state.error = message(error)
+      return false
+    } finally {
+      state.working = false
+    }
+  }
+
+  async function forwardToManager() {
+    if (!state.id || !api.forwardToManager) return false
+    if (!isBudgetWithinLimit.value) {
+      const excedente = simulation.result?.cenario100?.excedenteOrcamento || '0.00'
+      state.error = `Não é permitido encaminhar ao gerente: o cenário de 100% da meta excede o orçamento estabelecido (excedente: R$ ${excedente}).`
+      return false
+    }
+    state.working = true; state.error = ''
+    try {
+      const raw = await api.forwardToManager(state.id, { versaoEsperada: state.versaoProposta || state.versaoVigente })
+      state.encaminhadaGerente = true
+      state.notice = 'Campanha encaminhada ao gerente com sucesso.'
+      return true
+    } catch (error) {
+      state.error = message(error)
+      return false
+    } finally {
+      state.working = false
+    }
+  }
+
+  return {
+    state, simulation, cancelProposal, dirty, busy, readOnly, currentSimulation,
+    canReview, canActivate, isCodeApproved, isBudgetWithinLimit,
+    loadCodeApproval, approveCode, rejectCode, forwardToManager,
+    load, save, recordProgress, loadCompetences, selectCompetence, runSimulation,
+    changePage, accept, activate,
+    dispose() { disposed = true; ++requestSequence; ++referenceSequence; ++pageSequence }
+  }
 }

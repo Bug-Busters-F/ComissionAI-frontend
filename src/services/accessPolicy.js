@@ -18,6 +18,7 @@ export function canAccess(role, action, permissions = null) {
     editCampaign: ['ANALISTA_NEGOCIOS', 'ANALISTA_CODIGO', 'GERENTE_VENDAS'],
     saveCampaign: ['ANALISTA_NEGOCIOS', 'ANALISTA_CODIGO'],
     removeCampaign: ['ANALISTA_NEGOCIOS'],
+    approveCode: ['ANALISTA_CODIGO'],
     viewData: ['GERENTE_VENDAS', 'AUDITOR'],
     manageData: ['GERENTE_VENDAS'], calculate: ['GERENTE_VENDAS'],
     manageUsers: []
