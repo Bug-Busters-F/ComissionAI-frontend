@@ -155,12 +155,11 @@ async function checkVigenciaClosings(campaignData) {
       return comp && comp >= startYm && comp <= endYm && c.status === 'CONCLUIDO'
     })
   } catch (err) {
-    // 403 (analistas sem permissão financeira de fechamento) exibe aviso neutro
-    if (err?.response?.status === 403) {
-      isClosingStatusRestricted.value = true
-      return
+    // Para 403 ou qualquer erro de rede/servidor na listagem, exibe aviso neutro para não sugerir falsamente competência aberta
+    isClosingStatusRestricted.value = true
+    if (err?.response?.status !== 403) {
+      console.warn('Não foi possível verificar fechamentos da vigência:', err)
     }
-    console.warn('Não foi possível verificar fechamentos da vigência:', err)
   }
 }
 
