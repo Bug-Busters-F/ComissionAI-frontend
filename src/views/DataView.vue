@@ -72,7 +72,16 @@
               <h2 class="mt-1 text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">{{ period.name }}</h2>
               <span class="text-xs font-semibold text-sage-muted">({{ period.competenciaCodigo }})</span>
             </div>
-            <StatusBadge :label="period.status" :tone="period.tone" />
+            <div class="flex flex-col items-end gap-1.5">
+              <span
+                v-if="closedCompetences[period.competencia]"
+                class="inline-flex items-center gap-1 rounded-full bg-brand-dark px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm"
+                title="Fechamento contábil e apuração definitiva consolidados"
+              >
+                🔒 Liquidada
+              </span>
+              <StatusBadge :label="period.status" :tone="period.tone" />
+            </div>
           </div>
 
           <!-- Card de progresso ativo se esta competência estiver processando -->
@@ -123,7 +132,7 @@
           <li v-for="(message, index) in period.mensagens" :key="index">{{ userFacingText(message) }}</li>
         </ul>
         <div class="mt-7 pt-4 border-t border-sage-border-light flex flex-col gap-2">
-          <button v-if="access.can('manageData')"
+          <button v-if="access.can('manageData') && !closedCompetences[period.competencia]"
             type="button"
             @click="store.openCicloModal(period.competenciaCodigo)"
             class="focus-ring flex items-center justify-between rounded-xl bg-sage-light px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-sage-border transition"
@@ -141,9 +150,10 @@
           <RouterLink
             v-if="period.vendasCount > 0"
             :to="{ name: 'dados-calculo', params: { competencia: period.competencia } }"
-            class="focus-ring flex items-center justify-between rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-brand-hover"
+            class="focus-ring flex items-center justify-between rounded-xl px-4 py-2.5 text-xs font-bold transition"
+            :class="closedCompetences[period.competencia] ? 'bg-sage-light text-brand-dark hover:bg-sage-border' : 'bg-brand text-brand-dark hover:bg-brand-hover'"
           >
-            <span>{{ access.can('calculate') ? 'Calcular comissões' : 'Consultar cálculos' }}</span>
+            <span>{{ closedCompetences[period.competencia] ? 'Consultar fechamento 🔒' : (access.can('calculate') ? 'Calcular comissões' : 'Consultar cálculos') }}</span>
             <span>→</span>
           </RouterLink>
           <span v-else class="rounded-xl bg-sage-light px-4 py-2.5 text-xs font-semibold text-sage-muted text-center">
@@ -151,16 +161,19 @@
           </span>
 
           <div class="flex items-center justify-between pt-1 text-[11px]">
-            <button v-if="access.can('manageData')"
+            <button v-if="access.can('manageData') && !closedCompetences[period.competencia]"
               type="button"
               @click="store.openComissModal(period.competenciaCodigo)"
               class="font-semibold text-sage-muted hover:text-brand-dark hover:underline"
             >
               Taxas de comissão
             </button>
+            <span v-else-if="closedCompetences[period.competencia]" class="font-semibold text-sage-muted">
+              Taxas congeladas
+            </span>
 
             <button
-              v-if="access.can('manageData') && (period.cicloFechado || period.status !== 'Ciclo Pendente')"
+              v-if="access.can('manageData') && !closedCompetences[period.competencia] && (period.cicloFechado || period.status !== 'Ciclo Pendente')"
               type="button"
               @click="store.abrirModalExclusaoBase(period.competenciaCodigo)"
               class="text-sage-muted hover:text-danger hover:underline transition flex items-center gap-1 font-semibold"
@@ -169,6 +182,12 @@
               <Trash2 class="h-3 w-3" />
               <span>Excluir base</span>
             </button>
+            <span
+              v-else-if="closedCompetences[period.competencia]"
+              class="text-[11px] font-semibold text-sage-muted italic"
+            >
+              Base bloqueada
+            </span>
           </div>
         </div>
       </article>
@@ -227,7 +246,7 @@
 import { useAccessPolicy } from '@/services/useAccessPolicy'
 const access = useAccessPolicy()
 import { userFacingText } from '@/services/userFacingText'
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RefreshCw, Trash2, Database, FileSpreadsheet } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -236,11 +255,32 @@ import EnviosList from '@/components/data/EnviosList.vue'
 import ConfirmDeleteModal from '@/components/data/ConfirmDeleteModal.vue'
 import EnvioReportModal from '@/components/data/EnvioReportModal.vue'
 import { useDataStore } from '@/stores/dataStore'
+import { listClosings, normalizeCompetenceKey } from '@/services/closingService'
 
 const store = useDataStore()
+const closedCompetences = ref({})
+
+async function loadClosings() {
+  try {
+    const data = await listClosings({ size: 100 })
+    const list = data?.content || (Array.isArray(data) ? data : [])
+    const map = {}
+    for (const item of list) {
+      if (item.status === 'CONCLUIDO' && item.competencia) {
+        map[normalizeCompetenceKey(item.competencia)] = item
+      }
+    }
+    closedCompetences.value = map
+  } catch {
+    // Tratamento resiliente caso perfil não tenha permissão de fechamento (ex: 403 para analista)
+  }
+}
 
 onMounted(async () => {
-  await store.loadCompetenciasFromSales()
+  await Promise.all([
+    store.loadCompetenciasFromSales(),
+    loadClosings()
+  ])
   if (store.dadosEfetivados.itens.length === 0) {
     await store.carregarDadosEfetivados()
   }
