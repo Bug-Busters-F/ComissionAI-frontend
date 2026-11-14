@@ -26,14 +26,33 @@
         <button
           type="button"
           class="focus-ring inline-flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-          :disabled="!canCalculate"
+          :disabled="!canCalculate || closingStatusData.bloqueada"
           v-if="access.can('calculate')" @click="handleCalculation"
         >
           <RefreshCw v-if="isCalculating" class="h-4 w-4 animate-spin" aria-hidden="true" />
-          <span>{{ isCalculating ? (recalculationRequested ? 'Recalculando…' : 'Calculando…') : hasPreviousCalculation ? 'Recalcular comissões' : 'Calcular comissões' }}</span>
+          <span>{{ isCalculating ? (recalculationRequested ? 'Recalculando…' : 'Calculando…') : hasPreviousCalculation ? 'Recalcular e conferir' : 'Calcular comissões' }}</span>
         </button>
       </div>
     </section>
+
+    <!-- Card de Fechamento Contábil e Liquidação ([FRONT-10]) -->
+    <CompetenceClosingStatusCard
+      v-if="competenceKey"
+      :competencia="competenceKey"
+      :status-data="closingStatusData"
+      :is-checking-status="isCheckingClosingStatus"
+      :is-recalculating="isCalculating && recalculationRequested"
+      :can-execute-closing="canExecuteClosing"
+      :has-preview-calculated="Boolean(previewTotals)"
+      :has-proof="Boolean(closingResponseData)"
+      :proof-downloaded="proofDownloaded"
+      :divergence-warning="divergenceWarning"
+      :lost-response-warning="lostResponseWarning"
+      @refresh-status="checkClosingStatus(true)"
+      @download-proof="handleDownloadProof"
+      @recalculate-and-check="triggerRecalculateAndCheck"
+      @open-closing-modal="isClosingModalOpen = true"
+    />
 
     <section v-if="!competenceKey" class="rounded-2xl border border-danger/30 bg-danger-bg p-6" role="alert">
       <h2 class="text-xl font-extrabold text-danger-dark">Competência inválida</h2>
@@ -381,17 +400,30 @@
         </div>
       </section>
     </div>
+
+    <!-- Modal de Fechamento Definitivo ([FRONT-10]) -->
+    <CompetenceClosingModal
+      :open="isClosingModalOpen"
+      :competencia="competenceKey"
+      :is-submitting="isSubmittingClosing"
+      :current-user="currentUserIdentifier"
+      :preview-totals="previewTotals"
+      @confirm="handleConfirmClosing"
+      @cancel="isClosingModalOpen = false"
+    />
   </div>
 </template>
 
 <script setup>
 import { useAccessPolicy } from '@/services/useAccessPolicy'
 const access = useAccessPolicy()
-import { computed, defineComponent, h, ref, watch } from 'vue'
+import { computed, defineComponent, h, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { RefreshCw } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import CompetenceClosingModal from '@/components/competence/CompetenceClosingModal.vue'
+import CompetenceClosingStatusCard from '@/components/competence/CompetenceClosingStatusCard.vue'
 import { ASYNC_EXECUTION_STATES, formatExecutionStateLabel, executionStateTone } from '@/services/asyncExecutionService'
 import { dataService } from '@/services/dataService'
 import { calculationService } from '@/services/calculationService'
@@ -402,6 +434,14 @@ import { filterCadastralImpediments, groupCoverageImpediments, isCoverageImpedim
 import MissingBasesCard from '@/components/data/MissingBasesCard.vue'
 import { useCalculationStore } from '@/stores/calculationStore'
 import { useDataStore } from '@/stores/dataStore'
+import { useAccountStore } from '@/stores/accountStore'
+import {
+  getClosingStatus,
+  executeClosing,
+  downloadClosingProof,
+  saveClosingToSession,
+  getClosingFromSession
+} from '@/services/closingService'
 
 const PaginationControls = defineComponent({
   props: { page: { type: Number, required: true }, totalPages: { type: Number, required: true } },
@@ -439,6 +479,44 @@ const resultPageSize = 10
 const competenceGeneration = ref(0)
 const salesQueryRequestId = ref(0)
 const historyRequestId = ref(0)
+
+const accountStore = useAccountStore()
+const closingStatusData = ref({ status: 'ABERTA', bloqueada: false })
+const isCheckingClosingStatus = ref(false)
+const isClosingModalOpen = ref(false)
+const isSubmittingClosing = ref(false)
+const closingResponseData = ref(null)
+const proofDownloaded = ref(false)
+const divergenceWarning = ref(null)
+const lostResponseWarning = ref(false)
+const previewTotals = ref(null)
+const backupPreviewImpediments = ref([])
+let closingPollingTimer = null
+let closingPollingCounter = 0
+
+const currentUserIdentifier = computed(() => {
+  return accountStore.user?.email || accountStore.user?.nome || accountStore.user?.name || ''
+})
+
+const canExecuteClosing = computed(() => {
+  return (access.can('calculate') || accountStore.isAdmin || accountStore.isManager) &&
+    closingStatusData.value.status !== 'PROCESSANDO' &&
+    closingStatusData.value.status !== 'CONCLUIDO' &&
+    Boolean(currentUserIdentifier.value)
+})
+
+watch(result, (newResult) => {
+  if (newResult && !newResult.resumoExecucao) {
+    previewTotals.value = {
+      totalVendasProcessadas: newResult.totalVendasProcessadas ?? 0,
+      totalCalculados: newResult.totalCalculados ?? 0,
+      totalImpedimentos: newResult.totalImpedimentos ?? 0,
+      valorTotalVendas: newResult.valorTotalVendas ?? 0,
+      valorTotalComissao: newResult.valorTotalComissao ?? 0
+    }
+    backupPreviewImpediments.value = [...(newResult.impedimentos || [])]
+  }
+}, { immediate: true })
 
 const coverageGroups = computed(() =>
   groupCoverageImpediments(result.value?.impedimentos || [], competenceKey.value)
@@ -506,6 +584,7 @@ watch([matriculaFilter, originFilter], () => {
 })
 
 async function loadCompetence() {
+  stopClosingPolling()
   calculationStore.recoverExecution(competenceKey.value)
   const generation = competenceGeneration.value + 1
   competenceGeneration.value = generation
@@ -524,16 +603,153 @@ async function loadCompetence() {
   resultPage.value = 0
   showRecalculateConfirm.value = false
   lastOperation.value = CALCULATION_OPERATION.NORMAL
+  closingStatusData.value = { status: 'ABERTA', bloqueada: false }
+  divergenceWarning.value = null
+  lostResponseWarning.value = false
+  closingResponseData.value = null
+  proofDownloaded.value = false
 
   if (!competenceKey.value) return
+
+  const sessionClosing = getClosingFromSession()
+  if (sessionClosing && sessionClosing.competencia === competenceKey.value) {
+    closingResponseData.value = sessionClosing
+  }
 
   const hasSharedCalculationState = syncCalculationStoreState(competenceKey.value)
   if (!hasSharedCalculationState) restoreSessionResult(competenceKey.value)
   await Promise.all([
     loadSalesCount(competenceKey.value, generation),
-    loadHistory(0, competenceKey.value, generation)
+    loadHistory(0, competenceKey.value, generation),
+    checkClosingStatus()
   ])
 }
+
+async function checkClosingStatus(manual = false) {
+  if (!competenceKey.value) return
+  if (manual) isCheckingClosingStatus.value = true
+  try {
+    const data = await getClosingStatus(competenceKey.value)
+    closingStatusData.value = data
+    if (data?.status === 'PROCESSANDO') {
+      startClosingPolling()
+    } else {
+      stopClosingPolling()
+    }
+  } catch (err) {
+    if (err?.response?.status !== 403) {
+      console.warn('Erro ao consultar status de fechamento:', err)
+    }
+  } finally {
+    if (manual) isCheckingClosingStatus.value = false
+  }
+}
+
+function startClosingPolling() {
+  stopClosingPolling()
+  closingPollingCounter = 0
+  const poll = async () => {
+    closingPollingCounter++
+    try {
+      const data = await getClosingStatus(competenceKey.value)
+      closingStatusData.value = data
+      if (data?.status !== 'PROCESSANDO') {
+        stopClosingPolling()
+        return
+      }
+    } catch (e) {
+      // transient network error during polling
+    }
+    // Primeiros 60s (20 ciclos de 3s) a cada 3s; após 60s, a cada 15s sem desbloquear
+    const delay = closingPollingCounter <= 20 ? 3000 : 15000
+    closingPollingTimer = setTimeout(poll, delay)
+  }
+  closingPollingTimer = setTimeout(poll, 3000)
+}
+
+function stopClosingPolling() {
+  if (closingPollingTimer) {
+    clearTimeout(closingPollingTimer)
+    closingPollingTimer = null
+  }
+}
+
+function triggerRecalculateAndCheck() {
+  showRecalculateConfirm.value = true
+}
+
+async function handleConfirmClosing({ motivo, executadoPor }) {
+  isSubmittingClosing.value = true
+  divergenceWarning.value = null
+  lostResponseWarning.value = false
+  try {
+    const response = await executeClosing({
+      competencia: competenceKey.value,
+      executadoPor,
+      motivo
+    })
+    closingResponseData.value = response
+    proofDownloaded.value = false
+    saveClosingToSession(response)
+
+    // Comparar totais da prévia com os do fechamento usando centavos inteiros (evita imprecisão de ponto flutuante)
+    if (previewTotals.value && response) {
+      const prevTotalCents = Math.round((Number(previewTotals.value.valorTotalComissao) || 0) * 100)
+      const closedTotalCents = Math.round((Number(response.valorTotalComissao) || 0) * 100)
+      const prevVendas = Number(previewTotals.value.totalCalculados) || 0
+      const closedVendas = Number(response.totalCalculados) || 0
+      if (prevTotalCents !== closedTotalCents || prevVendas !== closedVendas) {
+        divergenceWarning.value = `Os valores consolidados (R$ ${(closedTotalCents / 100).toFixed(2)}, ${closedVendas} vendas) diferem da prévia recalculada (R$ ${(prevTotalCents / 100).toFixed(2)}, ${prevVendas} vendas). Verifique se regras ou vendas foram alteradas durante o processo.`
+      }
+    }
+
+    closingStatusData.value = {
+      status: 'CONCLUIDO',
+      bloqueada: true,
+      protocolo: response.protocolo,
+      fechadoEm: response.concluidoEm,
+      executadoPor: response.executadoPor,
+      totalVendasProcessadas: response.totalVendasProcessadas,
+      totalCalculados: response.totalCalculados,
+      totalImpedimentos: response.totalImpedimentos,
+      valorTotalVendas: response.valorTotalVendas,
+      valorTotalComissao: response.valorTotalComissao
+    }
+    isClosingModalOpen.value = false
+
+    handleDownloadProof()
+  } catch (err) {
+    if (err.isNetworkRecovery) {
+      lostResponseWarning.value = true
+      isClosingModalOpen.value = false
+      if (err.recoveredStatus) {
+        closingStatusData.value = err.recoveredStatus
+        if (err.recoveredStatus.status === 'PROCESSANDO') {
+          startClosingPolling()
+        }
+      }
+    } else {
+      alert(err.response?.data?.message || err.message || 'Falha ao executar fechamento.')
+    }
+  } finally {
+    isSubmittingClosing.value = false
+  }
+}
+
+function handleDownloadProof() {
+  if (closingResponseData.value) {
+    try {
+      downloadClosingProof(closingResponseData.value)
+      proofDownloaded.value = true
+    } catch (e) {
+      console.warn('Erro ao disparar download do comprovante:', e)
+    }
+  }
+}
+
+onBeforeUnmount(() => {
+  stopClosingPolling()
+})
 
 function syncCalculationStoreState(expectedCompetence = competenceKey.value) {
   if (calculationStore.competencia !== expectedCompetence) return false
