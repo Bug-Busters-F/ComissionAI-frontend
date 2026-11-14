@@ -39,7 +39,8 @@
           class="focus-ring inline-flex items-center gap-2 rounded-full border border-sage-border bg-white px-4 py-2.5 text-xs font-bold text-brand-dark shadow-sm transition hover:bg-sage-light"
           @click="$emit('downloadProof')"
         >
-          <span>📥 Baixar Comprovante (JSON)</span>
+          <Download class="h-4 w-4 text-brand-dark" aria-hidden="true" />
+          <span>Baixar Comprovante (JSON)</span>
         </button>
       </div>
     </div>
@@ -51,7 +52,7 @@
       role="alert"
     >
       <div class="flex items-start gap-2">
-        <span class="font-bold">⚠️</span>
+        <AlertTriangle class="h-4 w-4 text-warning-dark shrink-0 mt-0.5" aria-hidden="true" />
         <div>
           <p class="font-bold">Divergência detectada entre a prévia e o fechamento:</p>
           <p class="opacity-90">{{ divergenceWarning }}</p>
@@ -66,7 +67,7 @@
       role="alert"
     >
       <div class="flex items-start gap-2">
-        <span class="font-bold">⚠️</span>
+        <AlertTriangle class="h-4 w-4 text-warning-dark shrink-0 mt-0.5" aria-hidden="true" />
         <div>
           <p class="font-bold">Resposta interrompida pela rede:</p>
           <p class="opacity-90">
@@ -173,7 +174,7 @@
       class="rounded-2xl border border-danger/30 bg-danger-bg p-5 text-sm text-danger-dark space-y-3"
     >
       <div class="flex items-center gap-2.5">
-        <span class="text-base">❌</span>
+        <XCircle class="h-5 w-5 text-danger shrink-0" aria-hidden="true" />
         <p class="font-bold">A última tentativa de fechamento falhou</p>
       </div>
       <p class="text-xs leading-relaxed opacity-90">
@@ -229,6 +230,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { Download, AlertTriangle, XCircle } from 'lucide-vue-next'
 
 const props = defineProps({
   competencia: { type: String, default: '' },

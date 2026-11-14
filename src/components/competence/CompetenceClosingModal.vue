@@ -22,7 +22,7 @@
             aria-label="Fechar modal"
             @click="$emit('cancel')"
           >
-            ✕
+            <X class="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
         <h2 :id="modalTitleId" class="text-2xl font-extrabold tracking-tight text-brand-dark">
@@ -36,7 +36,7 @@
       <!-- Alerta de Impacto Corporativo Global -->
       <div class="rounded-2xl border border-danger/30 bg-danger-bg p-4 text-xs sm:text-sm text-danger-dark space-y-2">
         <div class="flex items-start gap-2.5">
-          <span class="font-bold text-base leading-none">⚠️</span>
+          <AlertTriangle class="h-5 w-5 text-danger shrink-0 mt-0.5" aria-hidden="true" />
           <div class="space-y-1">
             <p class="font-bold">Atenção ao impacto global em todas as campanhas:</p>
             <p class="leading-relaxed opacity-90">
@@ -131,6 +131,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { X, AlertTriangle } from 'lucide-vue-next'
 
 const props = defineProps({
   open: { type: Boolean, default: false },

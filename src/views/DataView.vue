@@ -78,7 +78,8 @@
                 class="inline-flex items-center gap-1 rounded-full bg-brand-dark px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm"
                 title="Fechamento contábil e apuração definitiva consolidados"
               >
-                🔒 Liquidada
+                <Lock class="h-3 w-3" aria-hidden="true" />
+                <span>Liquidada</span>
               </span>
               <StatusBadge :label="period.status" :tone="period.tone" />
             </div>
@@ -138,8 +139,11 @@
             class="focus-ring flex items-center justify-between rounded-xl bg-sage-light px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-sage-border transition"
           >
             <template v-if="store.activeJob.status === 'PROCESSING' && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)">
-              <span>Acompanhar processamento</span>
-              <span>⏳</span>
+              <span class="inline-flex items-center gap-1.5">
+                <RefreshCw class="h-3.5 w-3.5 animate-spin text-brand-dark" aria-hidden="true" />
+                <span>Acompanhar processamento</span>
+              </span>
+              <span class="text-xs font-semibold">{{ store.activeJob.progress }}%</span>
             </template>
             <template v-else>
               <span>{{ period.cicloFechado ? 'Reenviar ciclo (RH + Vendas)' : 'Fechar ciclo (RH + Vendas)' }}</span>
@@ -153,7 +157,10 @@
             class="focus-ring flex items-center justify-between rounded-xl px-4 py-2.5 text-xs font-bold transition"
             :class="closedCompetences[period.competencia] ? 'bg-sage-light text-brand-dark hover:bg-sage-border' : 'bg-brand text-brand-dark hover:bg-brand-hover'"
           >
-            <span>{{ closedCompetences[period.competencia] ? 'Consultar fechamento 🔒' : (access.can('calculate') ? 'Calcular comissões' : 'Consultar cálculos') }}</span>
+            <span class="inline-flex items-center gap-1.5">
+              <Lock v-if="closedCompetences[period.competencia]" class="h-3.5 w-3.5 text-brand-dark" aria-hidden="true" />
+              <span>{{ closedCompetences[period.competencia] ? 'Consultar fechamento' : (access.can('calculate') ? 'Calcular comissões' : 'Consultar cálculos') }}</span>
+            </span>
             <span>→</span>
           </RouterLink>
           <span v-else class="rounded-xl bg-sage-light px-4 py-2.5 text-xs font-semibold text-sage-muted text-center">
@@ -247,7 +254,7 @@ import { useAccessPolicy } from '@/services/useAccessPolicy'
 const access = useAccessPolicy()
 import { userFacingText } from '@/services/userFacingText'
 import { onMounted, ref } from 'vue'
-import { RefreshCw, Trash2, Database, FileSpreadsheet } from 'lucide-vue-next'
+import { RefreshCw, Trash2, Database, FileSpreadsheet, Lock } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import EfetivadosTable from '@/components/data/EfetivadosTable.vue'

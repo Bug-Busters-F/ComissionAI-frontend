@@ -16,7 +16,7 @@
         role="alert"
       >
         <div class="flex items-start gap-2.5">
-          <span class="font-bold">🔒</span>
+          <Lock class="h-5 w-5 text-warning-dark shrink-0 mt-0.5" aria-hidden="true" />
           <div>
             <p class="font-bold">Vigência com competência lacrada por fechamento contábil:</p>
             <p class="text-xs opacity-90 leading-relaxed">
@@ -29,10 +29,11 @@
       </div>
       <div
         v-else-if="isClosingStatusRestricted"
-        class="rounded-xl border border-sage-border bg-sage-light/60 p-3.5 text-xs text-sage-muted"
+        class="flex items-center gap-2 rounded-xl border border-sage-border bg-sage-light/60 p-3.5 text-xs text-sage-muted"
         role="status"
       >
-        ℹ️ Informações de fechamento contábil indisponíveis para o seu perfil de acesso.
+        <Info class="h-4 w-4 text-sage-muted shrink-0" aria-hidden="true" />
+        <span>Informações de fechamento contábil indisponíveis para o seu perfil de acesso.</span>
       </div>
       <p v-if="campaign.motivoBloqueioEdicao" class="rounded-xl bg-warning-bg p-4 text-sm text-warning-text">{{ campaign.motivoBloqueioEdicao }}</p>
       <p v-if="campaign.versaoProposta && campaign.versaoVigente" class="rounded-xl bg-sage-light p-4 text-sm">Existe uma proposta de alteração separada (versão {{ campaign.versaoProposta }}). A versão vigente é {{ campaign.versaoVigente }}. Use o seletor abaixo para consultar as versões publicadas.</p>
@@ -71,6 +72,7 @@ import { createCampaignLifecycleApi } from '@/services/campaignLifecycleApi'
 import CampaignVersionHistory from '@/components/campaigns/CampaignVersionHistory.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Lock, Info } from 'lucide-vue-next'
 import CampaignDeleteDialog from '@/components/common/CampaignDeleteDialog.vue'
 import CampaignProposalReviewSummary from '@/components/campaigns/CampaignProposalReviewSummary.vue'
 import CampaignBasesSection from '@/components/campaigns/CampaignBasesSection.vue'
