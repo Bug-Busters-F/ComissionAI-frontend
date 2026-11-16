@@ -215,5 +215,92 @@ describe('Campaign Creation Stage 4 (Conferência e Governança) — [FRONT-9]',
       }
       expect(lifecycle.canActivate.value).toBe(false)
     })
+
+    it('executa devolução para a Etapa 3 preservando aprovação técnica de código', async () => {
+      const campaign = campaignFixture()
+      campaign.propostas[2].campos.taxaPercentual = '4'
+      campaign.propostas[2].pendenciasRemotas = []
+      campaign.propostas[2].metadadosRecebidos.validacaoPendente = false
+
+      const apiReturnMock = vi.fn(async (id, payload) => ({
+        ...savedResponse(campaign),
+        id,
+        ultimaEtapa: payload.etapaDestino,
+        estadoEsteira: 'DEVOLVIDA',
+        encaminhadaGerente: false,
+        revisaoControle: 101
+      }))
+
+      const { lifecycle } = await setupAndAccept(campaign, {
+        returnProposal: apiReturnMock
+      }, {
+        dentroDoOrcamento: true,
+        statusEnquadramento: 'ENQUADRADO'
+      })
+
+      // Código técnico previamente aprovado
+      lifecycle.state.codeApproval = {
+        statusAprovacaoCodigo: 'APROVADO',
+        regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
+      }
+      expect(lifecycle.canActivate.value).toBe(true)
+
+      // Devolução para Etapa 3 (Simulação/Orçamento)
+      const devolvido = await lifecycle.returnProposal({
+        etapaDestino: 3,
+        motivo: 'Ajustar parâmetros de projeção na simulação'
+      })
+      expect(devolvido).toBe(true)
+      expect(apiReturnMock).toHaveBeenCalledWith(42, {
+        etapaDestino: 3,
+        motivo: 'Ajustar parâmetros de projeção na simulação'
+      })
+      expect(lifecycle.state.ultimaEtapa).toBe(3)
+
+      // Backend preserva status do código, mas invalida aceite de simulação
+      lifecycle.simulation.accepted = false
+      expect(lifecycle.isCodeApproved.value).toBe(true)
+      expect(lifecycle.canActivate.value).toBe(false)
+    })
+  })
+
+  describe('Casos de Borda de Orçamento e Comparação', () => {
+    it('permite ativação quando o custo projetado é exatamente igual ao teto orçamentário (saldo 0)', async () => {
+      const campaign = campaignFixture()
+      campaign.propostas[2].campos.taxaPercentual = '4'
+      campaign.propostas[2].pendenciasRemotas = []
+      campaign.propostas[2].metadadosRecebidos.validacaoPendente = false
+
+      const { lifecycle } = await setupAndAccept(campaign, {}, {
+        dentroDoOrcamento: true,
+        statusEnquadramento: 'ENQUADRADO',
+        excedenteOrcamento: '0.00',
+        saldoOrcamento: '0.00',
+        orcamentoTeto: '50000.00',
+        custoTotalProjetado: '50000.00'
+      })
+
+      lifecycle.state.codeApproval = {
+        statusAprovacaoCodigo: 'APROVADO',
+        regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
+      }
+
+      expect(lifecycle.isBudgetWithinLimit.value).toBe(true)
+      expect(lifecycle.canActivate.value).toBe(true)
+    })
+
+    it('exibe mensagem explicativa de campanha sem versão publicada anterior', async () => {
+      const campaign = campaignFixture()
+      const app = createSSRApp(CampaignVersionComparison, {
+        published: null,
+        campaign,
+        proposedNumber: 1,
+        baseCompetence: null,
+        proposedCompetence: '2026-09'
+      })
+
+      const html = await renderToString(app)
+      expect(html).toContain('Não há versão anterior publicada')
+    })
   })
 })

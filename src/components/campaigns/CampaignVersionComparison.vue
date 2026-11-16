@@ -32,6 +32,9 @@
     </article>
     <p v-if="!comparison.fields.length && !comparison.rules.length" class="mt-4 text-sm text-sage-muted">Nenhuma alteração nos dados da campanha ou nas condições das regras.</p>
   </section>
+  <section v-else class="rounded-2xl border border-sage-border bg-white p-5 text-sm text-sage-muted">
+    <p>Não há versão anterior publicada para comparação nesta campanha.</p>
+  </section>
 </template>
 <script setup>
 import { computed } from 'vue'

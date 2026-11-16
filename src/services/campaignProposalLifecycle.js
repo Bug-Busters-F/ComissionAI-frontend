@@ -337,6 +337,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     try {
       const res = await api.approveCode(state.id, { aprovado: true, aprovadoPor })
       state.codeApproval = res
+      if (res?.revisaoControle != null) state.revisaoControle = res.revisaoControle
       return true
     } catch (error) {
       state.error = message(error)
@@ -352,6 +353,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     try {
       const res = await api.approveCode(state.id, { aprovado: false, aprovadoPor, motivo })
       state.codeApproval = res
+      if (res?.revisaoControle != null) state.revisaoControle = res.revisaoControle
       return true
     } catch (error) {
       state.error = message(error)
@@ -382,8 +384,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
       if (raw && raw.id) {
         applySaved(raw, campaign)
       }
-      state.encaminhadaGerente = false
-      state.ultimaEtapa = destinoNum
+      state.ultimaEtapa = raw?.ultimaEtapa || destinoNum
       state.notice = `Proposta devolvida com sucesso para a Etapa ${destinoNum}.`
       return true
     } catch (error) {
@@ -405,6 +406,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     state.working = true; state.error = ''
     try {
       const raw = await api.forwardToManager(state.id, { versaoEsperada: state.versaoProposta || state.versaoVigente })
+      if (raw?.revisaoControle != null) state.revisaoControle = raw.revisaoControle
       state.encaminhadaGerente = true
       state.notice = 'Campanha encaminhada ao gerente com sucesso.'
       return true
