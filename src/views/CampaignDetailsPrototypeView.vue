@@ -10,6 +10,31 @@
     </header>
 
     <template v-if="campaign && !loadError">
+      <div
+        v-if="hasClosedCompetenceInVigencia"
+        class="rounded-2xl border border-warning-border bg-warning-bg p-4 text-sm text-warning-dark space-y-1"
+        role="alert"
+      >
+        <div class="flex items-start gap-2.5">
+          <Lock class="h-5 w-5 text-warning-dark shrink-0 mt-0.5" aria-hidden="true" />
+          <div>
+            <p class="font-bold">Vigência com competência lacrada por fechamento contábil:</p>
+            <p class="text-xs opacity-90 leading-relaxed">
+              A(s) competência(s)
+              <strong>{{ closedCompetencesInVigencia.map(c => c.competencia).join(', ') }}</strong>
+              já possui(em) fechamento final concluído. A edição e publicação desta campanha estão permanentemente bloqueadas para este período.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div
+        v-else-if="isClosingStatusRestricted"
+        class="flex items-center gap-2 rounded-xl border border-sage-border bg-sage-light/60 p-3.5 text-xs text-sage-muted"
+        role="status"
+      >
+        <Info class="h-4 w-4 text-sage-muted shrink-0" aria-hidden="true" />
+        <span>Informações de fechamento contábil indisponíveis para o seu perfil de acesso.</span>
+      </div>
       <p v-if="campaign.motivoBloqueioEdicao" class="rounded-xl bg-warning-bg p-4 text-sm text-warning-text">{{ campaign.motivoBloqueioEdicao }}</p>
       <p v-if="campaign.versaoProposta && campaign.versaoVigente" class="rounded-xl bg-sage-light p-4 text-sm">Existe uma proposta de alteração separada (versão {{ campaign.versaoProposta }}). A versão vigente é {{ campaign.versaoVigente }}. Use o seletor abaixo para consultar as versões publicadas.</p>
       <CampaignVersionHistory v-if="!isDemo && campaign.versaoVigente != null" :campaign-id="campaign.id" :current-version="campaign.versaoVigente" />
@@ -47,6 +72,7 @@ import { createCampaignLifecycleApi } from '@/services/campaignLifecycleApi'
 import CampaignVersionHistory from '@/components/campaigns/CampaignVersionHistory.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Lock, Info } from 'lucide-vue-next'
 import CampaignDeleteDialog from '@/components/common/CampaignDeleteDialog.vue'
 import CampaignProposalReviewSummary from '@/components/campaigns/CampaignProposalReviewSummary.vue'
 import CampaignBasesSection from '@/components/campaigns/CampaignBasesSection.vue'
@@ -58,6 +84,7 @@ import { campaignDemo, isCampaignDemoEnabled } from '@/services/campaignDemo'
 import { campaignService, normalizeCampaignError } from '@/services/campaignService'
 import { campaignStateTone, formatCampaignChannel, formatCampaignState, formatPeriodArrow } from '@/services/campaignMappers'
 import { useNotificationStore } from '@/stores/notificationStore'
+import { listClosings } from '@/services/closingService'
 
 const route = useRoute()
 const router = useRouter()
@@ -69,6 +96,9 @@ const isDeleteOpen = ref(false)
 const isRemoving = ref(false)
 const deleteError = ref('')
 const isDemo = isCampaignDemoEnabled
+const closedCompetencesInVigencia = ref([])
+const isClosingStatusRestricted = ref(false)
+const hasClosedCompetenceInVigencia = computed(() => closedCompetencesInVigencia.value.length > 0)
 const proposalCampaign = computed(() => campaign.value && !isDemo ? persistedCampaignToProposal(campaign.value) : null)
 const proposalValidation = computed(() => proposalCampaign.value ? validateCampaignProposalSet(proposalCampaign.value) : null)
 function dateTime(value) {
@@ -104,10 +134,34 @@ async function loadCampaign() {
     }
     campaign.value = current
     if (!campaign.value) loadError.value = 'A campanha não foi encontrada ou já foi removida.'
+    else if (!isDemo) void checkVigenciaClosings(campaign.value)
   } catch (error) {
     loadError.value = normalizeCampaignError(error).message
   } finally {
     isLoading.value = false
+  }
+}
+
+async function checkVigenciaClosings(campaignData) {
+  if (!campaignData?.dataInicio || !campaignData?.dataFim) return
+  closedCompetencesInVigencia.value = []
+  isClosingStatusRestricted.value = false
+  try {
+    const page = await listClosings({ size: 100 })
+    const closings = page?.content || []
+    const startYm = campaignData.dataInicio.slice(0, 7)
+    const endYm = campaignData.dataFim.slice(0, 7)
+
+    closedCompetencesInVigencia.value = closings.filter(c => {
+      const comp = c.competencia
+      return comp && comp >= startYm && comp <= endYm && c.status === 'CONCLUIDO'
+    })
+  } catch (err) {
+    // Para 403 ou qualquer erro de rede/servidor na listagem, exibe aviso neutro para não sugerir falsamente competência aberta
+    isClosingStatusRestricted.value = true
+    if (err?.response?.status !== 403) {
+      console.warn('Não foi possível verificar fechamentos da vigência:', err)
+    }
   }
 }
 
