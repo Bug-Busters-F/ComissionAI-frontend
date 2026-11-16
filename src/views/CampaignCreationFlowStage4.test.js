@@ -303,4 +303,90 @@ describe('Campaign Creation Stage 4 (Conferência e Governança) — [FRONT-9]',
       expect(html).toContain('Não há versão anterior publicada')
     })
   })
+
+  describe('Concorrência 409 e Erro 400 na Ativação e Encaminhamento', () => {
+    it('sinaliza remoteChanged quando a ativação retorna 409 Conflict', async () => {
+      const campaign = campaignFixture()
+      campaign.propostas[2].campos.taxaPercentual = '4'
+      campaign.propostas[2].pendenciasRemotas = []
+      campaign.propostas[2].metadadosRecebidos.validacaoPendente = false
+
+      const { lifecycle, api } = await setupAndAccept(campaign, {
+        activate: vi.fn(async () => {
+          const err = new Error('Conflito de revisão da campanha')
+          err.response = { status: 409, data: { message: 'A campanha foi alterada por outro usuário.' } }
+          throw err
+        })
+      }, {
+        dentroDoOrcamento: true,
+        statusEnquadramento: 'ENQUADRADO'
+      })
+
+      lifecycle.state.codeApproval = {
+        statusAprovacaoCodigo: 'APROVADO',
+        regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
+      }
+      expect(lifecycle.canActivate.value).toBe(true)
+
+      const ativado = await lifecycle.activate()
+      expect(ativado).toBe(false)
+      expect(lifecycle.state.remoteChanged).toBe(true)
+      expect(lifecycle.state.error).toContain('A campanha foi alterada por outro usuário')
+    })
+
+    it('captura erro 400 com mensagem legível quando a ativação é rejeitada pelo backend', async () => {
+      const campaign = campaignFixture()
+      campaign.propostas[2].campos.taxaPercentual = '4'
+      campaign.propostas[2].pendenciasRemotas = []
+      campaign.propostas[2].metadadosRecebidos.validacaoPendente = false
+
+      const { lifecycle } = await setupAndAccept(campaign, {
+        activate: vi.fn(async () => {
+          const err = new Error('Bloqueio de governança')
+          err.response = { status: 400, data: { message: 'A simulação vinculada perdeu a validade.' } }
+          throw err
+        })
+      }, {
+        dentroDoOrcamento: true,
+        statusEnquadramento: 'ENQUADRADO'
+      })
+
+      lifecycle.state.codeApproval = {
+        statusAprovacaoCodigo: 'APROVADO',
+        regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
+      }
+
+      const ativado = await lifecycle.activate()
+      expect(ativado).toBe(false)
+      expect(lifecycle.state.error).toContain('A simulação vinculada perdeu a validade')
+    })
+  })
+
+  describe('Renderização de Botões por Papel na Etapa 4 (SoD na UI)', () => {
+    it('renderiza botões de decisão exclusivamente para os papéis autorizados', async () => {
+      const { canAccess } = await import('@/services/accessPolicy')
+
+      // GERENTE_VENDAS: pode devolver e ativar, mas não aprova código HITL nem encaminha
+      expect(canAccess('GERENTE_VENDAS', 'returnProposal')).toBe(true)
+      expect(canAccess('GERENTE_VENDAS', 'activateCampaign')).toBe(true)
+      expect(canAccess('GERENTE_VENDAS', 'approveCode')).toBe(false)
+
+      // ANALISTA_CODIGO: aprova código HITL, mas não devolve, nem ativa, nem encaminha
+      expect(canAccess('ANALISTA_CODIGO', 'approveCode')).toBe(true)
+      expect(canAccess('ANALISTA_CODIGO', 'returnProposal')).toBe(false)
+      expect(canAccess('ANALISTA_CODIGO', 'activateCampaign')).toBe(false)
+
+      // ANALISTA_NEGOCIOS: encaminha propostas, mas não devolve, nem ativa, nem aprova código HITL
+      expect(canAccess('ANALISTA_NEGOCIOS', 'createCampaign')).toBe(true)
+      expect(canAccess('ANALISTA_NEGOCIOS', 'returnProposal')).toBe(false)
+      expect(canAccess('ANALISTA_NEGOCIOS', 'activateCampaign')).toBe(false)
+      expect(canAccess('ANALISTA_NEGOCIOS', 'approveCode')).toBe(false)
+
+      // AUDITOR: somente leitura, sem nenhum botão de mutação na Etapa 4
+      expect(canAccess('AUDITOR', 'viewCampaigns')).toBe(true)
+      expect(canAccess('AUDITOR', 'approveCode')).toBe(false)
+      expect(canAccess('AUDITOR', 'returnProposal')).toBe(false)
+      expect(canAccess('AUDITOR', 'activateCampaign')).toBe(false)
+    })
+  })
 })
