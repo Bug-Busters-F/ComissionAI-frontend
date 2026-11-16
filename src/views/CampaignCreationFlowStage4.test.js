@@ -163,4 +163,57 @@ describe('Campaign Creation Stage 4 (Conferência e Governança) — [FRONT-9]',
       expect(html).toContain('2026-06 vs 2026-07')
     })
   })
+
+  describe('Devolução pelo Gerente e Efeito Cascata', () => {
+    it('executa devolução formal para a Etapa 1 e bloqueia ativação se forçado retorno', async () => {
+      const campaign = campaignFixture()
+      campaign.propostas[2].campos.taxaPercentual = '4'
+      campaign.propostas[2].pendenciasRemotas = []
+      campaign.propostas[2].metadadosRecebidos.validacaoPendente = false
+
+      const apiReturnMock = vi.fn(async (id, payload) => ({
+        ...savedResponse(campaign),
+        id,
+        ultimaEtapa: payload.etapaDestino,
+        estadoEsteira: 'DEVOLVIDA',
+        encaminhadaGerente: false,
+        revisaoControle: 99
+      }))
+
+      const { lifecycle, api } = await setupAndAccept(campaign, {
+        returnProposal: apiReturnMock
+      }, {
+        dentroDoOrcamento: true,
+        statusEnquadramento: 'ENQUADRADO'
+      })
+
+      lifecycle.state.codeApproval = {
+        statusAprovacaoCodigo: 'APROVADO',
+        regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
+      }
+      expect(lifecycle.canActivate.value).toBe(true)
+
+      // Devolve para Etapa 1
+      const devolvido = await lifecycle.returnProposal({
+        etapaDestino: 1,
+        motivo: 'Ajustar regras antes de prosseguir'
+      })
+      expect(devolvido).toBe(true)
+      expect(apiReturnMock).toHaveBeenCalledWith(42, {
+        etapaDestino: 1,
+        motivo: 'Ajustar regras antes de prosseguir'
+      })
+
+      expect(lifecycle.state.ultimaEtapa).toBe(1)
+      expect(lifecycle.state.encaminhadaGerente).toBe(false)
+      expect(lifecycle.state.revisaoControle).toBe(99)
+
+      // Cascata simulada vinda do backend: se o backend invalidou o código na devolução
+      lifecycle.state.codeApproval = {
+        statusAprovacaoCodigo: 'INVALIDADO',
+        regras: [{ regraId: 1, statusAprovacaoCodigo: 'INVALIDADO' }]
+      }
+      expect(lifecycle.canActivate.value).toBe(false)
+    })
+  })
 })

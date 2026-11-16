@@ -165,10 +165,19 @@
             Encaminhar ao Gerente →
           </button>
           <button
-            v-if="provider.mode === 'api'"
+            v-if="provider.mode === 'api' && canReturnProposal"
+            type="button"
+            class="focus-ring rounded-full border border-danger/40 bg-white px-5 py-3 text-sm font-bold text-danger-dark transition hover:bg-danger-bg disabled:opacity-50"
+            :disabled="persistence.working"
+            @click="openReturnModal"
+          >
+            Devolver proposta
+          </button>
+          <button
+            v-if="provider.mode === 'api' && canActivateCampaign"
             type="button"
             class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold transition hover:bg-brand-hover disabled:opacity-50"
-            :disabled="!lifecycle.canActivate.value"
+            :disabled="!lifecycle.canActivate.value || persistence.working"
             @click="persistence.activationOpen = true"
           >
             {{ persistence.editingPublished ? 'Publicar nova versão' : 'Aprovar e ativar campanha' }}
@@ -203,6 +212,73 @@
     <CampaignLifecycleDialog :open="persistence.activationOpen" :title="persistence.editingPublished ? 'Publicar esta nova versão?' : 'Aprovar e ativar esta campanha?'" :confirm-label="persistence.editingPublished ? 'Confirmar publicação' : 'Confirmar ativação'" :busy="persistence.working" @cancel="persistence.activationOpen = false" @confirm="activateCampaign">
       <p v-if="persistence.editingPublished" class="mb-3 font-bold">A nova versão substituirá a vigente para todo o período da campanha. As versões anteriores continuarão disponíveis no histórico.</p>
       <p>Serão ativadas as {{ campaign.propostas.length }} regras da versão salva, com a vigência {{ campaign.dataInicio }} a {{ campaign.dataFim }} e o aceite registrado no protocolo {{ simulation.result?.protocolo }}.</p>
+    </CampaignLifecycleDialog>
+    <CampaignLifecycleDialog
+      :open="returnModalOpen"
+      title="Devolver proposta de campanha"
+      confirm-label="Confirmar devolução"
+      :busy="persistence.working"
+      @cancel="returnModalOpen = false"
+      @confirm="confirmReturnProposal"
+    >
+      <p class="text-sm text-sage-muted mb-4">
+        Ao devolver a proposta, o aceite de simulação será desvinculado e os responsáveis serão notificados para realizar os ajustes solicitados.
+      </p>
+      <div class="space-y-3">
+        <label class="block text-xs font-bold uppercase tracking-wider text-sage-muted">Etapa de destino para devolução</label>
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <label
+            class="flex cursor-pointer flex-col rounded-xl border p-3 text-sm transition"
+            :class="returnDestinationStep === 1 ? 'border-brand bg-brand-light/30 font-bold' : 'border-sage-border bg-white hover:bg-sage-light/20'"
+          >
+            <div class="flex items-center gap-2">
+              <input type="radio" v-model="returnDestinationStep" :value="1" class="text-brand focus:ring-brand" />
+              <span>Etapa 1</span>
+            </div>
+            <span class="mt-1 text-xs text-sage-muted">Proposta e Regras</span>
+          </label>
+          <label
+            class="flex cursor-pointer flex-col rounded-xl border p-3 text-sm transition"
+            :class="returnDestinationStep === 2 ? 'border-brand bg-brand-light/30 font-bold' : 'border-sage-border bg-white hover:bg-sage-light/20'"
+          >
+            <div class="flex items-center gap-2">
+              <input type="radio" v-model="returnDestinationStep" :value="2" class="text-brand focus:ring-brand" />
+              <span>Etapa 2</span>
+            </div>
+            <span class="mt-1 text-xs text-sage-muted">Revisão Técnica de Código</span>
+          </label>
+          <label
+            class="flex cursor-pointer flex-col rounded-xl border p-3 text-sm transition"
+            :class="returnDestinationStep === 3 ? 'border-brand bg-brand-light/30 font-bold' : 'border-sage-border bg-white hover:bg-sage-light/20'"
+          >
+            <div class="flex items-center gap-2">
+              <input type="radio" v-model="returnDestinationStep" :value="3" class="text-brand focus:ring-brand" />
+              <span>Etapa 3</span>
+            </div>
+            <span class="mt-1 text-xs text-sage-muted">Simulação e Orçamento</span>
+          </label>
+        </div>
+
+        <div class="pt-2">
+          <label for="return-proposal-reason" class="block text-xs font-bold uppercase tracking-wider text-sage-muted">
+            Justificativa formal de devolução <span class="text-danger">*</span>
+          </label>
+          <textarea
+            id="return-proposal-reason"
+            v-model="returnReason"
+            rows="3"
+            maxlength="500"
+            placeholder="Descreva detalhadamente o que deve ser corrigido antes da nova submissão..."
+            class="focus-ring mt-1 w-full rounded-xl border border-sage-border p-3 text-sm"
+            :disabled="persistence.working"
+          />
+          <div class="mt-1 flex justify-between text-xs text-sage-muted">
+            <span v-if="returnReasonError" class="font-semibold text-danger-dark">{{ returnReasonError }}</span>
+            <span v-else>Obrigatório para registro de auditoria</span>
+            <span>{{ returnReason.length }}/500</span>
+          </div>
+        </div>
+      </div>
     </CampaignLifecycleDialog>
     <CampaignReinterpretConfirmDialog :open="campaignReinterpretationOpen" @cancel="cancelCampaignReinterpretation" @confirm="confirmCampaignReinterpretation" />
     <CampaignApiRuleReviewDialog :integration="integration" :index="Math.max(0, campaign.propostas.findIndex((p) => p.clientId === integrationState.review?.targetId))" @confirm="applyIntegrationReview" />
@@ -268,6 +344,40 @@ const {
 } = useCampaignProposalFlow({ canEditStep: access.editStep, canWrite: () => access.can('editCampaign'), canSave: () => access.can('saveCampaign'), canStartProposal: () => access.can('createCampaign') })
 const feedback = createCampaignActionFeedback(useNotificationStore())
 const canApproveCode = computed(() => access.can('approveCode'))
+const canReturnProposal = computed(() => access.can('returnProposal'))
+const canActivateCampaign = computed(() => access.can('activateCampaign'))
+const returnModalOpen = ref(false)
+const returnDestinationStep = ref(1)
+const returnReason = ref('')
+const returnReasonError = ref('')
+
+function openReturnModal() {
+  returnDestinationStep.value = 1
+  returnReason.value = ''
+  returnReasonError.value = ''
+  returnModalOpen.value = true
+}
+
+async function confirmReturnProposal() {
+  if (!returnReason.value.trim()) {
+    returnReasonError.value = 'A justificativa formal de devolução é obrigatória.'
+    return
+  }
+  returnReasonError.value = ''
+  const stepDest = Number(returnDestinationStep.value)
+  const success = await feedback('returnProposal', () => lifecycle.returnProposal({
+    etapaDestino: stepDest,
+    motivo: returnReason.value.trim()
+  }), {
+    error: () => persistence.error,
+    successMessage: () => persistence.notice
+  })
+  if (success) {
+    returnModalOpen.value = false
+    const stepKeys = { 1: 'dados', 2: 'propostas', 3: 'simulacao' }
+    await navigateTo(stepKeys[stepDest] || 'dados')
+  }
+}
 
 function formatCurrency(val) {
   if (val == null || val === '') return 'R$ 0,00'

@@ -23,6 +23,7 @@ export function createCampaignLifecycleApi(http = api) {
     async getCodeApproval(id) { return (await http.get(`/campanhas/${id}/aprovacao-codigo`, config)).data },
     async forwardToManager(id, payload = {}) { return (await http.post(`/campanhas/${id}/encaminhar-gerente`, payload, config)).data },
     async compareVersions(id, versaoBase, versaoComparada) { return (await http.get(`/campanhas/${id}/versoes/comparacao`, { ...config, params: { versaoBase, versaoComparada } })).data },
-    async updateBudget(id, payload) { return (await http.patch(`/campanhas/${id}/orcamento`, payload, config)).data }
+    async updateBudget(id, payload) { return (await http.patch(`/campanhas/${id}/orcamento`, payload, config)).data },
+    async returnProposal(id, payload) { return (await http.post(`/campanhas/${id}/devolver`, payload, config)).data }
   }
 }

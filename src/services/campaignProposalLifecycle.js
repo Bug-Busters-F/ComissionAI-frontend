@@ -361,6 +361,40 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     }
   }
 
+  async function returnProposal({ etapaDestino = 1, motivo = '' } = {}) {
+    if (!state.id || !api.returnProposal) return false
+    const destinoNum = Number(etapaDestino)
+    if (!Number.isInteger(destinoNum) || destinoNum < 1 || destinoNum > 3) {
+      state.error = 'A etapa de destino da devolução deve ser entre 1 e 3.'
+      return false
+    }
+    const motivoLimpo = String(motivo || '').trim()
+    if (!motivoLimpo) {
+      state.error = 'A justificativa formal de devolução é obrigatória.'
+      return false
+    }
+    state.working = true; state.error = ''
+    try {
+      const raw = await api.returnProposal(state.id, {
+        etapaDestino: destinoNum,
+        motivo: motivoLimpo
+      })
+      if (raw && raw.id) {
+        applySaved(raw, campaign)
+      }
+      state.encaminhadaGerente = false
+      state.ultimaEtapa = destinoNum
+      state.notice = `Proposta devolvida com sucesso para a Etapa ${destinoNum}.`
+      return true
+    } catch (error) {
+      state.error = message(error)
+      if (error?.response?.status === 409) state.remoteChanged = true
+      return false
+    } finally {
+      state.working = false
+    }
+  }
+
   async function forwardToManager() {
     if (!state.id || !api.forwardToManager) return false
     if (!isBudgetWithinLimit.value) {
@@ -385,7 +419,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
   return {
     state, simulation, cancelProposal, dirty, busy, readOnly, currentSimulation,
     canReview, canActivate, isCodeApproved, isBudgetWithinLimit,
-    loadCodeApproval, approveCode, rejectCode, forwardToManager,
+    loadCodeApproval, approveCode, rejectCode, forwardToManager, returnProposal,
     load, save, recordProgress, loadCompetences, selectCompetence, runSimulation,
     changePage, accept, activate,
     dispose() { disposed = true; ++requestSequence; ++referenceSequence; ++pageSequence }

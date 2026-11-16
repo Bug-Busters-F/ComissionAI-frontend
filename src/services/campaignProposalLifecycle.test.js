@@ -372,4 +372,48 @@ describe('governance, budget limits and code approval ([FRONT-9])', () => {
     expect(s.flow.state.codeApproval.statusAprovacaoCodigo).toBe('REJEITADO')
     s.scope.stop()
   })
+
+  it('validates returnProposal input, submits payload and applies returned backend state', async () => {
+    let s
+    s = setup({
+      returnProposal: vi.fn(async (id, payload) => ({
+        ...savedResponse(s.campaign),
+        id,
+        ultimaEtapa: payload.etapaDestino,
+        revisaoControle: 45,
+        encaminhadaGerente: false
+      }))
+    })
+    await ready(s)
+
+    // Blank reason rejected
+    expect(await s.flow.returnProposal({ etapaDestino: 1, motivo: '   ' })).toBe(false)
+    expect(s.flow.state.error).toContain('A justificativa formal de devolução é obrigatória')
+    expect(s.api.returnProposal).not.toHaveBeenCalled()
+
+    // Invalid stage rejected
+    expect(await s.flow.returnProposal({ etapaDestino: 4, motivo: 'Inválido' })).toBe(false)
+    expect(s.flow.state.error).toContain('A etapa de destino da devolução deve ser entre 1 e 3')
+
+    // Successful return to stage 1
+    s.flow.state.encaminhadaGerente = true
+    const ok = await s.flow.returnProposal({ etapaDestino: 1, motivo: 'Ajustar limites da regra 2' })
+    expect(ok).toBe(true)
+    expect(s.api.returnProposal).toHaveBeenCalledWith(42, {
+      etapaDestino: 1,
+      motivo: 'Ajustar limites da regra 2'
+    })
+    expect(s.flow.state.ultimaEtapa).toBe(1)
+    expect(s.flow.state.revisaoControle).toBe(45)
+    expect(s.flow.state.encaminhadaGerente).toBe(false)
+    expect(s.flow.state.notice).toContain('Proposta devolvida com sucesso para a Etapa 1')
+
+    // Concurrency conflict (409) handling
+    s.api.returnProposal.mockRejectedValueOnce({
+      response: { status: 409, data: { message: 'Conflito de versão' } }
+    })
+    expect(await s.flow.returnProposal({ etapaDestino: 2, motivo: 'Ajuste técnico' })).toBe(false)
+    expect(s.flow.state.remoteChanged).toBe(true)
+    s.scope.stop()
+  })
 })
