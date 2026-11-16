@@ -12,7 +12,7 @@ export class CampaignProposalIntegrationUnavailableError extends Error {
 
 function defaultMode() {
   const configured = import.meta.env?.VITE_CAMPAIGN_PROPOSALS_MODE
-  return ['manual', 'demo', 'api'].includes(configured) ? configured : 'manual'
+  return ['manual', 'demo', 'api'].includes(configured) ? configured : 'api'
 }
 
 function unavailable(action) {
