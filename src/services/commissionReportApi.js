@@ -37,42 +37,75 @@ export function isCompetenceClosed(statusPayload) {
  * @returns {Array}
  */
 export function mergeCollaboratorReport(porColaborador = [], totaisPorColaborador = []) {
-  if (!Array.isArray(porColaborador)) return []
-  const namesByMatricula = new Map()
+  // Resiliência: detecta se os parâmetros foram invertidos
+  let detailed = Array.isArray(porColaborador) ? porColaborador : []
+  let totals = Array.isArray(totaisPorColaborador) ? totaisPorColaborador : []
 
-  if (Array.isArray(totaisPorColaborador)) {
-    for (const item of totaisPorColaborador) {
-      if (item && item.matricula && item.nomeColaborador) {
-        namesByMatricula.set(String(item.matricula).trim(), String(item.nomeColaborador).trim())
-      }
+  if (detailed.length > 0 && detailed[0]?.nomeColaborador && totals.length > 0 && !totals[0]?.nomeColaborador) {
+    const temp = detailed
+    detailed = totals
+    totals = temp
+  }
+
+  const namesByMatricula = new Map()
+  for (const item of totals) {
+    if (item && item.matricula && item.nomeColaborador) {
+      namesByMatricula.set(String(item.matricula).trim(), String(item.nomeColaborador).trim())
     }
   }
 
-  return porColaborador.map((c, index) => {
-    const matricula = String(c.matricula || '').trim()
-    const nomeColaborador = namesByMatricula.get(matricula) || (matricula ? `Colaborador ${matricula}` : `Colaborador #${index + 1}`)
-    const valorTotalAPagar = c.valorTotalAPagar !== null && c.valorTotalAPagar !== undefined
-      ? Number(c.valorTotalAPagar)
-      : null
+  // Se porColaborador tiver registros detalhados, usa como fonte principal
+  if (detailed.length > 0) {
+    return detailed.map((c, index) => {
+      const matricula = String(c.matricula || '').trim()
+      const nomeColaborador = namesByMatricula.get(matricula) || (matricula ? `Colaborador ${matricula}` : `Colaborador #${index + 1}`)
+      const valorTotalAPagar = c.valorTotalAPagar !== null && c.valorTotalAPagar !== undefined
+        ? Number(c.valorTotalAPagar)
+        : null
 
+      return {
+        matricula,
+        nomeColaborador,
+        codCargo: c.codCargo ?? null,
+        cargo: c.nomeCargo || (c.codCargo != null ? `Cargo ${c.codCargo}` : 'Cargo não informado'),
+        codLoja: c.codLoja ?? null,
+        loja: c.nomeLoja || (c.codLoja != null ? `Loja ${c.codLoja}` : 'Loja não informada'),
+        codMarca: c.codMarca ?? null,
+        marca: c.nomeMarca || (c.codMarca != null ? `Marca ${c.codMarca}` : 'Marca não informada'),
+        quantidadeVendas: Number(c.quantidadeVendas) || 0,
+        valorTotalVendas: Number(c.valorTotalVendas) || 0,
+        valorTotalComissao: Number(c.valorTotalComissao) || 0,
+        valorTotalBonusPercentual: Number(c.valorTotalBonusPercentual) || 0,
+        valorTotalBonusFixo: Number(c.valorTotalBonusFixo) || 0,
+        valorTotalBonus: Number(c.valorTotalBonus) || 0,
+        valorTotalAPagar,
+        taxaMediaEfetiva: Number(c.taxaMediaEfetiva) || 0,
+        rowKey: `${matricula || 'sem-mat'}-${c.codLoja ?? '0'}-${c.codCargo ?? '0'}-${index}`
+      }
+    })
+  }
+
+  // Fallback caso apenas totaisPorColaborador venha preenchido
+  return totals.map((t, index) => {
+    const matricula = String(t.matricula || '').trim()
     return {
       matricula,
-      nomeColaborador,
-      codCargo: c.codCargo ?? null,
-      cargo: c.nomeCargo || (c.codCargo != null ? `Cargo ${c.codCargo}` : 'Cargo não informado'),
-      codLoja: c.codLoja ?? null,
-      loja: c.nomeLoja || (c.codLoja != null ? `Loja ${c.codLoja}` : 'Loja não informada'),
-      codMarca: c.codMarca ?? null,
-      marca: c.nomeMarca || (c.codMarca != null ? `Marca ${c.codMarca}` : 'Marca não informada'),
-      quantidadeVendas: Number(c.quantidadeVendas) || 0,
-      valorTotalVendas: Number(c.valorTotalVendas) || 0,
-      valorTotalComissao: Number(c.valorTotalComissao) || 0,
-      valorTotalBonusPercentual: Number(c.valorTotalBonusPercentual) || 0,
-      valorTotalBonusFixo: Number(c.valorTotalBonusFixo) || 0,
-      valorTotalBonus: Number(c.valorTotalBonus) || 0,
-      valorTotalAPagar,
-      taxaMediaEfetiva: Number(c.taxaMediaEfetiva) || 0,
-      rowKey: `${matricula || 'sem-mat'}-${c.codLoja ?? '0'}-${c.codCargo ?? '0'}-${index}`
+      nomeColaborador: t.nomeColaborador || (matricula ? `Colaborador ${matricula}` : `Colaborador #${index + 1}`),
+      codCargo: t.codCargo ?? null,
+      cargo: t.cargo || (t.codCargo != null ? `Cargo ${t.codCargo}` : 'Cargo não informado'),
+      codLoja: t.codLoja ?? null,
+      loja: t.loja || (t.codLoja != null ? `Loja ${t.codLoja}` : 'Loja não informada'),
+      codMarca: t.codMarca ?? null,
+      marca: t.marca || 'Marca não informada',
+      quantidadeVendas: Number(t.quantidadeVendas) || 0,
+      valorTotalVendas: Number(t.valorTotalVendas) || 0,
+      valorTotalComissao: Number(t.valorTotalComissao) || 0,
+      valorTotalBonusPercentual: 0,
+      valorTotalBonusFixo: 0,
+      valorTotalBonus: 0,
+      valorTotalAPagar: Number(t.valorTotalComissao) || 0,
+      taxaMediaEfetiva: 0,
+      rowKey: `${matricula || 'sem-mat'}-${t.codLoja ?? '0'}-${t.codCargo ?? '0'}-${index}`
     }
   })
 }
@@ -168,4 +201,7 @@ export function createCommissionReportApi(httpClient = api) {
 }
 
 export const commissionReportApi = createCommissionReportApi()
+export const getCompetenceClosingStatus = (...args) => commissionReportApi.getCompetenceClosingStatus(...args)
+export const getConsolidatedReport = (...args) => commissionReportApi.getConsolidatedReport(...args)
+export const exportReportCsv = (...args) => commissionReportApi.exportReportCsv(...args)
 export default commissionReportApi
