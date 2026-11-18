@@ -76,6 +76,22 @@ export function createStatisticalAlertsApi(http = defaultHttp) {
         hasNewCases48h,
         latestAlert
       }
+    },
+
+    /**
+     * Solicita o reprocessamento de anomalias para um lote de preparação efetivado.
+     * Conforme SoD e SecurityConfig.java:42, restrito a ADMIN e GERENTE.
+     * Dispara POST para /api/v1/alertas-estatisticos/reprocessar com { lotePreparacaoId } no corpo.
+     *
+     * @param {string} loteId
+     * @returns {Promise<Object>}
+     */
+    async reprocessLote(loteId) {
+      if (!loteId) throw new Error('Identificador do lote de preparação é obrigatório.')
+      const res = await http.post('/alertas-estatisticos/reprocessar', {
+        lotePreparacaoId: loteId
+      })
+      return res.data
     }
   }
 }

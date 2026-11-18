@@ -73,4 +73,23 @@ describe('statisticalAlertsApi — Cliente de Alertas Estatísticos (FRONT-6)', 
     expect(check.hasNewCases48h).toBe(true)
     expect(check.latestAlert?.id).toBe(1)
   })
+
+  it('reprocessLote dispara POST para /alertas-estatisticos/reprocessar com lotePreparacaoId no body', async () => {
+    const mockHttp = {
+      post: vi.fn().mockResolvedValue({ data: { success: true } })
+    }
+
+    const api = createStatisticalAlertsApi(mockHttp)
+    const res = await api.reprocessLote('uuid-lote-123')
+
+    expect(mockHttp.post).toHaveBeenCalledWith('/alertas-estatisticos/reprocessar', {
+      lotePreparacaoId: 'uuid-lote-123'
+    })
+    expect(res.success).toBe(true)
+  })
+
+  it('reprocessLote rejeita chamada sem identificador', async () => {
+    const api = createStatisticalAlertsApi({})
+    await expect(api.reprocessLote('')).rejects.toThrow('Identificador do lote')
+  })
 })

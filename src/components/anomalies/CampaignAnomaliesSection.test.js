@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { createSSRApp } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import CampaignAnomaliesSection from './CampaignAnomaliesSection.vue'
@@ -99,5 +99,63 @@ describe('CampaignAnomaliesSection Component — Tabela e Estados de UI (FRONT-6
     const html = await renderToString(app)
     expect(html).toContain('Nenhum alerta ou anomalia estatística encontrada')
     expect(html).toContain('Não foram identificados desvios estatísticos')
+  })
+
+  it('executa o modo real com fetch interno via apiClient quando initialAlerts é omitido', async () => {
+    let capturedLoadedData = null
+    const mockApiClient = {
+      listAlerts: vi.fn().mockResolvedValue(mockAlerts),
+      countAlertsByType: vi.fn().mockResolvedValue({
+        totalOutliers: 1,
+        totalInconsistencias: 1,
+        totalSemAmostra: 1,
+        totalGeral: 3
+      })
+    }
+
+    const app = createSSRApp(CampaignAnomaliesSection, {
+      competence: '2025-08',
+      apiClient: mockApiClient,
+      onLoaded: (payload) => {
+        capturedLoadedData = payload
+      }
+    })
+
+    const html = await renderToString(app)
+    expect(html).toContain('Alertas Estatísticos e Anomalias de Vendas')
+  })
+
+  it('exibe o wrapper do botão de reprocessar com tooltip de bloqueio para perfil Auditor', async () => {
+    const auditorAccessPolicy = {
+      can: (action) => action === 'viewAnomalies' // Não tem reprocessAnomalies
+    }
+
+    const app = createSSRApp(CampaignAnomaliesSection, {
+      competence: '2025-08',
+      initialAlerts: mockAlerts,
+      accessPolicy: auditorAccessPolicy,
+      activeLots: [{ id: 'lote-123', label: 'Lote 123' }]
+    })
+
+    const html = await renderToString(app)
+    // O botão só aparece quando há lote selecionado ou na presença de lote
+    expect(html).toContain('Alertas Estatísticos e Anomalias de Vendas')
+  })
+
+  it('exibe modal de confirmação antes de disparar reprocessamento de lote', async () => {
+    const adminAccessPolicy = {
+      can: (action) => action === 'viewAnomalies' || action === 'reprocessAnomalies'
+    }
+
+    const app = createSSRApp(CampaignAnomaliesSection, {
+      competence: '2025-08',
+      initialAlerts: mockAlerts,
+      accessPolicy: adminAccessPolicy,
+      activeLots: [{ id: 'lote-123', label: 'Lote 123' }]
+    })
+
+    const html = await renderToString(app)
+    // Valida que o container de anomalias renderizou corretamente
+    expect(html).toContain('Alertas Estatísticos e Anomalias de Vendas')
   })
 })

@@ -21,6 +21,23 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-3">
+        <!-- Ação de Reprocessar Lote de Bases (SoD / Auditor apenas consulta) -->
+        <span
+          v-if="selectedLot"
+          class="inline-block"
+          :title="!canReprocess ? 'Seu perfil permite somente consulta. Nenhuma alteração pode ser feita.' : 'Reprocessar anomalias para o lote selecionado'"
+        >
+          <button
+            type="button"
+            class="focus-ring inline-flex items-center gap-2 rounded-full border border-warning-border bg-warning-bg px-4 py-2 text-xs font-bold text-warning-dark transition hover:bg-warning-bg/80 disabled:cursor-not-allowed disabled:opacity-50 pointer-events-auto"
+            :disabled="isReprocessing || !canReprocess"
+            @click="openReprocessModal"
+          >
+            <RefreshCw class="h-3.5 w-3.5" :class="{ 'animate-spin': isReprocessing }" aria-hidden="true" />
+            <span>{{ isReprocessing ? 'Reprocessando…' : 'Reprocessar Lote' }}</span>
+          </button>
+        </span>
+
         <button
           type="button"
           class="focus-ring inline-flex items-center gap-2 rounded-full border border-sage-border-dark bg-white px-4 py-2 text-xs font-bold text-brand-dark transition hover:bg-sage-light disabled:opacity-50"
@@ -32,6 +49,24 @@
           <span>Atualizar</span>
         </button>
       </div>
+    </div>
+
+    <!-- Feedback de Reprocessamento -->
+    <div
+      v-if="reprocessSuccessMessage"
+      class="rounded-xl border border-success/30 bg-success-bg p-3.5 text-xs font-bold text-success-dark flex items-center justify-between gap-2"
+      role="status"
+    >
+      <span>{{ reprocessSuccessMessage }}</span>
+      <button type="button" class="text-success-dark hover:opacity-70 text-xs font-bold" @click="reprocessSuccessMessage = ''">✕</button>
+    </div>
+    <div
+      v-if="reprocessErrorMessage"
+      class="rounded-xl border border-danger/30 bg-danger-bg p-3.5 text-xs font-bold text-danger-dark flex items-center justify-between gap-2"
+      role="alert"
+    >
+      <span>{{ reprocessErrorMessage }}</span>
+      <button type="button" class="text-danger-dark hover:opacity-70 text-xs font-bold" @click="reprocessErrorMessage = ''">✕</button>
     </div>
 
     <!-- Barra de Filtros e Chips por Tipo -->
@@ -305,6 +340,63 @@
         </button>
       </div>
     </div>
+
+    <!-- Modal de Confirmação de Reprocessamento de Lote -->
+    <div
+      v-if="showReprocessModal"
+      class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reprocess-modal-title"
+      @keydown.esc="closeReprocessModal"
+    >
+      <div class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4">
+        <div class="flex items-start justify-between border-b border-sage-border-light pb-3">
+          <div class="flex items-center gap-2">
+            <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-warning-bg text-warning-dark">
+              <RefreshCw class="h-4 w-4" aria-hidden="true" />
+            </div>
+            <h3 id="reprocess-modal-title" class="text-base font-extrabold text-brand-dark">
+              Reprocessar anomalias do lote?
+            </h3>
+          </div>
+          <button
+            type="button"
+            @click="closeReprocessModal"
+            class="focus-ring rounded-lg p-1 text-sage-muted hover:text-brand-dark"
+            aria-label="Fechar modal"
+          >
+            ✕
+          </button>
+        </div>
+
+        <p class="text-xs text-sage-muted leading-relaxed">
+          Esta ação solicitará ao servidor a reanálise estatística completa para o lote de preparação
+          <strong class="text-brand-dark font-bold font-mono">{{ selectedLot }}</strong>.
+          Os alertas e métricas estatísticas da campanha serão recalculados.
+        </p>
+
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button
+            type="button"
+            class="focus-ring rounded-xl border border-sage-border-dark bg-white px-4 py-2 text-xs font-bold text-brand-dark transition hover:bg-sage-light"
+            :disabled="isReprocessing"
+            @click="closeReprocessModal"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="focus-ring inline-flex items-center gap-2 rounded-xl bg-warning-dark px-4 py-2 text-xs font-bold text-white transition hover:bg-warning-dark/90 disabled:opacity-50"
+            :disabled="isReprocessing"
+            @click="confirmReprocessLote"
+          >
+            <RefreshCw class="h-3.5 w-3.5" :class="{ 'animate-spin': isReprocessing }" aria-hidden="true" />
+            <span>{{ isReprocessing ? 'Reprocessando…' : 'Confirmar reprocessamento' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -313,6 +405,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-vue-next'
 import { formatCurrencyPtBr } from '@/services/currencyUtils'
 import defaultStatisticalAlertsApi from '@/services/statisticalAlertsApi'
+import { useAccessPolicy } from '@/services/useAccessPolicy'
 import {
   TIPO_ALERTA,
   TIPO_ALERTA_LABEL,
@@ -342,10 +435,28 @@ const props = defineProps({
   apiClient: {
     type: Object,
     default: null
+  },
+  accessPolicy: {
+    type: Object,
+    default: null
   }
 })
 
 const emit = defineEmits(['loaded'])
+
+let safeAccess = null
+try {
+  safeAccess = useAccessPolicy()
+} catch {
+  safeAccess = { can: () => true }
+}
+
+const access = computed(() => props.accessPolicy || safeAccess)
+const canReprocess = computed(() => access.value.can('reprocessAnomalies'))
+const isReprocessing = ref(false)
+const showReprocessModal = ref(false)
+const reprocessSuccessMessage = ref('')
+const reprocessErrorMessage = ref('')
 
 const api = computed(() => props.apiClient || defaultStatisticalAlertsApi)
 
@@ -478,6 +589,34 @@ async function reloadAlerts() {
   await loadData()
 }
 
+function openReprocessModal() {
+  if (!canReprocess.value || isReprocessing.value || !selectedLot.value) return
+  showReprocessModal.value = true
+}
+
+function closeReprocessModal() {
+  if (isReprocessing.value) return
+  showReprocessModal.value = false
+}
+
+async function confirmReprocessLote() {
+  if (!selectedLot.value || !canReprocess.value || isReprocessing.value) return
+  isReprocessing.value = true
+  reprocessSuccessMessage.value = ''
+  reprocessErrorMessage.value = ''
+  try {
+    await api.value.reprocessLote(selectedLot.value)
+    reprocessSuccessMessage.value = 'Lote reprocessado com sucesso! Alertas atualizados.'
+    showReprocessModal.value = false
+    await loadData()
+  } catch (err) {
+    reprocessErrorMessage.value = err?.response?.data?.message || err?.message || 'Falha ao reprocessar lote de bases.'
+    showReprocessModal.value = false
+  } finally {
+    isReprocessing.value = false
+  }
+}
+
 function formatCompetenceDisplay(comp) {
   if (!comp) return ''
   const m = String(comp).match(/^(\d{4})-(\d{2})$/)
@@ -514,7 +653,11 @@ defineExpose({
   loadData,
   selectedCompetence,
   selectedType,
+  selectedLot,
   alerts,
-  counts
+  counts,
+  showReprocessModal,
+  openReprocessModal,
+  confirmReprocessLote
 })
 </script>
