@@ -34,7 +34,24 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
   let progressQueue = Promise.resolve()
   const rulesReady = computed(() => validateCampaignProposalSet(campaign).canAdvanceLocally && campaign.propostas.every((p) => ruleArtifactsCurrent(p, campaign)))
   const currentSimulation = computed(() => Boolean(rulesReady.value && simulation.result && simulationFingerprint === fingerprint.value && !dirty.value && simulation.result.competencia === simulation.selectedCompetencia))
-  const canReview = computed(() => !busy.value && !processing() && !state.remoteChanged && currentSimulation.value && simulation.accepted && state.readiness?.aptaParaAtivacao === true)
+
+  function hasSimulationBlockers(readiness) {
+    if (!readiness || !Array.isArray(readiness.divergencias)) return false
+    return readiness.divergencias.some((d) =>
+      !d.includes('código Python') &&
+      !d.includes('Analista de Código') &&
+      !d.includes('encaminhada ao gerente')
+    )
+  }
+
+  function isSimulationAccepted(readiness, expectedId) {
+    if (!readiness || !expectedId) return false
+    if (String(readiness.simulacaoId) !== String(expectedId)) return false
+    if (readiness.aptaParaAtivacao === true) return true
+    return readiness.statusAceite === 'ACEITA' && !hasSimulationBlockers(readiness)
+  }
+
+  const canReview = computed(() => !busy.value && !processing() && !state.remoteChanged && currentSimulation.value && simulation.accepted && isSimulationAccepted(state.readiness, simulation.result?.id))
 
   const isCodeApproved = computed(() => {
     if (!state.codeApproval) return true
@@ -153,7 +170,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
           simulation.result = simulationViewModel(savedSimulation); simulation.executionId = savedSimulation.id
           simulation.totalItems = savedSimulation.totalVendasRecortadas; simulation.totalPages = Math.max(1, Math.ceil(simulation.totalItems / simulation.pageSize))
           simulationFingerprint = fingerprint.value
-          state.readiness = readiness; simulation.accepted = readiness.aptaParaAtivacao === true && String(readiness.simulacaoId) === String(savedSimulation.id)
+          state.readiness = readiness; simulation.accepted = isSimulationAccepted(readiness, savedSimulation.id)
           simulation.acceptance = { aceitoPor: readiness.aceitoPor, aceitoEm: readiness.dataAceite, protocolo: readiness.protocoloSimulacao }
           simulation.status = 'CONCLUIDA'; simulation.progress = 100
           await changePage(1)
@@ -281,10 +298,13 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
       if (!await verifySavedVersion({ acceptanceId: id })) return false
       if (disposed || before !== fingerprint.value || simulation.result?.id !== id || competence !== simulation.selectedCompetencia) return false
       state.readiness = readiness
-      simulation.accepted = readiness.aptaParaAtivacao === true && String(readiness.simulacaoId) === String(id)
+      simulation.accepted = isSimulationAccepted(readiness, id)
       simulation.acceptance = accepted
       simulation.acceptOpen = false
-      if (!simulation.accepted) throw new Error(readiness.mensagem || 'O backend apontou divergências no aceite. Confira os bloqueios.')
+      if (!simulation.accepted) {
+        const blocker = (readiness.divergencias || []).find((d) => !d.includes('código Python') && !d.includes('Analista de Código') && !d.includes('encaminhada ao gerente'))
+        throw new Error(blocker || readiness.mensagem || 'O backend apontou divergências no aceite. Confira os bloqueios.')
+      }
       return true
     } catch (error) { simulation.accepted = false; simulation.error = message(error); return false } finally { state.working = false }
   }
