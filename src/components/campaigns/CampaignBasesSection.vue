@@ -517,7 +517,7 @@ const props = defineProps({
   campaignsList: { type: Array, default: () => [] }
 })
 
-const emit = defineEmits(['competence-selected', 'base-associated', 'base-uploaded'])
+const emit = defineEmits(['competence-selected', 'base-associated', 'base-uploaded', 'base-effective'])
 
 const authStore = useSafeAuthStore()
 const pageError = ref('')
@@ -723,6 +723,7 @@ function onBatchCommitted() {
   carregarAnexos()
   carregarCompetencias()
   emit('base-uploaded')
+  emit('base-effective')
 }
 
 async function executarUploadCiclo() {

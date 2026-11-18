@@ -50,6 +50,14 @@
       <CampaignBasesSection
         v-if="!isDemo && campaign?.id"
         :campanha-id="campaign.id"
+        @base-effective="handleBaseEffective"
+      />
+
+      <!-- Seção de Alertas Estatísticos e Anomalias de Vendas ([FRONT-6]) -->
+      <CampaignAnomaliesSection
+        v-if="!isDemo && campaign?.id && access.can('viewAnomalies')"
+        ref="anomaliesSectionRef"
+        :campaign="campaign"
       />
 
       <section class="rounded-[22px] bg-white p-6 sm:p-7 text-sm">
@@ -80,6 +88,7 @@ import { Lock, Info } from 'lucide-vue-next'
 import CampaignDeleteDialog from '@/components/common/CampaignDeleteDialog.vue'
 import CampaignProposalReviewSummary from '@/components/campaigns/CampaignProposalReviewSummary.vue'
 import CampaignBasesSection from '@/components/campaigns/CampaignBasesSection.vue'
+import CampaignAnomaliesSection from '@/components/anomalies/CampaignAnomaliesSection.vue'
 import { persistedCampaignToProposal } from '@/services/campaignProposalPersistence'
 import { validateCampaignProposalSet } from '@/services/campaignProposalValidation'
 import CampaignSummary from '@/components/common/CampaignSummary.vue'
@@ -105,6 +114,11 @@ const isClosingStatusRestricted = ref(false)
 const hasClosedCompetenceInVigencia = computed(() => closedCompetencesInVigencia.value.length > 0)
 const proposalCampaign = computed(() => campaign.value && !isDemo ? persistedCampaignToProposal(campaign.value) : null)
 const proposalValidation = computed(() => proposalCampaign.value ? validateCampaignProposalSet(proposalCampaign.value) : null)
+const anomaliesSectionRef = ref(null)
+
+function handleBaseEffective() {
+  anomaliesSectionRef.value?.reloadAlerts()
+}
 function dateTime(value) {
   if (!value) return 'Não informado'
   const date = new Date(value)
