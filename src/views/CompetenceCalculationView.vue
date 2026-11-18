@@ -16,7 +16,8 @@
         <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">Competência selecionada</p>
         <h2 class="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-brand-dark">{{ formatCompetenceCode(competenceKey) }}</h2>
         <p class="mt-2 text-sm text-sage-muted">
-          <template v-if="salesQueryState === SALES_QUERY_STATE.SUCCESS">{{ salesCount }} vendas cadastradas no período.</template>
+          <template v-if="isClosedCompetence">Competência lacrada e liquidada contabilmente.</template>
+          <template v-else-if="salesQueryState === SALES_QUERY_STATE.SUCCESS">{{ salesCount }} vendas cadastradas no período.</template>
           <template v-else-if="salesQueryState === SALES_QUERY_STATE.LOADING">Consultando as vendas cadastradas…</template>
           <template v-else-if="salesQueryState === SALES_QUERY_STATE.ERROR">Não foi possível consultar as vendas.</template>
           <template v-else>Competência não validada.</template>
@@ -24,10 +25,11 @@
       </div>
       <div class="flex flex-wrap items-center gap-3">
         <button
+          v-if="access.can('calculate') && !isClosedCompetence"
           type="button"
           class="focus-ring inline-flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="!canCalculate || closingStatusData.bloqueada"
-          v-if="access.can('calculate')" @click="handleCalculation"
+          @click="handleCalculation"
         >
           <RefreshCw v-if="isCalculating" class="h-4 w-4 animate-spin" aria-hidden="true" />
           <span>{{ isCalculating ? (recalculationRequested ? 'Recalculando…' : 'Calculando…') : hasPreviousCalculation ? 'Recalcular e conferir' : 'Calcular comissões' }}</span>
@@ -37,9 +39,9 @@
 
     <!-- Card de Fechamento Contábil e Liquidação ([FRONT-10]) -->
     <CompetenceClosingStatusCard
-      v-if="competenceKey"
+      v-if="competenceKey && effectiveClosingStatusData"
       :competencia="competenceKey"
-      :status-data="closingStatusData"
+      :status-data="effectiveClosingStatusData"
       :is-checking-status="isCheckingClosingStatus"
       :is-recalculating="isCalculating && recalculationRequested"
       :can-execute-closing="canExecuteClosing"
@@ -59,7 +61,7 @@
       <p class="mt-2 text-sm leading-6 text-danger-dark/80">Informe uma competência válida no formato MM/AAAA, com mês entre 01 e 12.</p>
     </section>
 
-    <section v-else-if="salesQueryState === SALES_QUERY_STATE.LOADING" class="rounded-2xl border border-sage-border bg-white p-6" role="status" aria-live="polite">
+    <section v-else-if="!isClosedCompetence && salesQueryState === SALES_QUERY_STATE.LOADING" class="rounded-2xl border border-sage-border bg-white p-6" role="status" aria-live="polite">
       <div class="flex items-center gap-3">
         <RefreshCw class="h-5 w-5 animate-spin text-sage-muted" aria-hidden="true" />
         <div>
@@ -69,7 +71,7 @@
       </div>
     </section>
 
-    <section v-else-if="salesQueryState === SALES_QUERY_STATE.ERROR" class="rounded-2xl border border-danger/30 bg-danger-bg p-6" role="alert">
+    <section v-else-if="!isClosedCompetence && salesQueryState === SALES_QUERY_STATE.ERROR" class="rounded-2xl border border-danger/30 bg-danger-bg p-6" role="alert">
       <h2 class="text-xl font-extrabold text-danger-dark">Não foi possível consultar as vendas</h2>
       <p class="mt-2 text-sm leading-6 text-danger-dark/80">{{ salesQueryError }}</p>
       <button type="button" class="focus-ring mt-5 rounded-full bg-danger px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60" :disabled="isCalculating" @click="retrySalesQuery">
@@ -77,7 +79,7 @@
       </button>
     </section>
 
-    <section v-else-if="salesQueryState === SALES_QUERY_STATE.SUCCESS && salesCount === 0" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
+    <section v-else-if="!isClosedCompetence && salesQueryState === SALES_QUERY_STATE.SUCCESS && salesCount === 0" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
       <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
       <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência. O cálculo permanece indisponível.</p>
     </section>
@@ -221,120 +223,246 @@
         @recalculate="handleMissingBasesRecalculate"
       />
 
-      <section v-if="result.resultados.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="calculated-sales-heading">
-        <div class="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h2 id="calculated-sales-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Vendas calculadas</h2>
-            <p class="mt-1 text-sm text-sage-muted">Valores e taxas retornados pelo motor de cálculo.</p>
-          </div>
-          <div class="flex flex-wrap gap-3">
-            <label class="sr-only" for="calculation-registration-filter">Filtrar por matrícula</label>
-            <input id="calculation-registration-filter" v-model="matriculaFilter" type="search" class="campaign-control max-w-[220px]" placeholder="Filtrar matrícula" />
-            <label class="sr-only" for="calculation-origin-filter">Filtrar por origem da taxa</label>
-            <select id="calculation-origin-filter" v-model="originFilter" class="campaign-control max-w-[220px]">
-              <option value="">Todas as origens</option>
-              <option v-for="origin in originOptions" :key="origin" :value="origin">{{ formatOrigin(origin) }}</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="mt-6 overflow-x-auto">
-          <table class="w-full min-w-[920px] text-left text-sm">
-            <thead class="bg-sage-pill text-[10px] uppercase tracking-[0.12em] text-sage-muted">
-              <tr>
-                <th class="rounded-l-xl px-3 py-3">Venda</th>
-                <th class="px-3 py-3">Matrícula</th>
-                <th class="px-3 py-3">Data</th>
-                <th class="px-3 py-3">Valor da venda</th>
-                <th class="px-3 py-3">Taxa aplicada</th>
-                <th class="px-3 py-3">Origem</th>
-                <th class="px-3 py-3">Comissão</th>
-                <th class="rounded-r-xl px-3 py-3">Detalhes</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-sage-border-light">
-              <tr v-for="sale in paginatedResults" :key="sale.idVenda || sale.protocoloCalculo">
-                <td class="px-3 py-4 font-semibold text-brand-dark">{{ shortId(sale.idVenda) }}</td>
-                <td class="px-3 py-4 text-sage-subtle">{{ sale.matricula || 'Não informada' }}</td>
-                <td class="px-3 py-4 text-sage-subtle">{{ formatDate(sale.dataVenda) }}</td>
-                <td class="px-3 py-4 font-semibold text-brand-dark">{{ currency(sale.valorVenda) }}</td>
-                <td class="px-3 py-4 text-sage-subtle">{{ percent(sale.taxaAplicada) }}</td>
-                <td class="px-3 py-4"><StatusBadge :label="formatOrigin(sale.origemTaxa)" :tone="sale.origemTaxa === 'REGRA_NEGOCIO' ? 'success' : 'neutral'" /></td>
-                <td class="px-3 py-4 font-extrabold text-brand-dark">{{ currency(sale.valorComissao) }}</td>
-                <td class="px-3 py-4">
-                  <details>
-                    <summary class="cursor-pointer font-bold text-brand-dark">Ver</summary>
-                    <dl class="mt-3 min-w-[210px] space-y-1 text-xs text-sage-muted">
-                      <div><dt class="inline">Protocolo: </dt><dd class="inline break-all">{{ sale.protocoloCalculo || 'Não informado' }}</dd></div>
-                      <div><dt class="inline">Marca: </dt><dd class="inline">{{ sale.codMarca ?? 'Não informada' }}</dd></div>
-                      <div><dt class="inline">Loja: </dt><dd class="inline">{{ sale.codLoja ?? 'Não informada' }}</dd></div>
-                      <div><dt class="inline">Cargo: </dt><dd class="inline">{{ sale.codCargo ?? 'Não informado' }}</dd></div>
-                      <div><dt class="inline">Regra: </dt><dd class="inline">{{ sale.idRegra ?? 'Não informada' }}</dd></div>
-                      <div><dt class="inline">Calculado em: </dt><dd class="inline">{{ formatDateTime(sale.dataCalculo) }}</dd></div>
-                    </dl>
-                  </details>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p v-if="!paginatedResults.length" class="mt-5 rounded-xl bg-sage-light px-4 py-3 text-sm text-sage-muted" role="status">
-          Nenhuma venda corresponde aos filtros selecionados.
-        </p>
-
-        <PaginationControls :page="resultPage" :total-pages="resultTotalPages" @previous="resultPage -= 1" @next="resultPage += 1" />
-      </section>
-
-      <section v-if="cadastralImpediments.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="cadastral-blocked-sales-heading">
-        <div>
-          <h2 id="cadastral-blocked-sales-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Vendas com impedimento cadastral (RH)</h2>
-          <p class="mt-1 text-sm text-sage-muted">Inconsistências em vínculos com colaboradores, ausência de cargo ou datas fora da vigência contratual.</p>
-        </div>
-        <div class="mt-6 overflow-x-auto">
-          <table class="w-full min-w-[720px] text-left text-sm">
-            <thead class="bg-sage-pill text-[10px] uppercase tracking-[0.12em] text-sage-muted">
-              <tr><th class="rounded-l-xl px-3 py-3">Venda</th><th class="px-3 py-3">Matrícula</th><th class="px-3 py-3">Data</th><th class="px-3 py-3">Valor</th><th class="rounded-r-xl px-3 py-3">Motivo</th></tr>
-            </thead>
-            <tbody class="divide-y divide-sage-border-light">
-              <tr v-for="blocked in cadastralImpediments" :key="blocked.idVenda || `${blocked.matricula}-${blocked.dataVenda}`">
-                <td class="px-3 py-4 font-semibold text-brand-dark">{{ shortId(blocked.idVenda) }}</td>
-                <td class="px-3 py-4 text-sage-subtle">{{ blocked.matricula || 'Não informada' }}</td>
-                <td class="px-3 py-4 text-sage-subtle">{{ formatDate(blocked.dataVenda) }}</td>
-                <td class="px-3 py-4 font-semibold text-brand-dark">{{ currency(blocked.valorVenda) }}</td>
-                <td class="px-3 py-4 text-danger-dark">{{ blocked.motivo || 'Motivo não informado' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <details v-if="coverageSales.length" class="group rounded-[22px] bg-white p-6 sm:p-7">
-        <summary class="cursor-pointer text-sm font-bold text-brand-dark transition hover:text-brand">
-          Ver listagem individual de vendas com bloqueio de cobertura ({{ coverageSales.length }} vendas protegidas)
-        </summary>
-        <div class="mt-5 overflow-x-auto">
-          <table class="w-full min-w-[720px] text-left text-sm">
-            <thead class="bg-sage-pill text-[10px] uppercase tracking-[0.12em] text-sage-muted">
-              <tr><th class="rounded-l-xl px-3 py-3">Venda</th><th class="px-3 py-3">Matrícula</th><th class="px-3 py-3">Data</th><th class="px-3 py-3">Valor</th><th class="rounded-r-xl px-3 py-3">Motivo</th></tr>
-            </thead>
-            <tbody class="divide-y divide-sage-border-light">
-              <tr v-for="blocked in coverageSales" :key="blocked.idVenda || `${blocked.matricula}-${blocked.dataVenda}`">
-                <td class="px-3 py-4 font-semibold text-brand-dark">{{ shortId(blocked.idVenda) }}</td>
-                <td class="px-3 py-4 text-sage-subtle">{{ blocked.matricula || 'Não informada' }}</td>
-                <td class="px-3 py-4 text-sage-subtle">{{ formatDate(blocked.dataVenda) }}</td>
-                <td class="px-3 py-4 font-semibold text-brand-dark">{{ currency(blocked.valorVenda) }}</td>
-                <td class="px-3 py-4 text-warning-dark">{{ blocked.motivo || 'Motivo não informado' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </details>
-
       <section v-if="!result.resumoExecucao && !result.resultados.length && !result.impedimentos.length" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
         <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
         <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência.</p>
       </section>
     </template>
+
+    <!-- Navegação de Abas de Apuração e Relatórios Consolidados (FRONT-11) -->
+    <section v-if="result || isClosedCompetence" class="space-y-6">
+      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-sage-border pb-4">
+        <nav class="flex flex-wrap items-center gap-2" aria-label="Abas de apuração e relatórios">
+          <button
+            type="button"
+            class="focus-ring inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition"
+            :class="activeReportTab === 'colaboradores' ? 'bg-brand text-brand-dark shadow-sm' : 'bg-white text-sage-muted hover:bg-sage-light hover:text-brand-dark'"
+            @click="activeReportTab = 'colaboradores'"
+          >
+            <span>Por Colaborador</span>
+            <span
+              v-if="collaboratorRows.length"
+              class="rounded-full bg-brand-dark/10 px-2 py-0.5 text-xs font-extrabold"
+            >
+              {{ collaboratorRows.length }}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            class="focus-ring inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition"
+            :class="activeReportTab === 'regras' ? 'bg-brand text-brand-dark shadow-sm' : 'bg-white text-sage-muted hover:bg-sage-light hover:text-brand-dark'"
+            @click="activeReportTab = 'regras'"
+          >
+            <span>Por Grupo de Regra</span>
+            <span
+              v-if="ruleRows.length"
+              class="rounded-full bg-brand-dark/10 px-2 py-0.5 text-xs font-extrabold"
+            >
+              {{ ruleRows.length }}
+            </span>
+          </button>
+
+          <button
+            v-if="result?.resultados?.length"
+            type="button"
+            class="focus-ring inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition"
+            :class="activeReportTab === 'vendas' ? 'bg-brand text-brand-dark shadow-sm' : 'bg-white text-sage-muted hover:bg-sage-light hover:text-brand-dark'"
+            @click="activeReportTab = 'vendas'"
+          >
+            <span>Vendas Detalhadas</span>
+            <span class="rounded-full bg-brand-dark/10 px-2 py-0.5 text-xs font-extrabold">
+              {{ result.resultados.length }}
+            </span>
+          </button>
+
+          <button
+            v-if="cadastralImpediments.length || coverageSales.length"
+            type="button"
+            class="focus-ring inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition"
+            :class="activeReportTab === 'impedimentos' ? 'bg-brand text-brand-dark shadow-sm' : 'bg-white text-sage-muted hover:bg-sage-light hover:text-brand-dark'"
+            @click="activeReportTab = 'impedimentos'"
+          >
+            <span>Impedimentos</span>
+            <span class="rounded-full bg-warning-dark/20 text-warning-dark px-2 py-0.5 text-xs font-extrabold">
+              {{ cadastralImpediments.length + coverageSales.length }}
+            </span>
+          </button>
+        </nav>
+
+        <CommissionReportExportDropdown
+          :disabled="!isClosedCompetence || isLoadingReport || isExportingCsv"
+          :loading="isExportingCsv"
+          @export="handleExportReport"
+        />
+      </div>
+
+      <div v-if="reportError && isClosedCompetence" class="rounded-2xl border border-danger/30 bg-danger-bg p-5" role="alert">
+        <p class="text-sm font-bold text-danger-dark">{{ reportError }}</p>
+        <button type="button" class="mt-3 rounded-full bg-danger px-4 py-2 text-xs font-bold text-white" @click="loadClosingReport(competenceKey)">
+          Tentar carregar novamente
+        </button>
+      </div>
+
+      <div
+        v-if="!isClosedCompetence && (activeReportTab === 'colaboradores' || activeReportTab === 'regras')"
+        class="rounded-[22px] border border-sage-border bg-white p-7 text-center space-y-3"
+      >
+        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-sage-light text-sage-muted">
+          <FileSpreadsheet class="h-6 w-6" />
+        </div>
+        <h3 class="text-lg font-extrabold text-brand-dark">Relatório Consolidado Disponível Após o Fechamento</h3>
+        <p class="mx-auto max-w-xl text-sm leading-6 text-sage-muted">
+          Os relatórios consolidados por colaborador e por grupo de regra com exportação contábil oficial (.csv) são gerados no fechamento contábil e liquidação da competência.
+        </p>
+        <div class="pt-2">
+          <button
+            v-if="canExecuteClosing"
+            type="button"
+            class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-brand-dark transition hover:bg-brand-hover"
+            @click="isClosingModalOpen = true"
+          >
+            Realizar Fechamento da Competência
+          </button>
+          <button
+            v-else-if="result?.resultados?.length"
+            type="button"
+            class="focus-ring inline-flex items-center gap-2 rounded-full border border-sage-border-dark px-5 py-2.5 text-sm font-bold text-brand-dark transition hover:bg-sage-light"
+            @click="activeReportTab = 'vendas'"
+          >
+            Visualizar Vendas Detalhadas
+          </button>
+        </div>
+      </div>
+
+      <div v-else-if="activeReportTab === 'colaboradores'">
+        <CommissionReportCollaboratorTab
+          :items="collaboratorRows"
+          :loading="isLoadingReport"
+        />
+      </div>
+
+      <div v-else-if="activeReportTab === 'regras'">
+        <CommissionReportRuleTab
+          :rules="ruleRows"
+          :total-gerais-comissao="totalGeraisComissao"
+          :loading="isLoadingReport"
+        />
+      </div>
+
+      <div v-else-if="activeReportTab === 'vendas' && result?.resultados?.length">
+        <section class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="calculated-sales-heading">
+          <div class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 id="calculated-sales-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Vendas calculadas</h2>
+              <p class="mt-1 text-sm text-sage-muted">Valores e taxas retornados pelo motor de cálculo.</p>
+            </div>
+            <div class="flex flex-wrap gap-3">
+              <label class="sr-only" for="calculation-registration-filter">Filtrar por matrícula</label>
+              <input id="calculation-registration-filter" v-model="matriculaFilter" type="search" class="campaign-control max-w-[220px]" placeholder="Filtrar matrícula" />
+              <label class="sr-only" for="calculation-origin-filter">Filtrar por origem da taxa</label>
+              <select id="calculation-origin-filter" v-model="originFilter" class="campaign-control max-w-[220px]">
+                <option value="">Todas as origens</option>
+                <option v-for="origin in originOptions" :key="origin" :value="origin">{{ formatOrigin(origin) }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mt-6 overflow-x-auto">
+            <table class="w-full min-w-[920px] text-left text-sm">
+              <thead class="bg-sage-pill text-[10px] uppercase tracking-[0.12em] text-sage-muted">
+                <tr>
+                  <th class="rounded-l-xl px-3 py-3">Venda</th>
+                  <th class="px-3 py-3">Matrícula</th>
+                  <th class="px-3 py-3">Data</th>
+                  <th class="px-3 py-3">Valor da venda</th>
+                  <th class="px-3 py-3">Taxa aplicada</th>
+                  <th class="px-3 py-3">Origem</th>
+                  <th class="px-3 py-3">Comissão</th>
+                  <th class="rounded-r-xl px-3 py-3">Detalhes</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-sage-border-light">
+                <tr v-for="sale in paginatedResults" :key="sale.idVenda || sale.protocoloCalculo">
+                  <td class="px-3 py-4 font-semibold text-brand-dark">{{ shortId(sale.idVenda) }}</td>
+                  <td class="px-3 py-4 text-sage-subtle">{{ sale.matricula || 'Não informada' }}</td>
+                  <td class="px-3 py-4 text-sage-subtle">{{ formatDate(sale.dataVenda) }}</td>
+                  <td class="px-3 py-4 font-semibold text-brand-dark">{{ currency(sale.valorVenda) }}</td>
+                  <td class="px-3 py-4 text-sage-subtle">{{ percent(sale.taxaAplicada) }}</td>
+                  <td class="px-3 py-4"><StatusBadge :label="formatOrigin(sale.origemTaxa)" :tone="sale.origemTaxa === 'REGRA_NEGOCIO' ? 'success' : 'neutral'" /></td>
+                  <td class="px-3 py-4 font-extrabold text-brand-dark">{{ currency(sale.valorComissao) }}</td>
+                  <td class="px-3 py-4">
+                    <details>
+                      <summary class="cursor-pointer font-bold text-brand-dark">Ver</summary>
+                      <dl class="mt-3 min-w-[210px] space-y-1 text-xs text-sage-muted">
+                        <div><dt class="inline">Protocolo: </dt><dd class="inline break-all">{{ sale.protocoloCalculo || 'Não informado' }}</dd></div>
+                        <div><dt class="inline">Marca: </dt><dd class="inline">{{ sale.codMarca ?? 'Não informada' }}</dd></div>
+                        <div><dt class="inline">Loja: </dt><dd class="inline">{{ sale.codLoja ?? 'Não informada' }}</dd></div>
+                        <div><dt class="inline">Cargo: </dt><dd class="inline">{{ sale.codCargo ?? 'Não informado' }}</dd></div>
+                        <div><dt class="inline">Regra: </dt><dd class="inline">{{ sale.idRegra ?? 'Não informada' }}</dd></div>
+                        <div><dt class="inline">Calculado em: </dt><dd class="inline">{{ formatDateTime(sale.dataCalculo) }}</dd></div>
+                      </dl>
+                    </details>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p v-if="!paginatedResults.length" class="mt-5 rounded-xl bg-sage-light px-4 py-3 text-sm text-sage-muted" role="status">
+            Nenhuma venda corresponde aos filtros selecionados.
+          </p>
+
+          <PaginationControls :page="resultPage" :total-pages="resultTotalPages" @previous="resultPage -= 1" @next="resultPage += 1" />
+        </section>
+      </div>
+
+      <div v-else-if="activeReportTab === 'impedimentos'" class="space-y-6">
+        <section v-if="cadastralImpediments.length" class="rounded-[22px] bg-white p-6 sm:p-7" aria-labelledby="cadastral-blocked-sales-heading">
+          <div>
+            <h2 id="cadastral-blocked-sales-heading" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Vendas com impedimento cadastral (RH)</h2>
+            <p class="mt-1 text-sm text-sage-muted">Inconsistências em vínculos com colaboradores, ausência de cargo ou datas fora da vigência contratual.</p>
+          </div>
+          <div class="mt-6 overflow-x-auto">
+            <table class="w-full min-w-[720px] text-left text-sm">
+              <thead class="bg-sage-pill text-[10px] uppercase tracking-[0.12em] text-sage-muted">
+                <tr><th class="rounded-l-xl px-3 py-3">Venda</th><th class="px-3 py-3">Matrícula</th><th class="px-3 py-3">Data</th><th class="px-3 py-3">Valor</th><th class="rounded-r-xl px-3 py-3">Motivo</th></tr>
+              </thead>
+              <tbody class="divide-y divide-sage-border-light">
+                <tr v-for="blocked in cadastralImpediments" :key="blocked.idVenda || `${blocked.matricula}-${blocked.dataVenda}`">
+                  <td class="px-3 py-4 font-semibold text-brand-dark">{{ shortId(blocked.idVenda) }}</td>
+                  <td class="px-3 py-4 text-sage-subtle">{{ blocked.matricula || 'Não informada' }}</td>
+                  <td class="px-3 py-4 text-sage-subtle">{{ formatDate(blocked.dataVenda) }}</td>
+                  <td class="px-3 py-4 font-semibold text-brand-dark">{{ currency(blocked.valorVenda) }}</td>
+                  <td class="px-3 py-4 text-danger-dark">{{ blocked.motivo || 'Motivo não informado' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <details v-if="coverageSales.length" class="group rounded-[22px] bg-white p-6 sm:p-7">
+          <summary class="cursor-pointer text-sm font-bold text-brand-dark transition hover:text-brand">
+            Ver listagem individual de vendas com bloqueio de cobertura ({{ coverageSales.length }} vendas protegidas)
+          </summary>
+          <div class="mt-5 overflow-x-auto">
+            <table class="w-full min-w-[720px] text-left text-sm">
+              <thead class="bg-sage-pill text-[10px] uppercase tracking-[0.12em] text-sage-muted">
+                <tr><th class="rounded-l-xl px-3 py-3">Venda</th><th class="px-3 py-3">Matrícula</th><th class="px-3 py-3">Data</th><th class="px-3 py-3">Valor</th><th class="rounded-r-xl px-3 py-3">Motivo</th></tr>
+              </thead>
+              <tbody class="divide-y divide-sage-border-light">
+                <tr v-for="blocked in coverageSales" :key="blocked.idVenda || `${blocked.matricula}-${blocked.dataVenda}`">
+                  <td class="px-3 py-4 font-semibold text-brand-dark">{{ shortId(blocked.idVenda) }}</td>
+                  <td class="px-3 py-4 text-sage-subtle">{{ blocked.matricula || 'Não informada' }}</td>
+                  <td class="px-3 py-4 text-sage-subtle">{{ formatDate(blocked.dataVenda) }}</td>
+                  <td class="px-3 py-4 font-semibold text-brand-dark">{{ currency(blocked.valorVenda) }}</td>
+                  <td class="px-3 py-4 text-warning-dark">{{ blocked.motivo || 'Motivo não informado' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+    </section>
 
     <section v-if="historyLoading" class="rounded-2xl bg-white px-6 py-10 text-center text-sm text-sage-muted" role="status">
       Consultando cálculos já registrados…
@@ -380,7 +508,7 @@
       <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência.</p>
     </section>
 
-    <p v-else-if="!result && !historyLoading" class="rounded-2xl border border-sage-border bg-sage-light px-5 py-4 text-sm leading-6 text-sage-muted">
+    <p v-else-if="!result && !historyLoading && !isClosedCompetence" class="rounded-2xl border border-sage-border bg-sage-light px-5 py-4 text-sm leading-6 text-sage-muted">
       Nenhum cálculo foi executado nesta sessão. Use o botão acima para iniciar o processamento.
     </p>
 
@@ -419,11 +547,20 @@ import { useAccessPolicy } from '@/services/useAccessPolicy'
 const access = useAccessPolicy()
 import { computed, defineComponent, h, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { RefreshCw } from 'lucide-vue-next'
+import { RefreshCw, FileSpreadsheet } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import CompetenceClosingModal from '@/components/competence/CompetenceClosingModal.vue'
 import CompetenceClosingStatusCard from '@/components/competence/CompetenceClosingStatusCard.vue'
+import CommissionReportCollaboratorTab from '@/components/calculation/CommissionReportCollaboratorTab.vue'
+import CommissionReportRuleTab from '@/components/calculation/CommissionReportRuleTab.vue'
+import CommissionReportExportDropdown from '@/components/calculation/CommissionReportExportDropdown.vue'
+import {
+  getConsolidatedReport,
+  exportReportCsv,
+  isCompetenceClosed,
+  mergeCollaboratorReport
+} from '@/services/commissionReportApi'
 import { ASYNC_EXECUTION_STATES, formatExecutionStateLabel, executionStateTone } from '@/services/asyncExecutionService'
 import { dataService } from '@/services/dataService'
 import { calculationService } from '@/services/calculationService'
@@ -493,6 +630,71 @@ const previewTotals = ref(null)
 const backupPreviewImpediments = ref([])
 let closingPollingTimer = null
 let closingPollingCounter = 0
+
+const activeReportTab = ref('colaboradores')
+const reportData = ref(null)
+const isLoadingReport = ref(false)
+const reportError = ref(null)
+const isExportingCsv = ref(false)
+
+const isClosedCompetence = computed(() => isCompetenceClosed(closingStatusData.value))
+
+const effectiveClosingStatusData = computed(() => {
+  if (!closingStatusData.value) return null
+  const base = { ...closingStatusData.value }
+  if (isCompetenceClosed(base) && reportData.value) {
+    const totalComissaoRegras = (reportData.value.totaisPorRegra || reportData.value.porRegra || [])
+      .reduce((sum, r) => sum + (Number(r.comissaoGerada ?? r.valorTotalComissao) || 0), 0)
+    const totalComissaoColabs = (reportData.value.porColaborador || reportData.value.totaisPorColaborador || [])
+      .reduce((sum, c) => sum + (Number(c.valorTotalComissao ?? c.valorTotalAPagar) || 0), 0)
+    const totalComissaoReport = Number(reportData.value.valorTotalComissao) || totalComissaoRegras || totalComissaoColabs
+
+    if (totalComissaoReport > 0) {
+      base.valorTotalComissao = totalComissaoReport
+    }
+
+    const totalVendasRegras = (reportData.value.totaisPorRegra || reportData.value.porRegra || [])
+      .reduce((sum, r) => sum + (Number(r.vendasComputadas ?? r.quantidadeVendas) || 0), 0)
+    const totalVendasColabs = (reportData.value.porColaborador || reportData.value.totaisPorColaborador || [])
+      .reduce((sum, c) => sum + (Number(c.quantidadeVendas) || 0), 0)
+    const totalVendasReport = totalVendasRegras || totalVendasColabs
+
+    if (!base.totalVendasProcessadas && totalVendasReport > 0) {
+      base.totalVendasProcessadas = totalVendasReport
+    }
+    if (!base.totalCalculados && totalVendasReport > 0) {
+      base.totalCalculados = totalVendasReport
+    }
+  }
+  return base
+})
+
+const collaboratorRows = computed(() => {
+  return mergeCollaboratorReport(
+    reportData.value?.totaisPorColaborador,
+    reportData.value?.porColaborador
+  )
+})
+
+const ruleRows = computed(() => {
+  return reportData.value?.totaisPorRegra || reportData.value?.porRegra || []
+})
+
+const totalGeraisComissao = computed(() => {
+  return reportData.value?.valorTotalComissao ?? closingStatusData.value?.valorTotalComissao ?? result.value?.valorTotalComissao ?? 0
+})
+
+watch(isClosedCompetence, (closed) => {
+  if (closed) {
+    if (activeReportTab.value === 'vendas' && !result.value?.resultados?.length) {
+      activeReportTab.value = 'colaboradores'
+    }
+  } else if (!closed && !['vendas', 'impedimentos'].includes(activeReportTab.value)) {
+    if (result.value?.resultados?.length) {
+      activeReportTab.value = 'vendas'
+    }
+  }
+})
 
 const currentUserIdentifier = computed(() => {
   return accountStore.user?.email || accountStore.user?.nome || accountStore.user?.name || ''
@@ -608,6 +810,8 @@ async function loadCompetence() {
   lostResponseWarning.value = false
   closingResponseData.value = null
   proofDownloaded.value = false
+  reportData.value = null
+  reportError.value = null
 
   if (!competenceKey.value) return
 
@@ -618,11 +822,15 @@ async function loadCompetence() {
 
   const hasSharedCalculationState = syncCalculationStoreState(competenceKey.value)
   if (!hasSharedCalculationState) restoreSessionResult(competenceKey.value)
-  await Promise.all([
-    loadSalesCount(competenceKey.value, generation),
-    loadHistory(0, competenceKey.value, generation),
-    checkClosingStatus()
-  ])
+  await checkClosingStatus()
+  if (isClosedCompetence.value) {
+    await loadClosingReport(competenceKey.value)
+  } else {
+    await Promise.all([
+      loadSalesCount(competenceKey.value, generation),
+      loadHistory(0, competenceKey.value, generation)
+    ])
+  }
 }
 
 async function checkClosingStatus(manual = false) {
@@ -635,6 +843,9 @@ async function checkClosingStatus(manual = false) {
       startClosingPolling()
     } else {
       stopClosingPolling()
+      if (isCompetenceClosed(data) && !reportData.value) {
+        void loadClosingReport(competenceKey.value)
+      }
     }
   } catch (err) {
     if (err?.response?.status !== 403) {
@@ -718,6 +929,9 @@ async function handleConfirmClosing({ motivo, executadoPor }) {
     }
     isClosingModalOpen.value = false
 
+    activeReportTab.value = 'colaboradores'
+    void loadClosingReport(competenceKey.value)
+
     handleDownloadProof()
   } catch (err) {
     if (err.isNetworkRecovery) {
@@ -745,6 +959,38 @@ function handleDownloadProof() {
     } catch (e) {
       console.warn('Erro ao disparar download do comprovante:', e)
     }
+  }
+}
+
+async function loadClosingReport(competencia = competenceKey.value) {
+  if (!competencia || !isClosedCompetence.value) {
+    reportData.value = null
+    return
+  }
+  isLoadingReport.value = true
+  reportError.value = null
+  try {
+    const data = await getConsolidatedReport(competencia)
+    reportData.value = data
+  } catch (err) {
+    if (err?.response?.status !== 404 && err?.response?.status !== 400) {
+      reportError.value = err?.response?.data?.message || err?.message || 'Não foi possível carregar os relatórios consolidados.'
+      console.warn('Erro ao carregar relatório consolidado de fechamento:', err)
+    }
+  } finally {
+    isLoadingReport.value = false
+  }
+}
+
+async function handleExportReport(tipo) {
+  if (!competenceKey.value) return
+  isExportingCsv.value = true
+  try {
+    await exportReportCsv(competenceKey.value, tipo)
+  } catch (err) {
+    alert(err?.response?.data?.message || err?.message || 'Falha ao exportar relatório CSV.')
+  } finally {
+    isExportingCsv.value = false
   }
 }
 

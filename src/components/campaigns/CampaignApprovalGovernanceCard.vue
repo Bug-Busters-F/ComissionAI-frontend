@@ -86,10 +86,11 @@
         <button
           type="button"
           :disabled="loading || isApprovedAndClean"
-          class="focus-ring rounded-full bg-brand px-5 py-2 text-xs font-bold text-brand-dark transition hover:bg-brand-hover disabled:opacity-50"
+          class="focus-ring inline-flex items-center gap-1.5 rounded-full bg-brand px-5 py-2 text-xs font-bold text-brand-dark transition hover:bg-brand-hover disabled:opacity-50"
           @click="$emit('approve')"
         >
-          {{ isApprovedAndClean ? 'Código Aprovado' : 'Aprovar Código Python' }}
+          <span v-if="loading" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <span>{{ isApprovedAndClean ? 'Código Aprovado' : 'Aprovar Código Python' }}</span>
         </button>
       </div>
     </div>

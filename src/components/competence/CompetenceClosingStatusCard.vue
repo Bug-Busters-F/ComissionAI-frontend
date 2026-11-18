@@ -29,7 +29,7 @@
           :disabled="isCheckingStatus"
           @click="$emit('refreshStatus')"
         >
-          <span v-if="isCheckingStatus" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-dark border-t-transparent" />
+          <span v-if="isCheckingStatus" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
           <span>{{ isCheckingStatus ? 'Consultando…' : 'Verificar status agora' }}</span>
         </button>
 
@@ -205,7 +205,7 @@
           :disabled="isRecalculating"
           @click="$emit('recalculateAndCheck')"
         >
-          <span v-if="isRecalculating" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-dark border-t-transparent" />
+          <span v-if="isRecalculating" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
           <span>{{ isRecalculating ? 'Recalculando e conferindo…' : 'Recalcular e conferir prévia' }}</span>
         </button>
 

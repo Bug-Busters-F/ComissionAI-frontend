@@ -173,11 +173,12 @@
         </div>
         <button
           type="button"
-          class="focus-ring shrink-0 self-start rounded-full bg-brand px-4 py-2 text-xs font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+          class="focus-ring shrink-0 self-start rounded-full bg-brand px-4 py-2 text-xs font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60 inline-flex items-center gap-1.5"
           :disabled="!canRunSimulation || simulation.isRunning"
           @click="handleRunSimulation"
         >
-          Executar nova simulação
+          <RefreshCw v-if="simulation.isRunning" class="h-3.5 w-3.5 animate-spin" />
+          <span>{{ simulation.isRunning ? 'Processando…' : 'Executar nova simulação' }}</span>
         </button>
       </div>
     </section>
@@ -347,7 +348,8 @@
             :disabled="!canRunSimulation || simulation.isRunning || simulation.isValidatingReference"
             @click="handleRunSimulation"
           >
-            <Play class="h-4 w-4" aria-hidden="true" />
+            <RefreshCw v-if="simulation.isRunning" class="h-4 w-4 animate-spin" aria-hidden="true" />
+            <Play v-else class="h-4 w-4" aria-hidden="true" />
             <span>
               {{
                 simulation.isRunning

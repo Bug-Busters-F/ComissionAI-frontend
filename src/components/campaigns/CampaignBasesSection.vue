@@ -179,7 +179,8 @@
             class="focus-ring inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-xs font-extrabold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
             title="Associa a base já cadastrada à campanha sem novo upload"
           >
-            <LinkIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': isAssociating }" />
+            <RefreshCw v-if="isAssociating" class="h-3.5 w-3.5 animate-spin" />
+            <LinkIcon v-else class="h-3.5 w-3.5" />
             <span>{{ isAssociating ? 'Associando...' : `Associar ${lote.tipoBase === 'HR' ? 'RH' : 'Vendas'}: ${lote.nomeArquivoOriginal || 'Lote ' + lote.reportId}` }}</span>
           </button>
 
@@ -239,7 +240,8 @@
               :disabled="!authStore.canModifyBases || abrindoLote === anexo.reportId"
               class="focus-ring inline-flex items-center gap-1.5 text-xs font-extrabold text-brand-dark hover:underline"
             >
-              <SlidersHorizontal class="h-3.5 w-3.5 text-brand" :class="{ 'animate-spin': abrindoLote === anexo.reportId }" />
+              <RefreshCw v-if="abrindoLote === anexo.reportId" class="h-3.5 w-3.5 animate-spin text-brand" />
+              <SlidersHorizontal v-else class="h-3.5 w-3.5 text-brand" />
               <span>{{ abrindoLote === anexo.reportId ? 'Abrindo preparação...' : 'Auditar e Corrigir Linhas' }}</span>
             </button>
           </div>
@@ -369,7 +371,8 @@
           @click="executarUploadCiclo"
           class="focus-ring inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-xs font-black text-brand-dark shadow-sm transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <UploadCloud class="h-4 w-4" />
+          <RefreshCw v-if="isUploading" class="h-4 w-4 animate-spin" />
+          <UploadCloud v-else class="h-4 w-4" />
           <span>{{ isUploading ? 'Processando envio...' : 'Enviar Bases (RH + Vendas)' }}</span>
         </button>
       </div>
