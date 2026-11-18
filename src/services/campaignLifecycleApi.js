@@ -18,6 +18,12 @@ export function createCampaignLifecycleApi(http = api) {
     async startProposal(id, revision) { return (await http.post(`/campanhas/${id}/proposta`, {}, revisionConfig(revision))).data },
     async cancelProposal(id, revision) { await http.delete(`/campanhas/${id}/proposta`, revisionConfig(revision)) },
     async history(id) { return (await http.get(`/campanhas/${id}/versoes`, config)).data },
-    async version(id, numero) { return (await http.get(`/campanhas/${id}/versoes/${numero}`, config)).data }
+    async version(id, numero) { return (await http.get(`/campanhas/${id}/versoes/${numero}`, config)).data },
+    async approveCode(id, payload) { return (await http.post(`/campanhas/${id}/aprovacao-codigo`, payload, config)).data },
+    async getCodeApproval(id) { return (await http.get(`/campanhas/${id}/aprovacao-codigo`, config)).data },
+    async forwardToManager(id, payload = {}) { return (await http.post(`/campanhas/${id}/encaminhar-gerente`, payload, config)).data },
+    async compareVersions(id, versaoBase, versaoComparada) { return (await http.get(`/campanhas/${id}/versoes/comparacao`, { ...config, params: { versaoBase, versaoComparada } })).data },
+    async updateBudget(id, payload) { return (await http.patch(`/campanhas/${id}/orcamento`, payload, config)).data },
+    async returnProposal(id, payload) { return (await http.post(`/campanhas/${id}/devolver`, payload, config)).data }
   }
 }

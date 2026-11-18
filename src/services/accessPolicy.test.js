@@ -30,4 +30,23 @@ describe('preview role permissions', () => {
     expect(canAccess('ADMINISTRADOR', 'manageUsers')).toBe(true)
     expect(canAccess('UNKNOWN', 'viewData')).toBe(false)
   })
+  it('enforces segregation of duties (SoD) for stage 4 governance', () => {
+    expect(canAccess('ANALISTA_CODIGO', 'approveCode')).toBe(true)
+    expect(canAccess('ADMINISTRADOR', 'approveCode')).toBe(true)
+    expect(canAccess('ANALISTA_NEGOCIOS', 'approveCode')).toBe(false)
+    expect(canAccess('GERENTE_VENDAS', 'approveCode')).toBe(false)
+    expect(canAccess('AUDITOR', 'approveCode')).toBe(false)
+
+    expect(canAccess('GERENTE_VENDAS', 'returnProposal')).toBe(true)
+    expect(canAccess('ADMINISTRADOR', 'returnProposal')).toBe(true)
+    expect(canAccess('ANALISTA_CODIGO', 'returnProposal')).toBe(false)
+    expect(canAccess('ANALISTA_NEGOCIOS', 'returnProposal')).toBe(false)
+    expect(canAccess('AUDITOR', 'returnProposal')).toBe(false)
+
+    expect(canAccess('GERENTE_VENDAS', 'activateCampaign')).toBe(true)
+    expect(canAccess('ADMINISTRADOR', 'activateCampaign')).toBe(true)
+    expect(canAccess('ANALISTA_CODIGO', 'activateCampaign')).toBe(false)
+    expect(canAccess('ANALISTA_NEGOCIOS', 'activateCampaign')).toBe(false)
+    expect(canAccess('AUDITOR', 'activateCampaign')).toBe(false)
+  })
 })

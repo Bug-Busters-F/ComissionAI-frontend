@@ -294,3 +294,181 @@ describe('profile-aware lifecycle callbacks', () => {
     s.scope.stop()
   })
 })
+
+describe('governance, budget limits and code approval ([FRONT-9])', () => {
+  it('blocks activation when code approval is missing or invalidated', async () => {
+    const s = setup()
+    await ready(s)
+    expect(s.flow.canActivate.value).toBe(true)
+
+    s.flow.state.codeApproval = { statusAprovacaoCodigo: 'PENDENTE', regras: [] }
+    expect(s.flow.isCodeApproved.value).toBe(false)
+    expect(s.flow.canActivate.value).toBe(false)
+
+    s.flow.state.codeApproval = {
+      statusAprovacaoCodigo: 'APROVADO',
+      regras: [{ regraId: 1, statusAprovacaoCodigo: 'INVALIDADO' }]
+    }
+    expect(s.flow.isCodeApproved.value).toBe(false)
+    expect(s.flow.canActivate.value).toBe(false)
+
+    s.flow.state.codeApproval = {
+      statusAprovacaoCodigo: 'APROVADO',
+      regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
+    }
+    expect(s.flow.isCodeApproved.value).toBe(true)
+    expect(s.flow.canActivate.value).toBe(true)
+    s.scope.stop()
+  })
+
+  it('blocks activation and forwarding when scenario 100% exceeds budget', async () => {
+    const s = setup({
+      forwardToManager: vi.fn(async () => ({}))
+    })
+    await ready(s)
+
+    s.flow.simulation.result.cenario100 = {
+      dentroDoOrcamento: false,
+      statusEnquadramento: 'ACIMA_DO_TETO',
+      excedenteOrcamento: '15000.00'
+    }
+
+    expect(s.flow.isBudgetWithinLimit.value).toBe(false)
+    expect(s.flow.canActivate.value).toBe(false)
+
+    expect(await s.flow.forwardToManager()).toBe(false)
+    expect(s.flow.state.error).toContain('Não é permitido encaminhar ao gerente')
+    expect(s.flow.state.error).toContain('15000.00')
+    expect(s.api.forwardToManager).not.toHaveBeenCalled()
+
+    // Now enquadrado
+    s.flow.simulation.result.cenario100 = {
+      dentroDoOrcamento: true,
+      statusEnquadramento: 'ENQUADRADO',
+      excedenteOrcamento: '0.00'
+    }
+    expect(s.flow.isBudgetWithinLimit.value).toBe(true)
+    expect(await s.flow.forwardToManager()).toBe(true)
+    expect(s.flow.state.encaminhadaGerente).toBe(true)
+    expect(s.api.forwardToManager).toHaveBeenCalledWith(42, expect.any(Object))
+    s.scope.stop()
+  })
+
+  it('approves and rejects code via lifecycle api calls', async () => {
+    const s = setup({
+      approveCode: vi.fn(async (id, payload) => ({
+        campanhaId: id,
+        statusAprovacaoCodigo: payload.aprovado ? 'APROVADO' : 'REJEITADO',
+        codigoAprovadoPor: payload.aprovadoPor
+      }))
+    })
+    await ready(s)
+
+    expect(await s.flow.approveCode('analista.codigo@empresa.com')).toBe(true)
+    expect(s.flow.state.codeApproval.statusAprovacaoCodigo).toBe('APROVADO')
+    expect(s.api.approveCode).toHaveBeenCalledWith(42, { aprovado: true, aprovadoPor: 'analista.codigo@empresa.com' })
+
+    expect(await s.flow.rejectCode('Taxa incorreta', 'analista.codigo@empresa.com')).toBe(true)
+    expect(s.flow.state.codeApproval.statusAprovacaoCodigo).toBe('REJEITADO')
+    s.scope.stop()
+  })
+
+  it('validates returnProposal input, submits payload and applies returned backend state', async () => {
+    let s
+    s = setup({
+      returnProposal: vi.fn(async (id, payload) => ({
+        ...savedResponse(s.campaign),
+        id,
+        ultimaEtapa: payload.etapaDestino,
+        revisaoControle: 45,
+        encaminhadaGerente: false
+      }))
+    })
+    await ready(s)
+
+    // Blank reason rejected
+    expect(await s.flow.returnProposal({ etapaDestino: 1, motivo: '   ' })).toBe(false)
+    expect(s.flow.state.error).toContain('A justificativa formal de devolução é obrigatória')
+    expect(s.api.returnProposal).not.toHaveBeenCalled()
+
+    // Invalid stage rejected
+    expect(await s.flow.returnProposal({ etapaDestino: 4, motivo: 'Inválido' })).toBe(false)
+    expect(s.flow.state.error).toContain('A etapa de destino da devolução deve ser entre 1 e 3')
+
+    // Successful return to stage 1
+    s.flow.state.encaminhadaGerente = true
+    const ok = await s.flow.returnProposal({ etapaDestino: 1, motivo: 'Ajustar limites da regra 2' })
+    expect(ok).toBe(true)
+    expect(s.api.returnProposal).toHaveBeenCalledWith(42, {
+      etapaDestino: 1,
+      motivo: 'Ajustar limites da regra 2'
+    })
+    expect(s.flow.state.ultimaEtapa).toBe(1)
+    expect(s.flow.state.revisaoControle).toBe(45)
+    expect(s.flow.state.encaminhadaGerente).toBe(false)
+    expect(s.flow.state.notice).toContain('Proposta devolvida com sucesso para a Etapa 1')
+
+    // Successful return to stage 2 (Revisão técnica de código)
+    const okStage2 = await s.flow.returnProposal({ etapaDestino: 2, motivo: 'Revisar script Python da regra 1' })
+    expect(okStage2).toBe(true)
+    expect(s.api.returnProposal).toHaveBeenCalledWith(42, {
+      etapaDestino: 2,
+      motivo: 'Revisar script Python da regra 1'
+    })
+    expect(s.flow.state.ultimaEtapa).toBe(2)
+
+    // Successful return to stage 3 (Simulação e parâmetros orçamentários)
+    const okStage3 = await s.flow.returnProposal({ etapaDestino: 3, motivo: 'Refazer simulação com meta ajustada' })
+    expect(okStage3).toBe(true)
+    expect(s.api.returnProposal).toHaveBeenCalledWith(42, {
+      etapaDestino: 3,
+      motivo: 'Refazer simulação com meta ajustada'
+    })
+    expect(s.flow.state.ultimaEtapa).toBe(3)
+
+    // Concurrency conflict (409) handling
+    s.api.returnProposal.mockRejectedValueOnce({
+      response: { status: 409, data: { message: 'Conflito de versão' } }
+    })
+    expect(await s.flow.returnProposal({ etapaDestino: 2, motivo: 'Ajuste técnico' })).toBe(false)
+    expect(s.flow.state.remoteChanged).toBe(true)
+    s.scope.stop()
+  })
+
+  it('updates revisaoControle on forwardToManager to prevent stale 409 on subsequent activation', async () => {
+    const s = setup({
+      forwardToManager: vi.fn(async () => ({
+        id: 42,
+        revisaoControle: 78,
+        encaminhadaGerente: true
+      }))
+    })
+    await ready(s)
+
+    s.flow.simulation.result.cenario100 = {
+      dentroDoOrcamento: true,
+      statusEnquadramento: 'ENQUADRADO',
+      excedenteOrcamento: '0.00'
+    }
+    s.flow.state.revisaoControle = 10
+    expect(await s.flow.forwardToManager()).toBe(true)
+    expect(s.flow.state.revisaoControle).toBe(78)
+    expect(s.flow.state.encaminhadaGerente).toBe(true)
+    s.scope.stop()
+  })
+
+  it('strictly blocks activation when simulation acceptance is missing even if code and budget are approved', async () => {
+    const s = setup()
+    await s.flow.save()
+    s.flow.state.codeApproval = {
+      statusAprovacaoCodigo: 'APROVADO',
+      regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
+    }
+    s.flow.simulation.accepted = false
+    expect(s.flow.isCodeApproved.value).toBe(true)
+    expect(s.flow.canActivate.value).toBe(false)
+    expect(await s.flow.activate()).toBe(false)
+    expect(s.api.activate).not.toHaveBeenCalled()
+    s.scope.stop()
+  })
+})

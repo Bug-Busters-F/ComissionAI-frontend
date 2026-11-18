@@ -3,6 +3,23 @@
     <h2 id="version-comparison-title" class="text-xl font-extrabold">Revisão das alterações</h2>
     <p class="mt-2 text-sm text-sage-muted">Versão vigente {{ published.numero }} → Proposta {{ proposedNumber }} · Baseada na versão {{ sourceNumber ?? published.numero }}.</p>
     <p class="mt-3 rounded-xl bg-warning-bg p-3 text-sm text-warning-text">Ao publicar, a nova versão valerá para todo o período da campanha. A versão vigente permanece preservada até a confirmação.</p>
+
+    <!-- Diagnóstico de Comparabilidade de Projeção Financeira -->
+    <div
+      v-if="isNonComparable"
+      class="mt-4 rounded-xl border border-warning/40 bg-warning-bg p-4 flex items-start gap-3 text-xs leading-5 text-warning-text"
+      role="status"
+    >
+      <AlertTriangle class="h-5 w-5 shrink-0 text-warning-text mt-0.5" />
+      <div>
+        <p class="font-bold">Projeção financeira não comparável</p>
+        <p class="mt-1">
+          As versões foram simuladas sobre competências de referência distintas ou não informadas
+          ({{ baseCompetence || 'não informada' }} vs {{ proposedCompetence || 'não informada' }}).
+          As alterações estruturais das regras permanecem visíveis abaixo, mas a comparação financeira direta foi desativada para evitar distorções.
+        </p>
+      </div>
+    </div>
     <div v-if="comparison.fields.length" class="mt-5 space-y-3">
       <article v-for="item in comparison.fields" :key="item.field" class="rounded-xl bg-sage-light p-4">
         <h3 class="text-sm font-bold">{{ item.label }}</h3>
@@ -15,10 +32,28 @@
     </article>
     <p v-if="!comparison.fields.length && !comparison.rules.length" class="mt-4 text-sm text-sage-muted">Nenhuma alteração nos dados da campanha ou nas condições das regras.</p>
   </section>
+  <section v-else class="rounded-2xl border border-sage-border bg-white p-5 text-sm text-sage-muted">
+    <p>Não há versão anterior publicada para comparação nesta campanha.</p>
+  </section>
 </template>
 <script setup>
 import { computed } from 'vue'
+import { AlertTriangle } from 'lucide-vue-next'
 import { compareCampaignVersion, displayVersionValue } from '@/services/campaignVersionComparison'
-const props = defineProps({ published: Object, campaign: { type: Object, required: true }, proposedNumber: Number, sourceNumber: Number })
+
+const props = defineProps({
+  published: Object,
+  campaign: { type: Object, required: true },
+  proposedNumber: Number,
+  sourceNumber: Number,
+  baseCompetence: { type: String, default: null },
+  proposedCompetence: { type: String, default: null }
+})
+
 const comparison = computed(() => compareCampaignVersion(props.published, props.campaign))
+
+const isNonComparable = computed(() => {
+  if (!props.baseCompetence || !props.proposedCompetence) return true
+  return props.baseCompetence !== props.proposedCompetence
+})
 </script>
