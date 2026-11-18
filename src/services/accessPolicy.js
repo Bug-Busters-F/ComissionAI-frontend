@@ -14,6 +14,7 @@ export function canAccess(role, action, permissions = null) {
   if (role === 'ADMINISTRADOR') return permissions === null || permissions.includes('ACESSO_COMPLETO')
   const matrix = {
     viewCampaigns: validRoles, viewWorkflow: validRoles,
+    viewAnomalies: validRoles,
     createCampaign: ['ANALISTA_NEGOCIOS'],
     editCampaign: ['ANALISTA_NEGOCIOS', 'ANALISTA_CODIGO', 'GERENTE_VENDAS'],
     saveCampaign: ['ANALISTA_NEGOCIOS', 'ANALISTA_CODIGO'],
@@ -23,9 +24,16 @@ export function canAccess(role, action, permissions = null) {
     activateCampaign: ['GERENTE_VENDAS'],
     viewData: ['GERENTE_VENDAS', 'AUDITOR'],
     manageData: ['GERENTE_VENDAS'], calculate: ['GERENTE_VENDAS'],
+    reprocessAnomalies: ['GERENTE_VENDAS'],
     manageUsers: []
   }
-  const permission = { createCampaign: 'EDITAR_CAMPANHAS', removeCampaign: 'EDITAR_CAMPANHAS', manageData: 'IMPORTAR_BASES', calculate: 'CALCULAR_COMPETENCIA' }[action]
+  const permission = {
+    createCampaign: 'EDITAR_CAMPANHAS',
+    removeCampaign: 'EDITAR_CAMPANHAS',
+    manageData: 'IMPORTAR_BASES',
+    calculate: 'CALCULAR_COMPETENCIA',
+    reprocessAnomalies: 'IMPORTAR_BASES'
+  }[action]
   return matrix[action]?.includes(role) === true && (!permission || permissions === null || permissions.includes(permission))
 }
 export function stepAccessMessage(role, step) {
