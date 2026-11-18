@@ -16,7 +16,8 @@
         <p class="text-xs font-bold uppercase tracking-[0.12em] text-sage-muted">Competência selecionada</p>
         <h2 class="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-brand-dark">{{ formatCompetenceCode(competenceKey) }}</h2>
         <p class="mt-2 text-sm text-sage-muted">
-          <template v-if="salesQueryState === SALES_QUERY_STATE.SUCCESS">{{ salesCount }} vendas cadastradas no período.</template>
+          <template v-if="isClosedCompetence">Competência lacrada e liquidada contabilmente.</template>
+          <template v-else-if="salesQueryState === SALES_QUERY_STATE.SUCCESS">{{ salesCount }} vendas cadastradas no período.</template>
           <template v-else-if="salesQueryState === SALES_QUERY_STATE.LOADING">Consultando as vendas cadastradas…</template>
           <template v-else-if="salesQueryState === SALES_QUERY_STATE.ERROR">Não foi possível consultar as vendas.</template>
           <template v-else>Competência não validada.</template>
@@ -24,10 +25,11 @@
       </div>
       <div class="flex flex-wrap items-center gap-3">
         <button
+          v-if="access.can('calculate') && !isClosedCompetence"
           type="button"
           class="focus-ring inline-flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="!canCalculate || closingStatusData.bloqueada"
-          v-if="access.can('calculate')" @click="handleCalculation"
+          @click="handleCalculation"
         >
           <RefreshCw v-if="isCalculating" class="h-4 w-4 animate-spin" aria-hidden="true" />
           <span>{{ isCalculating ? (recalculationRequested ? 'Recalculando…' : 'Calculando…') : hasPreviousCalculation ? 'Recalcular e conferir' : 'Calcular comissões' }}</span>
@@ -37,9 +39,9 @@
 
     <!-- Card de Fechamento Contábil e Liquidação ([FRONT-10]) -->
     <CompetenceClosingStatusCard
-      v-if="competenceKey"
+      v-if="competenceKey && effectiveClosingStatusData"
       :competencia="competenceKey"
-      :status-data="closingStatusData"
+      :status-data="effectiveClosingStatusData"
       :is-checking-status="isCheckingClosingStatus"
       :is-recalculating="isCalculating && recalculationRequested"
       :can-execute-closing="canExecuteClosing"
@@ -59,7 +61,7 @@
       <p class="mt-2 text-sm leading-6 text-danger-dark/80">Informe uma competência válida no formato MM/AAAA, com mês entre 01 e 12.</p>
     </section>
 
-    <section v-else-if="salesQueryState === SALES_QUERY_STATE.LOADING" class="rounded-2xl border border-sage-border bg-white p-6" role="status" aria-live="polite">
+    <section v-else-if="!isClosedCompetence && salesQueryState === SALES_QUERY_STATE.LOADING" class="rounded-2xl border border-sage-border bg-white p-6" role="status" aria-live="polite">
       <div class="flex items-center gap-3">
         <RefreshCw class="h-5 w-5 animate-spin text-sage-muted" aria-hidden="true" />
         <div>
@@ -69,7 +71,7 @@
       </div>
     </section>
 
-    <section v-else-if="salesQueryState === SALES_QUERY_STATE.ERROR" class="rounded-2xl border border-danger/30 bg-danger-bg p-6" role="alert">
+    <section v-else-if="!isClosedCompetence && salesQueryState === SALES_QUERY_STATE.ERROR" class="rounded-2xl border border-danger/30 bg-danger-bg p-6" role="alert">
       <h2 class="text-xl font-extrabold text-danger-dark">Não foi possível consultar as vendas</h2>
       <p class="mt-2 text-sm leading-6 text-danger-dark/80">{{ salesQueryError }}</p>
       <button type="button" class="focus-ring mt-5 rounded-full bg-danger px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60" :disabled="isCalculating" @click="retrySalesQuery">
@@ -77,7 +79,7 @@
       </button>
     </section>
 
-    <section v-else-if="salesQueryState === SALES_QUERY_STATE.SUCCESS && salesCount === 0" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
+    <section v-else-if="!isClosedCompetence && salesQueryState === SALES_QUERY_STATE.SUCCESS && salesCount === 0" class="rounded-2xl border border-sage-border bg-white p-6" role="status">
       <h2 class="text-xl font-extrabold text-brand-dark">Nenhuma venda encontrada</h2>
       <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência. O cálculo permanece indisponível.</p>
     </section>
@@ -506,7 +508,7 @@
       <p class="mt-2 text-sm leading-6 text-sage-muted">Não há vendas cadastradas para essa competência.</p>
     </section>
 
-    <p v-else-if="!result && !historyLoading" class="rounded-2xl border border-sage-border bg-sage-light px-5 py-4 text-sm leading-6 text-sage-muted">
+    <p v-else-if="!result && !historyLoading && !isClosedCompetence" class="rounded-2xl border border-sage-border bg-sage-light px-5 py-4 text-sm leading-6 text-sage-muted">
       Nenhum cálculo foi executado nesta sessão. Use o botão acima para iniciar o processamento.
     </p>
 
@@ -636,6 +638,36 @@ const reportError = ref(null)
 const isExportingCsv = ref(false)
 
 const isClosedCompetence = computed(() => isCompetenceClosed(closingStatusData.value))
+
+const effectiveClosingStatusData = computed(() => {
+  if (!closingStatusData.value) return null
+  const base = { ...closingStatusData.value }
+  if (isCompetenceClosed(base) && reportData.value) {
+    const totalComissaoRegras = (reportData.value.totaisPorRegra || reportData.value.porRegra || [])
+      .reduce((sum, r) => sum + (Number(r.comissaoGerada ?? r.valorTotalComissao) || 0), 0)
+    const totalComissaoColabs = (reportData.value.porColaborador || reportData.value.totaisPorColaborador || [])
+      .reduce((sum, c) => sum + (Number(c.valorTotalComissao ?? c.valorTotalAPagar) || 0), 0)
+    const totalComissaoReport = Number(reportData.value.valorTotalComissao) || totalComissaoRegras || totalComissaoColabs
+
+    if (totalComissaoReport > 0) {
+      base.valorTotalComissao = totalComissaoReport
+    }
+
+    const totalVendasRegras = (reportData.value.totaisPorRegra || reportData.value.porRegra || [])
+      .reduce((sum, r) => sum + (Number(r.vendasComputadas ?? r.quantidadeVendas) || 0), 0)
+    const totalVendasColabs = (reportData.value.porColaborador || reportData.value.totaisPorColaborador || [])
+      .reduce((sum, c) => sum + (Number(c.quantidadeVendas) || 0), 0)
+    const totalVendasReport = totalVendasRegras || totalVendasColabs
+
+    if (!base.totalVendasProcessadas && totalVendasReport > 0) {
+      base.totalVendasProcessadas = totalVendasReport
+    }
+    if (!base.totalCalculados && totalVendasReport > 0) {
+      base.totalCalculados = totalVendasReport
+    }
+  }
+  return base
+})
 
 const collaboratorRows = computed(() => {
   return mergeCollaboratorReport(
@@ -790,13 +822,14 @@ async function loadCompetence() {
 
   const hasSharedCalculationState = syncCalculationStoreState(competenceKey.value)
   if (!hasSharedCalculationState) restoreSessionResult(competenceKey.value)
-  await Promise.all([
-    loadSalesCount(competenceKey.value, generation),
-    loadHistory(0, competenceKey.value, generation),
-    checkClosingStatus()
-  ])
+  await checkClosingStatus()
   if (isClosedCompetence.value) {
     await loadClosingReport(competenceKey.value)
+  } else {
+    await Promise.all([
+      loadSalesCount(competenceKey.value, generation),
+      loadHistory(0, competenceKey.value, generation)
+    ])
   }
 }
 

@@ -84,7 +84,7 @@
     <div class="rounded-2xl border border-sage-border bg-white shadow-sm overflow-hidden">
       <!-- Loading Skeleton -->
       <div v-if="loading" class="p-8 text-center space-y-3">
-        <div class="inline-block h-6 w-6 animate-spin rounded-full border-2 border-brand-dark border-t-transparent" />
+        <RefreshCw class="inline-block h-6 w-6 animate-spin text-brand" aria-hidden="true" />
         <p class="text-xs font-semibold text-sage-muted">Carregando relatório consolidado por colaborador…</p>
       </div>
 
@@ -227,7 +227,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Users, Search, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { Users, Search, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-vue-next'
 import { formatCurrencyPtBr } from '@/services/currencyUtils'
 
 const props = defineProps({

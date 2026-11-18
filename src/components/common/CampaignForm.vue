@@ -101,7 +101,7 @@
     <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
       <button type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-white" :disabled="isSubmitting" @click="emit('cancel')">Cancelar</button>
       <button type="submit" class="focus-ring inline-flex items-center justify-center rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="isSubmitting">
-        <span v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-brand-dark/30 border-t-brand-dark" aria-hidden="true"></span>
+        <span v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" aria-hidden="true"></span>
         {{ isSubmitting ? 'Salvando…' : submitLabel }}
       </button>
     </div>

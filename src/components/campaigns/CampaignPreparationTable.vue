@@ -128,7 +128,10 @@
         <tbody class="divide-y divide-sage-border-light">
           <tr v-if="carregando">
             <td :colspan="batch?.tipoBase !== 'HR' ? 9 : 8" class="p-8 text-center text-sage-muted">
-              Carregando linhas do lote...
+              <div class="flex items-center justify-center gap-2">
+                <RefreshCw class="h-4 w-4 animate-spin text-brand" />
+                <span>Carregando linhas do lote...</span>
+              </div>
             </td>
           </tr>
           <tr v-else-if="!linhas.length">

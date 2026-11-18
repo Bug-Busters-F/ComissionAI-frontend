@@ -8,7 +8,7 @@
       aria-haspopup="true"
       @click="toggleDropdown"
     >
-      <span v-if="isExportingState" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-dark border-t-transparent" />
+      <span v-if="isExportingState" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
       <Download v-else class="h-4 w-4 text-brand-dark" aria-hidden="true" />
       <span>{{ isExportingState ? 'Exportando…' : 'Exportar Relatório (.csv)' }}</span>
       <ChevronDown class="h-3.5 w-3.5 opacity-70 transition-transform" :class="{ 'rotate-180': isOpen }" aria-hidden="true" />

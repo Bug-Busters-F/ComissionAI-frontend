@@ -12,7 +12,13 @@
           <p v-if="!user" class="text-xs leading-5 text-sage-muted">Defina uma senha inicial com pelo menos 8 caracteres. Nenhum convite será enviado automaticamente.</p>
           <p v-if="error" role="alert" class="rounded-xl bg-danger-bg p-3 text-sm text-danger-dark">{{ error }}</p>
         </div>
-        <footer class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-sage-border-light p-6"><button type="button" :disabled="busy" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-semibold hover:bg-sage-light" @click="$emit('cancel')">Cancelar</button><button type="submit" :disabled="busy" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold hover:bg-brand-hover disabled:opacity-50">{{ busy ? 'Salvando…' : user ? 'Salvar alterações' : 'Adicionar usuário' }}</button></footer>
+        <footer class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-sage-border-light p-6">
+          <button type="button" :disabled="busy" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-semibold hover:bg-sage-light" @click="$emit('cancel')">Cancelar</button>
+          <button type="submit" :disabled="busy" class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-5 py-3 text-sm font-bold hover:bg-brand-hover disabled:opacity-50">
+            <span v-if="busy" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            <span>{{ busy ? 'Salvando…' : user ? 'Salvar alterações' : 'Adicionar usuário' }}</span>
+          </button>
+        </footer>
       </form>
     </dialog>
   </Teleport>
