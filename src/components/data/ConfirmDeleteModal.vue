@@ -29,7 +29,7 @@
               {{ store.modalExclusao.detalhes }}
             </div>
             <p class="mt-3 text-[11px] font-semibold text-danger">
-              Esta ação removerá o registro do sistema e não poderá ser desfeita.
+              {{ store.modalExclusao.tipo === 'ENVIO' ? 'Os dados serão removidos; o registro histórico será mantido para consulta.' : 'Esta ação removerá o registro do sistema e não poderá ser desfeita.' }}
             </p>
           </div>
         </div>
