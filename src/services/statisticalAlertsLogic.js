@@ -195,8 +195,11 @@ export function parseComparableGroup(grupoStr) {
       competencia = part
       continue
     }
-    const [key, val] = part.split('=')
-    if (!key || val === undefined) continue
+    const [key, rawVal] = part.split('=')
+    if (!key || rawVal === undefined) continue
+    // Código ausente no cadastro chega como "null" (String.valueOf do back): não exibir "Loja null".
+    const val = rawVal.trim()
+    if (!val || val.toLowerCase() === 'null') continue
     const lowerKey = key.toLowerCase()
     if (lowerKey === 'loja') loja = val
     else if (lowerKey === 'cargo') cargo = val
@@ -534,4 +537,34 @@ export function createLatestGuard() {
     next: () => ++current,
     isCurrent: token => token === current
   }
+}
+
+// ---------------------------------------------------------------------------
+// Análise estatística assíncrona após a efetivação
+// ---------------------------------------------------------------------------
+
+/**
+ * O back passou a rodar a análise estatística depois do commit da efetivação (pendência 5 da FRONT-6).
+ * Logo após efetivar, a listagem pode ainda não refletir os novos alertas: a tela reconsulta nestes intervalos.
+ */
+export const POST_EFFECTIVE_POLL_DELAYS_MS = Object.freeze([3000, 6000, 12000, 20000, 30000])
+
+/** Motivo exibido no botão "Reprocessar Lote" enquanto a análise automática pós-efetivação não termina. */
+export const POST_EFFECTIVE_REPROCESS_HINT = 'Aguarde a análise automática da efetivação terminar antes de reprocessar o lote.'
+
+/**
+ * Assinatura da listagem para detectar que a análise assíncrona terminou:
+ * contadores por tipo + data de geração mais recente na página (alertas substituídos ganham novo geradoEm).
+ *
+ * @param {{ totalGeral?: number, totalOutliers?: number, totalInconsistencias?: number }} counts
+ * @param {{ content?: Array<{ geradoEm?: string }> }} page
+ * @returns {string}
+ */
+export function alertsListSignature(counts, page) {
+  const c = counts || {}
+  const latest = (Array.isArray(page?.content) ? page.content : [])
+    .map(a => Date.parse(a?.geradoEm))
+    .filter(Number.isFinite)
+    .reduce((max, t) => Math.max(max, t), 0)
+  return [c.totalGeral ?? 0, c.totalOutliers ?? 0, c.totalInconsistencias ?? 0, latest].join('|')
 }

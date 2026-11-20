@@ -149,7 +149,8 @@ watch(anomalyCompetence, () => {
 
 async function handleBaseEffective() {
   await loadAnomalyLots()
-  anomaliesSectionRef.value?.reloadAlerts()
+  // A análise estatística passou a rodar no back depois do commit: acompanha até os alertas aparecerem.
+  anomaliesSectionRef.value?.reloadAfterEffective()
 }
 function dateTime(value) {
   if (!value) return 'Não informado'
@@ -237,6 +238,11 @@ async function checkVigenciaClosings(campaignData) {
   if (!campaignData?.dataInicio || !campaignData?.dataFim) return
   closedCompetencesInVigencia.value = []
   isClosingStatusRestricted.value = false
+  // Perfis sem acesso ao histórico de fechamentos recebem direto o aviso neutro, sem disparar um 403 conhecido.
+  if (!access.can('viewClosings')) {
+    isClosingStatusRestricted.value = true
+    return
+  }
   try {
     const page = await listClosings({ size: 100 })
     const closings = page?.content || []

@@ -65,4 +65,9 @@ describe('preview role permissions', () => {
     expect(canAccess('ANALISTA_CODIGO', 'reprocessAnomalies')).toBe(false)
     expect(canAccess('UNKNOWN', 'reprocessAnomalies')).toBe(false)
   })
+
+  it('só consulta o histórico de fechamentos quando o perfil tem acesso (evita 403 conhecido na campanha)', () => {
+    for (const role of ['ADMINISTRADOR', 'GERENTE_VENDAS', 'AUDITOR']) expect(canAccess(role, 'viewClosings')).toBe(true)
+    for (const role of ['ANALISTA_NEGOCIOS', 'ANALISTA_CODIGO']) expect(canAccess(role, 'viewClosings')).toBe(false)
+  })
 })
