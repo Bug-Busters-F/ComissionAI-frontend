@@ -71,7 +71,7 @@
             <!-- Estado de sucesso com dados -->
             <p v-else class="mt-0.5 text-xs text-sage-muted">
               Competência em exibição: <strong class="text-brand-dark">{{ formatCompetenceDisplay(anomalySummary.competencia) }}</strong> ·
-              <strong class="text-brand-dark">{{ anomalySummary.totalOutliers }}</strong> anomalia(s) estatística(s) (&gt;3σ) e
+              <strong class="text-brand-dark">{{ anomalySummary.totalOutliers }}</strong> anomalia(s) estatística(s) (|Z| ≥ 3) e
               <strong class="text-brand-dark">{{ anomalySummary.totalInconsistencias }}</strong> inconsistência(s) de carga.
             </p>
           </div>
@@ -155,7 +155,7 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { AlertTriangle } from 'lucide-vue-next'
 import defaultStatisticalAlertsApi from '@/services/statisticalAlertsApi'
-import { extractAlertCompetence } from '@/services/statisticalAlertsLogic'
+import { extractAlertCompetence, describeAlertsError, formatCompetenceLabel } from '@/services/statisticalAlertsLogic'
 import { campaignDemo, isCampaignDemoEnabled } from '@/services/campaignDemo'
 import { campaignService, normalizeCampaignError } from '@/services/campaignService'
 import { campaignStateTone, formatCampaignState, formatPeriod } from '@/services/campaignMappers'
@@ -189,12 +189,7 @@ const anomalySummary = ref({
   ...(props.initialAnomalySummary || {})
 })
 
-function formatCompetenceDisplay(comp) {
-  if (!comp) return ''
-  const m = String(comp).match(/^(\d{4})-(\d{2})$/)
-  if (m) return `${m[2]}/${m[1]}`
-  return comp
-}
+const formatCompetenceDisplay = formatCompetenceLabel
 
 const process = [
   { number: 1, title: 'Prepare as bases mensais', detail: 'Importe RH, Vendas e Comissão.' },
@@ -237,7 +232,7 @@ async function loadAnomalySummary(competence) {
     anomalySummary.value.totalInconsistencias = counts?.totalInconsistencias ?? 0
     anomalySummary.value.totalGeral = counts?.totalGeral ?? 0
   } catch (err) {
-    anomalySummary.value.error = err?.response?.data?.message || err?.message || 'Falha ao consultar alertas no servidor.'
+    anomalySummary.value.error = describeAlertsError(err, 'list')
   } finally {
     anomalySummary.value.loading = false
   }

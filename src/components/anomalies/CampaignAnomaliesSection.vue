@@ -9,39 +9,61 @@
           </h2>
           <span
             v-if="counts.totalGeral > 0"
-            class="rounded-full bg-danger-bg border border-danger/30 px-2.5 py-0.5 text-xs font-extrabold text-danger-dark"
+            class="shrink-0 whitespace-nowrap rounded-full bg-danger-bg border border-danger/30 px-2.5 py-0.5 text-xs font-extrabold text-danger-dark"
           >
             {{ counts.totalGeral }} caso(s)
           </span>
         </div>
         <p class="mt-1 text-xs text-sage-muted">
-          Detecção de outliers em vendas diárias e inconsistências cadastrais para a competência
-          <strong class="text-brand-dark">{{ formatCompetenceDisplay(selectedCompetence) }}</strong>.
+          <template v-if="selectedCompetence">
+            Detecção de outliers em vendas diárias e inconsistências cadastrais para a competência
+            <strong class="text-brand-dark">{{ formatCompetenceLabel(selectedCompetence) }}</strong>.
+          </template>
+          <template v-else>Detecção de outliers em vendas diárias e inconsistências cadastrais.</template>
         </p>
       </div>
 
       <div class="flex flex-wrap items-center gap-3">
-        <!-- Ação de Reprocessar Lote de Bases (SoD / Auditor apenas consulta) -->
+        <!-- Modo Demonstração quando ativo -->
+        <div v-if="isDemoMode" class="flex items-center gap-2">
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-warning-bg border border-warning-border px-3 py-1 text-xs font-bold text-warning-dark">
+            <Sparkles class="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Dados de Exemplo Ativos</span>
+          </span>
+          <button
+            type="button"
+            class="focus-ring inline-flex items-center gap-1 rounded-full border border-sage-border bg-white px-3 py-1.5 text-xs font-bold text-sage-muted hover:text-brand-dark hover:bg-sage-light transition"
+            title="Voltar a consultar os alertas reais do servidor"
+            @click="resetToRealData"
+          >
+            <span>Voltar aos dados reais</span>
+          </button>
+        </div>
+
+        <!-- Ação de Reprocessar Lote (SoD: Auditor apenas consulta) -->
         <span
           v-if="selectedLot"
           class="inline-block"
-          :title="!canReprocess ? 'Seu perfil permite somente consulta. Nenhuma alteração pode ser feita.' : 'Reprocessar anomalias para o lote selecionado'"
+          :title="canReprocess ? 'Reprocessar anomalias para o lote selecionado' : deniedMessage"
         >
           <button
+            ref="reprocessTriggerRef"
             type="button"
             class="focus-ring inline-flex items-center gap-2 rounded-full border border-warning-border bg-warning-bg px-4 py-2 text-xs font-bold text-warning-dark transition hover:bg-warning-bg/80 disabled:cursor-not-allowed disabled:opacity-50 pointer-events-auto"
             :disabled="isReprocessing || !canReprocess"
+            :aria-describedby="!canReprocess ? 'reprocess-denied-hint' : undefined"
             @click="openReprocessModal"
           >
             <RefreshCw class="h-3.5 w-3.5" :class="{ 'animate-spin': isReprocessing }" aria-hidden="true" />
             <span>{{ isReprocessing ? 'Reprocessando…' : 'Reprocessar Lote' }}</span>
           </button>
+          <span v-if="!canReprocess" id="reprocess-denied-hint" class="sr-only">{{ deniedMessage }}</span>
         </span>
 
         <button
           type="button"
           class="focus-ring inline-flex items-center gap-2 rounded-full border border-sage-border-dark bg-white px-4 py-2 text-xs font-bold text-brand-dark transition hover:bg-sage-light disabled:opacity-50"
-          :disabled="isLoading"
+          :disabled="isLoading || !selectedCompetence"
           title="Recarregar alertas estatísticos"
           @click="reloadAlerts"
         >
@@ -53,12 +75,13 @@
 
     <!-- Feedback de Reprocessamento -->
     <div
-      v-if="reprocessSuccessMessage"
-      class="rounded-xl border border-success/30 bg-success-bg p-3.5 text-xs font-bold text-success-dark flex items-center justify-between gap-2"
+      v-if="reprocessFeedback"
+      class="rounded-xl border p-3.5 text-xs font-bold flex items-center justify-between gap-2"
+      :class="reprocessFeedback.tone === 'neutral' ? 'border-sage-border bg-sage-light text-brand-dark' : 'border-success/30 bg-success-bg text-success-dark'"
       role="status"
     >
-      <span>{{ reprocessSuccessMessage }}</span>
-      <button type="button" class="text-success-dark hover:opacity-70 text-xs font-bold" @click="reprocessSuccessMessage = ''">✕</button>
+      <span>{{ reprocessFeedback.message }}</span>
+      <button type="button" class="hover:opacity-70 text-xs font-bold" aria-label="Fechar aviso" @click="reprocessFeedback = null">✕</button>
     </div>
     <div
       v-if="reprocessErrorMessage"
@@ -66,7 +89,7 @@
       role="alert"
     >
       <span>{{ reprocessErrorMessage }}</span>
-      <button type="button" class="text-danger-dark hover:opacity-70 text-xs font-bold" @click="reprocessErrorMessage = ''">✕</button>
+      <button type="button" class="text-danger-dark hover:opacity-70 text-xs font-bold" aria-label="Fechar aviso de erro" @click="reprocessErrorMessage = ''">✕</button>
     </div>
 
     <!-- Barra de Filtros e Chips por Tipo -->
@@ -75,60 +98,24 @@
         <!-- Chips por Classificação (com contadores do backend) -->
         <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrar por classificação">
           <button
+            v-for="chip in typeChips"
+            :key="chip.value || 'todos'"
             type="button"
             class="focus-ring inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition"
-            :class="selectedType === '' ? 'bg-brand text-brand-dark shadow-sm' : 'bg-sage-light text-sage-muted hover:bg-sage-border-light hover:text-brand-dark'"
-            @click="setTypeFilter('')"
+            :class="selectedType === chip.value ? 'bg-brand text-brand-dark shadow-sm' : 'bg-sage-light text-sage-muted hover:bg-sage-border-light hover:text-brand-dark'"
+            :aria-pressed="selectedType === chip.value"
+            @click="setTypeFilter(chip.value)"
           >
-            <span>Todos</span>
-            <span class="rounded-full bg-brand-dark/10 px-1.5 py-0.2 text-[11px] font-extrabold">
-              {{ counts.totalGeral }}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            class="focus-ring inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition"
-            :class="selectedType === TIPO_ALERTA.OUTLIER_VENDA ? 'bg-brand text-brand-dark shadow-sm' : 'bg-sage-light text-sage-muted hover:bg-sage-border-light hover:text-brand-dark'"
-            @click="setTypeFilter(TIPO_ALERTA.OUTLIER_VENDA)"
-          >
-            <span class="h-2 w-2 rounded-full bg-danger shrink-0" aria-hidden="true"></span>
-            <span>Anomalias</span>
-            <span class="rounded-full bg-brand-dark/10 px-1.5 py-0.2 text-[11px] font-extrabold">
-              {{ counts.totalOutliers }}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            class="focus-ring inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition"
-            :class="selectedType === TIPO_ALERTA.SEM_VENDAS_PARA_RH ? 'bg-brand text-brand-dark shadow-sm' : 'bg-sage-light text-sage-muted hover:bg-sage-border-light hover:text-brand-dark'"
-            @click="setTypeFilter(TIPO_ALERTA.SEM_VENDAS_PARA_RH)"
-          >
-            <span class="h-2 w-2 rounded-full bg-warning shrink-0" aria-hidden="true"></span>
-            <span>Inconsistências de Carga</span>
-            <span class="rounded-full bg-brand-dark/10 px-1.5 py-0.2 text-[11px] font-extrabold">
-              {{ counts.totalInconsistencias }}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            class="focus-ring inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition"
-            :class="selectedType === TIPO_ALERTA.AMOSTRA_INSUFICIENTE ? 'bg-brand text-brand-dark shadow-sm' : 'bg-sage-light text-sage-muted hover:bg-sage-border-light hover:text-brand-dark'"
-            @click="setTypeFilter(TIPO_ALERTA.AMOSTRA_INSUFICIENTE)"
-          >
-            <span class="h-2 w-2 rounded-full bg-sage-muted shrink-0" aria-hidden="true"></span>
-            <span>Amostra Insuficiente</span>
-            <span class="rounded-full bg-brand-dark/10 px-1.5 py-0.2 text-[11px] font-extrabold">
-              {{ counts.totalSemAmostra }}
+            <span v-if="chip.dot" class="h-2 w-2 rounded-full shrink-0" :class="chip.dot" aria-hidden="true"></span>
+            <span>{{ chip.label }}</span>
+            <span class="rounded-full bg-brand-dark/10 px-1.5 py-0.5 text-[11px] font-extrabold">
+              {{ counts[chip.countKey] }}
             </span>
           </button>
         </div>
 
         <!-- Filtros de Competência, Lote e Matrícula -->
         <div class="flex flex-wrap items-center gap-2.5">
-          <!-- Seletor de Competência da Vigência (quando multi-competência) -->
           <div v-if="availableCompetences.length > 1" class="flex items-center">
             <label class="sr-only" for="anomaly-competence-filter">Competência</label>
             <select
@@ -138,36 +125,35 @@
               @change="handleCompetenceChange"
             >
               <option v-for="comp in availableCompetences" :key="comp" :value="comp">
-                {{ formatCompetenceDisplay(comp) }}
+                {{ formatCompetenceLabel(comp) }}
               </option>
             </select>
           </div>
 
-          <!-- Seletor de Lote da Campanha -->
-          <div v-if="activeLots.length" class="flex items-center">
+          <div v-if="availableLots.length" class="flex items-center">
             <label class="sr-only" for="anomaly-lot-filter">Filtrar por lote</label>
             <select
               id="anomaly-lot-filter"
               v-model="selectedLot"
-              class="campaign-control text-xs max-w-[210px]"
+              class="campaign-control text-xs max-w-[260px]"
               @change="handleFilterChange"
             >
               <option value="">Todos os lotes da competência</option>
-              <option v-for="lote in activeLots" :key="lote.id" :value="lote.id">
-                {{ lote.tipoBase || 'LOTE' }} — {{ lote.nomeArquivo || lote.id.slice(0, 8) }}
+              <option v-for="lote in availableLots" :key="lote.id" :value="lote.id">
+                {{ lote.label }}
               </option>
             </select>
           </div>
 
-          <!-- Filtro por Matrícula -->
           <div class="flex items-center">
-            <label class="sr-only" for="anomaly-matricula-filter">Filtrar matrícula</label>
+            <label class="sr-only" for="anomaly-matricula-filter">Filtrar por matrícula exata</label>
             <input
               id="anomaly-matricula-filter"
               v-model="matriculaFilter"
               type="search"
               class="campaign-control text-xs max-w-[170px]"
-              placeholder="Buscar matrícula"
+              placeholder="Matrícula exata"
+              :disabled="!selectedCompetence"
               @input="handleMatriculaDebounced"
             />
           </div>
@@ -175,7 +161,7 @@
       </div>
     </div>
 
-    <!-- Estado: Carregando -->
+    <!-- Estado: Carregando (primeira carga) -->
     <div v-if="isLoading && !alerts.content.length" class="p-12 text-center space-y-3" role="status">
       <RefreshCw class="mx-auto h-7 w-7 animate-spin text-brand" aria-hidden="true" />
       <p class="text-sm font-semibold text-sage-muted">Carregando alertas estatísticos…</p>
@@ -199,33 +185,60 @@
       </div>
     </div>
 
+    <!-- Estado: Sem competência definida -->
+    <div
+      v-else-if="!selectedCompetence"
+      class="rounded-2xl border border-sage-border bg-sage-light/40 p-10 text-center space-y-2"
+      role="status"
+    >
+      <h3 class="text-base font-extrabold text-brand-dark">Selecione uma competência</h3>
+      <p class="text-xs text-sage-muted max-w-md mx-auto">
+        Escolha a competência na seção de bases da campanha para consultar os alertas estatísticos.
+      </p>
+    </div>
+
     <!-- Estado: Vazio -->
     <div
       v-else-if="!alerts.content.length"
-      class="rounded-2xl border border-sage-border bg-sage-light/40 p-10 text-center space-y-2"
+      class="rounded-2xl border border-sage-border bg-sage-light/40 p-10 text-center space-y-3"
       role="status"
     >
       <CheckCircle2 class="mx-auto h-8 w-8 text-success-dark opacity-80" aria-hidden="true" />
       <h3 class="text-base font-extrabold text-brand-dark">Nenhum alerta ou anomalia estatística encontrada</h3>
       <p class="text-xs text-sage-muted max-w-md mx-auto">
-        Não foram identificados desvios estatísticos superiores a 3σ ou inconsistências de cadastro para os filtros informados.
+        Não foram identificados desvios estatísticos com |Z| ≥ 3 ou inconsistências de cadastro para os filtros informados.
       </p>
+      <div v-if="demoEnabled && !isDemoMode" class="pt-2 flex flex-wrap items-center justify-center gap-2">
+        <button
+          type="button"
+          class="focus-ring inline-flex items-center gap-2 rounded-full border border-brand bg-brand px-4 py-2 text-xs font-bold text-brand-dark transition hover:bg-brand-hover shadow-sm"
+          @click="loadDemoAnomalies"
+        >
+          <Sparkles class="h-3.5 w-3.5" aria-hidden="true" />
+          <span>Carregar Dados de Exemplo (Demonstração)</span>
+        </button>
+      </div>
     </div>
 
     <!-- Tabela de Alertas Estatísticos -->
     <div v-else class="space-y-4">
-      <div class="overflow-x-auto rounded-2xl border border-sage-border">
+      <p v-if="isLoading" class="sr-only" role="status">Atualizando alertas estatísticos…</p>
+      <div
+        class="overflow-x-auto rounded-2xl border border-sage-border transition-opacity"
+        :class="{ 'opacity-60': isLoading }"
+        :aria-busy="isLoading ? 'true' : 'false'"
+      >
         <table class="w-full min-w-[960px] text-left text-xs">
           <thead class="bg-sage-pill text-[10px] font-bold uppercase tracking-[0.1em] text-sage-muted border-b border-sage-border">
             <tr>
               <th scope="col" class="px-3.5 py-3.5">Classificação</th>
-              <th scope="col" class="px-3.5 py-3.5">Data</th>
+              <th scope="col" class="px-3.5 py-3.5">Referência</th>
               <th scope="col" class="px-3.5 py-3.5">Matrícula</th>
               <th scope="col" class="px-3.5 py-3.5">Grupo Comparável</th>
               <th scope="col" class="px-3.5 py-3.5 text-right font-black text-brand-dark">Valor Observado</th>
               <th scope="col" class="px-3.5 py-3.5 text-center">Faixa Esperada</th>
               <th scope="col" class="px-3.5 py-3.5 text-center">Método</th>
-              <th scope="col" class="px-3.5 py-3.5 min-w-[240px]">Explicação Orientativa</th>
+              <th scope="col" class="px-3.5 py-3.5 min-w-[420px]">Explicação Orientativa</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-sage-border-light text-sage-subtle">
@@ -234,7 +247,6 @@
               :key="alerta.id"
               class="transition hover:bg-sage-light/50"
             >
-              <!-- Classificação com Badges Diferenciados -->
               <td class="px-3.5 py-3.5 whitespace-nowrap">
                 <span
                   v-if="alerta.tipo === TIPO_ALERTA.OUTLIER_VENDA"
@@ -259,24 +271,21 @@
                 </span>
               </td>
 
-              <!-- Data da Venda / Referência -->
-              <td class="px-3.5 py-3.5 whitespace-nowrap text-sage-muted font-mono font-medium">
-                {{ formatAlertDate(alerta.dataReferencia) }}
+              <td class="px-3.5 py-3.5 whitespace-nowrap">
+                <span class="block text-sage-muted font-mono font-medium">{{ getAlertReferenceLabel(alerta).value }}</span>
+                <span class="block text-[10px] text-sage-muted">{{ getAlertReferenceLabel(alerta).hint }}</span>
               </td>
 
-              <!-- Matrícula -->
               <td class="px-3.5 py-3.5 whitespace-nowrap font-mono font-bold text-brand-dark">
                 {{ alerta.matricula || '—' }}
               </td>
 
-              <!-- Grupo Comparável Estruturado -->
               <td class="px-3.5 py-3.5 font-medium text-brand-dark">
-                <span class="block text-xs font-semibold">
+                <span class="block text-xs font-semibold whitespace-nowrap" :title="alerta.grupoComparavel || ''">
                   {{ parseComparableGroup(alerta.grupoComparavel).label }}
                 </span>
               </td>
 
-              <!-- Valor da Venda (Observado) -->
               <td class="px-3.5 py-3.5 text-right whitespace-nowrap font-black text-brand-dark">
                 <template v-if="alerta.valorObservado != null">
                   <span class="text-xs">{{ formatCurrency(alerta.valorObservado) }}</span>
@@ -288,25 +297,24 @@
                 </template>
               </td>
 
-              <!-- Faixa Esperada Provisória (Leave-One-Out) -->
               <td class="px-3.5 py-3.5 text-center whitespace-nowrap">
                 <template v-if="getEstimatedRange(alerta)">
                   <span class="text-xs font-bold text-brand-dark">{{ getEstimatedRange(alerta).label }}</span>
-                  <span class="block text-[10px] font-medium text-sage-muted">Faixa estimada (±3σ)</span>
+                  <span class="block text-[10px] font-medium text-sage-muted">
+                    {{ getEstimatedRange(alerta).uniform ? 'Desvio padrão zero no grupo' : 'Faixa estimada (±3σ)' }}
+                  </span>
                 </template>
                 <template v-else>
                   <span class="text-sage-muted">—</span>
                 </template>
               </td>
 
-              <!-- Método Estatístico -->
               <td class="px-3.5 py-3.5 text-center whitespace-nowrap">
-                <span class="rounded bg-sage-light px-2 py-0.5 text-[10px] font-mono font-bold text-sage-muted">
-                  {{ alerta.metodo || '—' }}
+                <span class="rounded bg-sage-light px-2 py-0.5 text-[10px] font-bold text-sage-muted" :title="alerta.metodo || ''">
+                  {{ formatMethodLabel(alerta) }}
                 </span>
               </td>
 
-              <!-- Explicação Orientativa Contextual -->
               <td class="px-3.5 py-3.5 text-xs text-sage-subtle leading-relaxed">
                 {{ getAlertExplanation(alerta) }}
               </td>
@@ -315,7 +323,6 @@
         </table>
       </div>
 
-      <!-- Paginação Oficial -->
       <div v-if="alerts.totalPages > 1" class="flex items-center justify-between gap-4 border-t border-sage-border pt-4">
         <button
           type="button"
@@ -341,16 +348,23 @@
       </div>
     </div>
 
-    <!-- Modal de Confirmação de Reprocessamento de Lote -->
+    <!-- Modal de Confirmação de Reprocessamento de Lote (teleportado para cobrir também a sidebar) -->
+    <Teleport to="body">
     <div
       v-if="showReprocessModal"
       class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 sm:p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="reprocess-modal-title"
-      @keydown.esc="closeReprocessModal"
+      @click.self="closeReprocessModal"
     >
-      <div class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4">
+      <div
+        ref="reprocessDialogRef"
+        class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4 outline-none"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reprocess-modal-title"
+        aria-describedby="reprocess-modal-description"
+        tabindex="-1"
+        @keydown.esc.stop="closeReprocessModal"
+      >
         <div class="flex items-start justify-between border-b border-sage-border-light pb-3">
           <div class="flex items-center gap-2">
             <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-warning-bg text-warning-dark">
@@ -362,18 +376,19 @@
           </div>
           <button
             type="button"
-            @click="closeReprocessModal"
             class="focus-ring rounded-lg p-1 text-sage-muted hover:text-brand-dark"
             aria-label="Fechar modal"
+            :disabled="isReprocessing"
+            @click="closeReprocessModal"
           >
             ✕
           </button>
         </div>
 
-        <p class="text-xs text-sage-muted leading-relaxed">
-          Esta ação solicitará ao servidor a reanálise estatística completa para o lote de preparação
-          <strong class="text-brand-dark font-bold font-mono">{{ selectedLot }}</strong>.
-          Os alertas e métricas estatísticas da campanha serão recalculados.
+        <p id="reprocess-modal-description" class="text-xs text-sage-muted leading-relaxed">
+          Esta ação solicitará ao servidor a reanálise estatística completa do lote de preparação
+          <strong class="text-brand-dark font-bold">{{ selectedLotLabel }}</strong>.
+          Alertas cujas bases mudaram serão substituídos; se nada mudou, nenhum alerta é recalculado.
         </p>
 
         <div class="flex items-center justify-end gap-3 pt-2">
@@ -397,12 +412,13 @@
         </div>
       </div>
     </div>
+    </Teleport>
   </section>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-vue-next'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { RefreshCw, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-vue-next'
 import { formatCurrencyPtBr } from '@/services/currencyUtils'
 import defaultStatisticalAlertsApi from '@/services/statisticalAlertsApi'
 import { useAccessPolicy } from '@/services/useAccessPolicy'
@@ -411,115 +427,126 @@ import {
   TIPO_ALERTA_LABEL,
   getEstimatedRange,
   parseComparableGroup,
-  formatAlertDate,
-  getAlertExplanation
+  getAlertReferenceLabel,
+  formatMethodLabel,
+  formatCompetenceLabel,
+  getAlertExplanation,
+  buildLotOptions,
+  describeAlertsError,
+  describeReprocessResult,
+  reprocessDeniedMessage,
+  createLatestGuard
 } from '@/services/statisticalAlertsLogic'
+import {
+  isAnomaliesDemoEnabled,
+  buildDemoAlerts,
+  buildDemoLots,
+  filterDemoAlerts,
+  countDemoAlerts,
+  simulateDemoReprocess,
+  DEMO_LOT_SALES_ID
+} from '@/services/statisticalAlertsDemo'
 
 const props = defineProps({
-  campaign: {
-    type: Object,
-    default: () => ({})
-  },
-  activeLots: {
-    type: Array,
-    default: () => []
-  },
-  competence: {
-    type: String,
-    default: ''
-  },
-  initialAlerts: {
-    type: Object,
-    default: null
-  },
-  apiClient: {
-    type: Object,
-    default: null
-  },
-  accessPolicy: {
-    type: Object,
-    default: null
-  }
+  campaign: { type: Object, default: () => ({}) },
+  /** Lotes de preparação (LotePreparacaoResponseDTO) da campanha; apenas EFETIVADO são exibidos. */
+  activeLots: { type: Array, default: () => [] },
+  /** Competência AAAA-MM sincronizada pela tela (v-model:competence). */
+  competence: { type: String, default: '' },
+  initialAlerts: { type: Object, default: null },
+  apiClient: { type: Object, default: null },
+  accessPolicy: { type: Object, default: null },
+  /** Permite o modo demonstração; por padrão segue VITE_ANOMALIES_DEMO. */
+  demoEnabled: { type: Boolean, default: isAnomaliesDemoEnabled }
 })
 
-const emit = defineEmits(['loaded'])
+const emit = defineEmits(['loaded', 'reprocessed', 'update:competence'])
 
+const EMPTY_PAGE = Object.freeze({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 20 })
+const EMPTY_COUNTS = Object.freeze({ totalOutliers: 0, totalInconsistencias: 0, totalSemAmostra: 0, totalGeral: 0 })
+const pageSize = 20
+
+const typeChips = [
+  { value: '', label: 'Todos', countKey: 'totalGeral', dot: '' },
+  { value: TIPO_ALERTA.OUTLIER_VENDA, label: 'Anomalias', countKey: 'totalOutliers', dot: 'bg-danger' },
+  { value: TIPO_ALERTA.SEM_VENDAS_PARA_RH, label: 'Inconsistências de Carga', countKey: 'totalInconsistencias', dot: 'bg-warning' },
+  { value: TIPO_ALERTA.AMOSTRA_INSUFICIENTE, label: 'Amostra Insuficiente', countKey: 'totalSemAmostra', dot: 'bg-sage-muted' }
+]
+
+// ----- Acesso (SoD) -----
 let safeAccess = null
 try {
   safeAccess = useAccessPolicy()
 } catch {
-  safeAccess = { can: () => true }
+  safeAccess = { can: () => true, role: null }
 }
-
 const access = computed(() => props.accessPolicy || safeAccess)
 const canReprocess = computed(() => access.value.can('reprocessAnomalies'))
-const isReprocessing = ref(false)
-const showReprocessModal = ref(false)
-const reprocessSuccessMessage = ref('')
-const reprocessErrorMessage = ref('')
+const currentRole = computed(() => {
+  const r = access.value.role
+  return r && typeof r === 'object' && 'value' in r ? r.value : r
+})
+const deniedMessage = computed(() => reprocessDeniedMessage(currentRole.value))
 
 const api = computed(() => props.apiClient || defaultStatisticalAlertsApi)
 
-// Estados de filtro e paginação
+// ----- Filtros e paginação -----
 const selectedType = ref('')
 const selectedLot = ref('')
 const matriculaFilter = ref('')
 const page = ref(0)
-const pageSize = 20
 const sort = ref('geradoEm,desc')
 
-// Determina competência inicial com base na campanha ou prop
-const initialComp = computed(() => {
-  if (props.competence) return props.competence
-  if (props.campaign?.dataInicio) return String(props.campaign.dataInicio).slice(0, 7)
-  return '2025-08'
-})
+function campaignStartCompetence() {
+  return props.campaign?.dataInicio ? String(props.campaign.dataInicio).slice(0, 7) : ''
+}
 
-const selectedCompetence = ref(initialComp.value)
+const selectedCompetence = ref(props.competence || campaignStartCompetence())
 
-// Computa competências disponíveis se a vigência abranger múltiplos meses
 const availableCompetences = computed(() => {
-  const start = props.campaign?.dataInicio ? String(props.campaign.dataInicio).slice(0, 7) : ''
+  const start = campaignStartCompetence()
   const end = props.campaign?.dataFim ? String(props.campaign.dataFim).slice(0, 7) : ''
-  if (!start) return [selectedCompetence.value].filter(Boolean)
-  if (!end || start === end) return [start]
-
   const list = []
-  let curr = start
-  list.push(curr)
-  while (curr < end) {
-    const [anoStr, mesStr] = curr.split('-')
-    let ano = parseInt(anoStr, 10)
-    let mes = parseInt(mesStr, 10) + 1
-    if (mes > 12) {
-      mes = 1
-      ano += 1
+  if (start) {
+    list.push(start)
+    let curr = start
+    while (end && curr < end && list.length <= 24) {
+      const [anoStr, mesStr] = curr.split('-')
+      let ano = parseInt(anoStr, 10)
+      let mes = parseInt(mesStr, 10) + 1
+      if (mes > 12) { mes = 1; ano += 1 }
+      curr = `${ano}-${String(mes).padStart(2, '0')}`
+      list.push(curr)
     }
-    curr = `${ano}-${String(mes).padStart(2, '0')}`
-    list.push(curr)
-    if (list.length > 24) break // Trava de segurança
   }
-  return list
+  // Competência sincronizada fora da vigência continua selecionável para não deixar o seletor inconsistente
+  if (selectedCompetence.value && !list.includes(selectedCompetence.value)) list.push(selectedCompetence.value)
+  return list.sort()
 })
 
-// Estados de dados e carregamento
-const alerts = ref(props.initialAlerts || {
-  content: [],
-  totalElements: 0,
-  totalPages: 0,
-  number: 0,
-  size: pageSize
-})
+// ----- Modo demonstração -----
+const isDemoMode = ref(false)
+const demoAlerts = computed(() => (isDemoMode.value ? buildDemoAlerts(selectedCompetence.value) : []))
 
-const counts = ref({
-  totalOutliers: 0,
-  totalInconsistencias: 0,
-  totalSemAmostra: 0,
-  totalGeral: 0
-})
+const availableLots = computed(() =>
+  isDemoMode.value ? buildLotOptions(buildDemoLots(selectedCompetence.value)) : buildLotOptions(props.activeLots)
+)
+const selectedLotLabel = computed(() => availableLots.value.find(l => l.id === selectedLot.value)?.label || selectedLot.value)
 
+// ----- Dados -----
+const alerts = ref(props.initialAlerts || { ...EMPTY_PAGE })
+const counts = ref({ ...EMPTY_COUNTS })
 const isLoading = ref(false)
 const loadError = ref('')
+const requestGuard = createLatestGuard()
+
+// ----- Reprocessamento -----
+const isReprocessing = ref(false)
+const showReprocessModal = ref(false)
+const reprocessFeedback = ref(null)
+const reprocessErrorMessage = ref('')
+const reprocessDialogRef = ref(null)
+const reprocessTriggerRef = ref(null)
 
 let debounceTimeout = null
 function handleMatriculaDebounced() {
@@ -535,9 +562,17 @@ function handleFilterChange() {
   void loadData()
 }
 
-function handleCompetenceChange() {
+function resetScopeForCompetence() {
   page.value = 0
   selectedLot.value = ''
+  isDemoMode.value = false
+  reprocessFeedback.value = null
+  reprocessErrorMessage.value = ''
+}
+
+function handleCompetenceChange() {
+  resetScopeForCompetence()
+  emit('update:competence', selectedCompetence.value)
   void loadData()
 }
 
@@ -553,16 +588,53 @@ function changePage(newPage) {
   void loadData()
 }
 
-async function loadData() {
-  isLoading.value = true
-  loadError.value = ''
+function loadDemoAnomalies() {
+  if (!props.demoEnabled || !selectedCompetence.value) return
+  isDemoMode.value = true
+  selectedLot.value = DEMO_LOT_SALES_ID
+  page.value = 0
+  void loadData()
+}
 
-  const baseFilters = {
+function resetToRealData() {
+  isDemoMode.value = false
+  selectedLot.value = ''
+  page.value = 0
+  reprocessFeedback.value = null
+  void loadData()
+}
+
+function currentBaseFilters() {
+  return {
     competencia: selectedCompetence.value,
     matricula: matriculaFilter.value.trim() || undefined,
     lotePreparacaoId: selectedLot.value || undefined
   }
+}
 
+async function loadData() {
+  const token = requestGuard.next()
+  loadError.value = ''
+
+  if (!selectedCompetence.value) {
+    isLoading.value = false
+    alerts.value = { ...EMPTY_PAGE }
+    counts.value = { ...EMPTY_COUNTS }
+    return
+  }
+
+  const baseFilters = currentBaseFilters()
+
+  if (isDemoMode.value) {
+    // Dados de exemplo nunca são emitidos para a tela pai (evento loaded) para não contaminar indicadores reais
+    const content = filterDemoAlerts(demoAlerts.value, { ...baseFilters, tipo: selectedType.value || undefined })
+    alerts.value = { content, totalElements: content.length, totalPages: content.length ? 1 : 0, number: 0, size: pageSize }
+    counts.value = countDemoAlerts(demoAlerts.value, baseFilters)
+    isLoading.value = false
+    return
+  }
+
+  isLoading.value = true
   try {
     const [alertsData, countsData] = await Promise.all([
       api.value.listAlerts({
@@ -574,14 +646,16 @@ async function loadData() {
       }),
       api.value.countAlertsByType(baseFilters)
     ])
+    if (!requestGuard.isCurrent(token)) return
 
-    alerts.value = alertsData || { content: [], totalElements: 0, totalPages: 0, number: 0, size: pageSize }
-    counts.value = countsData || { totalOutliers: 0, totalInconsistencias: 0, totalSemAmostra: 0, totalGeral: 0 }
+    alerts.value = alertsData || { ...EMPTY_PAGE }
+    counts.value = countsData || { ...EMPTY_COUNTS }
     emit('loaded', { alerts: alerts.value, counts: counts.value })
   } catch (err) {
-    loadError.value = err?.response?.data?.message || err?.message || 'Erro ao consultar alertas estatísticos.'
+    if (!requestGuard.isCurrent(token)) return
+    loadError.value = describeAlertsError(err, 'list')
   } finally {
-    isLoading.value = false
+    if (requestGuard.isCurrent(token)) isLoading.value = false
   }
 }
 
@@ -592,36 +666,42 @@ async function reloadAlerts() {
 function openReprocessModal() {
   if (!canReprocess.value || isReprocessing.value || !selectedLot.value) return
   showReprocessModal.value = true
+  void nextTick(() => reprocessDialogRef.value?.focus?.())
 }
 
 function closeReprocessModal() {
   if (isReprocessing.value) return
   showReprocessModal.value = false
+  void nextTick(() => reprocessTriggerRef.value?.focus?.())
 }
 
 async function confirmReprocessLote() {
   if (!selectedLot.value || !canReprocess.value || isReprocessing.value) return
+  const loteId = selectedLot.value
   isReprocessing.value = true
-  reprocessSuccessMessage.value = ''
+  reprocessFeedback.value = null
   reprocessErrorMessage.value = ''
+
   try {
-    await api.value.reprocessLote(selectedLot.value)
-    reprocessSuccessMessage.value = 'Lote reprocessado com sucesso! Alertas atualizados.'
-    showReprocessModal.value = false
+    let result
+    if (isDemoMode.value) {
+      await new Promise(resolve => setTimeout(resolve, 600))
+      result = simulateDemoReprocess(loteId, demoAlerts.value)
+    } else {
+      result = await api.value.reprocessLote(loteId)
+    }
+    reprocessFeedback.value = describeReprocessResult(result)
+    if (!isDemoMode.value) emit('reprocessed', result)
+    isReprocessing.value = false
+    closeReprocessModal()
     await loadData()
   } catch (err) {
-    reprocessErrorMessage.value = err?.response?.data?.message || err?.message || 'Falha ao reprocessar lote de bases.'
-    showReprocessModal.value = false
+    reprocessErrorMessage.value = describeAlertsError(err, 'reprocess')
+    isReprocessing.value = false
+    closeReprocessModal()
   } finally {
     isReprocessing.value = false
   }
-}
-
-function formatCompetenceDisplay(comp) {
-  if (!comp) return ''
-  const m = String(comp).match(/^(\d{4})-(\d{2})$/)
-  if (m) return `${m[2]}/${m[1]}`
-  return comp
 }
 
 function formatTypeLabel(tipo) {
@@ -635,6 +715,15 @@ function formatCurrency(val) {
 watch(() => props.competence, (newComp) => {
   if (newComp && newComp !== selectedCompetence.value) {
     selectedCompetence.value = newComp
+    resetScopeForCompetence()
+    void loadData()
+  }
+})
+
+// Lote selecionado que deixou de existir (descartado, outra competência) é limpo para não filtrar por id órfão
+watch(availableLots, (lots) => {
+  if (selectedLot.value && !lots.some(l => l.id === selectedLot.value)) {
+    selectedLot.value = ''
     page.value = 0
     void loadData()
   }
@@ -648,16 +737,26 @@ onMounted(() => {
   }
 })
 
+onBeforeUnmount(() => {
+  clearTimeout(debounceTimeout)
+})
+
 defineExpose({
   reloadAlerts,
   loadData,
   selectedCompetence,
   selectedType,
   selectedLot,
+  availableLots,
   alerts,
   counts,
+  isDemoMode,
   showReprocessModal,
+  reprocessFeedback,
+  reprocessErrorMessage,
   openReprocessModal,
-  confirmReprocessLote
+  confirmReprocessLote,
+  loadDemoAnomalies,
+  resetToRealData
 })
 </script>
