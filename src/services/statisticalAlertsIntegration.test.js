@@ -91,31 +91,33 @@ describe('statisticalAlertsIntegration — Testes de Integração de Fluxo e Con
     expect(explicacao).toContain('R$ 25.000,00')
     expect(explicacao).toContain('está acima da faixa estimada')
     expect(explicacao).toContain('Loja 10 · Cargo 5 · Marca 50')
-    expect(explicacao).toContain('score Z=13.33')
+    expect(explicacao).toContain('|Z| = 13,33')
   })
 
-  it('integra inconsistência de cadastro SEM_VENDAS_PARA_RH com dataReferencia nula', async () => {
+  it('integra inconsistência de cadastro SEM_VENDAS_PARA_RH no formato real do backend', async () => {
+    // AlertaEstatisticoService.alertaSemVendasRh: dia 1 da competência, grupo SEM_VENDAS_ASSOCIADAS, amostra 0
     const rawSemVendas = {
       id: 'alert-uuid-2',
       tipo: TIPO_ALERTA.SEM_VENDAS_PARA_RH,
-      dataReferencia: null,
+      dataReferencia: '2025-08-01',
       matricula: '8877',
-      grupoComparavel: '2025-08|loja=3|cargo=12|marca=1',
+      grupoComparavel: 'SEM_VENDAS_ASSOCIADAS',
+      tamanhoAmostra: 0,
       valorObservado: null,
       mediaGrupo: null,
       desvioPadrao: null,
       score: null,
-      metodo: 'CONSISTENCIA_CADASTRO'
+      metodo: 'Z_SCORE_LEAVE_ONE_OUT_V2'
     }
 
-    // Mesmo com dataReferencia nula, extrai a competência do grupoComparavel
     expect(extractAlertCompetence(rawSemVendas)).toBe('2025-08')
+    expect(parseComparableGroup(rawSemVendas.grupoComparavel).label).toBe('Sem vendas associadas')
     expect(getEstimatedRange(rawSemVendas)).toBeNull()
     expect(getAnomalyDirection(rawSemVendas)).toBe('INDEFINIDA')
 
     const exp = getAlertExplanation(rawSemVendas)
     expect(exp).toContain('matrícula 8877')
-    expect(exp).toContain('sem nenhuma venda registrada')
+    expect(exp).toContain('nenhuma venda foi associada')
   })
 
   it('garante que o perfil AUDITOR possui acesso de consulta e bloqueio de mutação', () => {

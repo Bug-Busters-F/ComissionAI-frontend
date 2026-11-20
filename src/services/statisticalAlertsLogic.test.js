@@ -155,7 +155,8 @@ describe('statisticalAlertsLogic — Regras e Adaptações de Alertas Estatísti
       expect(exp).toContain('acima')
       expect(exp).toContain('12.000')
       expect(exp).toContain('Loja 1 · Cargo 10 · Marca 100')
-      expect(exp).toContain('score Z=9.00')
+      expect(exp).toContain('|Z| = 9,00')
+      expect(exp).toContain('limiar |Z| ≥ 3')
     })
 
     it('gera explicação para SEM_VENDAS_PARA_RH com matrícula', () => {
@@ -165,7 +166,7 @@ describe('statisticalAlertsLogic — Regras e Adaptações de Alertas Estatísti
       }
       const exp = getAlertExplanation(alerta)
       expect(exp).toContain('matrícula M10293')
-      expect(exp).toContain('sem nenhuma venda registrada')
+      expect(exp).toContain('nenhuma venda foi associada')
     })
 
     it('gera explicação para AMOSTRA_INSUFICIENTE com contador e mínimo exigido', () => {
@@ -174,7 +175,7 @@ describe('statisticalAlertsLogic — Regras e Adaptações de Alertas Estatísti
         tamanhoAmostra: 2
       }
       const exp = getAlertExplanation(alerta)
-      expect(exp).toContain('2 observação(ões)')
+      expect(exp).toContain('2 venda(s), contando a própria venda analisada')
       expect(exp).toContain('mínimo necessário: 4')
     })
   })
