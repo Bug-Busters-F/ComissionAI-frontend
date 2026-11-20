@@ -29,6 +29,8 @@
       </template>
     </section>
 
+    <HomeAnomaliesCard v-if="access.can('viewAnomalies')" :campaigns="campaigns" :campaigns-loading="campaignsLoading" />
+
     <section class="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
       <article class="rounded-2xl bg-white p-6 sm:p-7" :aria-busy="campaignsLoading">
         <div class="flex items-center justify-between gap-4">
@@ -88,6 +90,7 @@ import { computed, onUnmounted, watch } from 'vue'
 import { ArrowRight } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import HomeAnomaliesCard from '@/components/anomalies/HomeAnomaliesCard.vue'
 import { useAccountStore } from '@/stores/accountStore'
 import { useAccessPolicy } from '@/services/useAccessPolicy'
 import { createHomeDashboardState } from '@/services/homeDashboardState'

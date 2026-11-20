@@ -49,4 +49,20 @@ describe('preview role permissions', () => {
     expect(canAccess('ANALISTA_NEGOCIOS', 'activateCampaign')).toBe(false)
     expect(canAccess('AUDITOR', 'activateCampaign')).toBe(false)
   })
+  it('garante permissões de anomalias (FRONT-6): auditor apenas consulta, reprocessamento restrito', () => {
+    // Todos os perfis válidos podem consultar anomalias
+    for (const role of ['ADMINISTRADOR', 'ANALISTA_NEGOCIOS', 'ANALISTA_CODIGO', 'GERENTE_VENDAS', 'AUDITOR']) {
+      expect(canAccess(role, 'viewAnomalies')).toBe(true)
+    }
+
+    // Apenas Administrador e Gerente podem reprocessar
+    expect(canAccess('ADMINISTRADOR', 'reprocessAnomalies')).toBe(true)
+    expect(canAccess('GERENTE_VENDAS', 'reprocessAnomalies')).toBe(true)
+
+    // Auditor e analistas NÃO podem reprocessar (SoD / Auditor apenas consulta)
+    expect(canAccess('AUDITOR', 'reprocessAnomalies')).toBe(false)
+    expect(canAccess('ANALISTA_NEGOCIOS', 'reprocessAnomalies')).toBe(false)
+    expect(canAccess('ANALISTA_CODIGO', 'reprocessAnomalies')).toBe(false)
+    expect(canAccess('UNKNOWN', 'reprocessAnomalies')).toBe(false)
+  })
 })

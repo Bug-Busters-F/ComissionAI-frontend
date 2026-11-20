@@ -50,6 +50,17 @@
       <CampaignBasesSection
         v-if="!isDemo && campaign?.id"
         :campanha-id="campaign.id"
+        @competence-selected="handleBasesCompetenceSelected"
+        @base-effective="handleBaseEffective"
+      />
+
+      <!-- Seção de Alertas Estatísticos e Anomalias de Vendas ([FRONT-6]) -->
+      <CampaignAnomaliesSection
+        v-if="!isDemo && campaign?.id && access.can('viewAnomalies')"
+        ref="anomaliesSectionRef"
+        v-model:competence="anomalyCompetence"
+        :campaign="campaign"
+        :active-lots="anomalyLots"
       />
 
       <section class="rounded-[22px] bg-white p-6 sm:p-7 text-sm">
@@ -74,12 +85,13 @@ const account = useAccountStore()
 import { createCampaignLifecycleApi } from '@/services/campaignLifecycleApi'
 import CampaignVersionHistory from '@/components/campaigns/CampaignVersionHistory.vue'
 import CampaignApprovalGovernanceCard from '@/components/campaigns/CampaignApprovalGovernanceCard.vue'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Lock, Info } from 'lucide-vue-next'
 import CampaignDeleteDialog from '@/components/common/CampaignDeleteDialog.vue'
 import CampaignProposalReviewSummary from '@/components/campaigns/CampaignProposalReviewSummary.vue'
 import CampaignBasesSection from '@/components/campaigns/CampaignBasesSection.vue'
+import CampaignAnomaliesSection from '@/components/anomalies/CampaignAnomaliesSection.vue'
 import { persistedCampaignToProposal } from '@/services/campaignProposalPersistence'
 import { validateCampaignProposalSet } from '@/services/campaignProposalValidation'
 import CampaignSummary from '@/components/common/CampaignSummary.vue'
@@ -89,6 +101,9 @@ import { campaignService, normalizeCampaignError } from '@/services/campaignServ
 import { campaignStateTone, formatCampaignChannel, formatCampaignState, formatPeriodArrow } from '@/services/campaignMappers'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { listClosings } from '@/services/closingService'
+import { campaignPreparationService } from '@/services/campaignPreparationService'
+import { fetchEffectivePreparationLots } from '@/services/statisticalAlertsApi'
+import { isCompetenceWithinVigencia } from '@/services/statisticalAlertsLogic'
 
 const route = useRoute()
 const router = useRouter()
@@ -105,6 +120,37 @@ const isClosingStatusRestricted = ref(false)
 const hasClosedCompetenceInVigencia = computed(() => closedCompetencesInVigencia.value.length > 0)
 const proposalCampaign = computed(() => campaign.value && !isDemo ? persistedCampaignToProposal(campaign.value) : null)
 const proposalValidation = computed(() => proposalCampaign.value ? validateCampaignProposalSet(proposalCampaign.value) : null)
+const anomaliesSectionRef = ref(null)
+const anomalyCompetence = ref('')
+const anomalyLots = ref([])
+let anomalyLotsRequest = 0
+
+// FRONT-6: lotes de preparação EFETIVADO da competência alimentam o filtro e o reprocessamento de anomalias
+async function loadAnomalyLots() {
+  const token = ++anomalyLotsRequest
+  const { lots, error } = await fetchEffectivePreparationLots(campaignPreparationService, {
+    campanhaId: campaign.value?.id,
+    competencia: anomalyCompetence.value,
+    canViewLots: access.can('viewPreparationLots')
+  })
+  if (token !== anomalyLotsRequest) return
+  anomalyLots.value = lots
+  if (error) console.warn('Não foi possível carregar os lotes efetivados para os alertas estatísticos:', error)
+}
+
+// A seção de bases pré-seleciona a competência mais recente do sistema; só sincroniza quando ela pertence à vigência
+function handleBasesCompetenceSelected(comp) {
+  if (isCompetenceWithinVigencia(comp, campaign.value?.dataInicio, campaign.value?.dataFim)) anomalyCompetence.value = comp
+}
+
+watch(anomalyCompetence, () => {
+  if (!isDemo && campaign.value?.id) void loadAnomalyLots()
+})
+
+async function handleBaseEffective() {
+  await loadAnomalyLots()
+  anomaliesSectionRef.value?.reloadAlerts()
+}
 function dateTime(value) {
   if (!value) return 'Não informado'
   const date = new Date(value)
@@ -171,6 +217,8 @@ async function loadCampaign() {
     campaign.value = current
     if (!campaign.value) loadError.value = 'A campanha não foi encontrada ou já foi removida.'
     else if (!isDemo) {
+      // Competência inicial dos alertas: início da vigência, até a seção de bases sincronizar a sua seleção
+      if (!anomalyCompetence.value && campaign.value.dataInicio) anomalyCompetence.value = String(campaign.value.dataInicio).slice(0, 7)
       void checkVigenciaClosings(campaign.value)
       try {
         codeApproval.value = await createCampaignLifecycleApi().getCodeApproval(campaign.value.id)

@@ -84,3 +84,12 @@ describe('Home real: apresentação', () => {
     expect(html).not.toContain('Pontos de atenção')
   })
 })
+
+describe('Home real: alertas estatísticos (FRONT-6)', () => {
+  it('exibe o card de alertas estatísticos para perfis com consulta de anomalias, sem consultar a API no SSR', async () => {
+    const html = await render()
+    expect(html).toContain('Alertas Estatísticos e Anomalias de Vendas')
+    expect(html).toContain('Conferir anomalias nas campanhas')
+    expect(html).not.toContain('/api/v1/')
+  })
+})

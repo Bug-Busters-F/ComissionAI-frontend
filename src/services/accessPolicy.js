@@ -14,6 +14,7 @@ export function canAccess(role, action, permissions = null) {
   if (role === 'ADMINISTRADOR') return permissions === null || permissions.includes('ACESSO_COMPLETO')
   const matrix = {
     viewCampaigns: validRoles, viewWorkflow: validRoles,
+    viewAnomalies: validRoles,
     createCampaign: ['ANALISTA_NEGOCIOS'],
     editCampaign: ['ANALISTA_NEGOCIOS', 'ANALISTA_CODIGO', 'GERENTE_VENDAS'],
     saveCampaign: ['ANALISTA_NEGOCIOS', 'ANALISTA_CODIGO'],
@@ -24,9 +25,19 @@ export function canAccess(role, action, permissions = null) {
     viewData: ['GERENTE_VENDAS', 'AUDITOR'],
     viewAudit: ['GERENTE_VENDAS', 'AUDITOR'],
     manageData: ['GERENTE_VENDAS'], calculate: ['GERENTE_VENDAS'],
+    reprocessAnomalies: ['GERENTE_VENDAS'],
+    // Espelha SecurityConfig: /campanhas/*/preparacao-bases/** restrito a ADMIN, GERENTE e NEGOCIOS
+    viewPreparationLots: ['ANALISTA_NEGOCIOS', 'GERENTE_VENDAS'],
     manageUsers: []
   }
-  const permission = { createCampaign: 'EDITAR_CAMPANHAS', removeCampaign: 'EDITAR_CAMPANHAS', manageData: 'IMPORTAR_BASES', calculate: 'CALCULAR_COMPETENCIA', viewAudit: role === 'GERENTE_VENDAS' ? 'CONSULTAR_LOGS_ANALISTAS' : 'CONSULTAR_LOGS_AUTORIZADOS' }[action]
+  const permission = {
+    createCampaign: 'EDITAR_CAMPANHAS',
+    removeCampaign: 'EDITAR_CAMPANHAS',
+    manageData: 'IMPORTAR_BASES',
+    calculate: 'CALCULAR_COMPETENCIA',
+    reprocessAnomalies: 'IMPORTAR_BASES',
+    viewAudit: role === 'GERENTE_VENDAS' ? 'CONSULTAR_LOGS_ANALISTAS' : 'CONSULTAR_LOGS_AUTORIZADOS'
+  }[action]
   return matrix[action]?.includes(role) === true && (!permission || permissions === null || permissions.includes(permission))
 }
 export function stepAccessMessage(role, step) {
