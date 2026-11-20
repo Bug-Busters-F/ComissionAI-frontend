@@ -133,6 +133,7 @@ const navigation = [
   { label: 'Home', to: '/home', section: 'home' },
   { label: 'Dados', to: '/dados', section: 'dados', permission: 'viewData' },
   { label: 'Campanhas', to: '/campanhas', section: 'campanhas' },
+  { label: 'Auditoria', to: '/auditoria', section: 'auditoria', permission: 'viewAudit' },
   { label: 'Gerenciamento', to: '/gerenciamento', section: 'gerenciamento', adminOnly: true }
 ]
 

@@ -22,10 +22,11 @@ export function canAccess(role, action, permissions = null) {
     returnProposal: ['GERENTE_VENDAS'],
     activateCampaign: ['GERENTE_VENDAS'],
     viewData: ['GERENTE_VENDAS', 'AUDITOR'],
+    viewAudit: ['GERENTE_VENDAS', 'AUDITOR'],
     manageData: ['GERENTE_VENDAS'], calculate: ['GERENTE_VENDAS'],
     manageUsers: []
   }
-  const permission = { createCampaign: 'EDITAR_CAMPANHAS', removeCampaign: 'EDITAR_CAMPANHAS', manageData: 'IMPORTAR_BASES', calculate: 'CALCULAR_COMPETENCIA' }[action]
+  const permission = { createCampaign: 'EDITAR_CAMPANHAS', removeCampaign: 'EDITAR_CAMPANHAS', manageData: 'IMPORTAR_BASES', calculate: 'CALCULAR_COMPETENCIA', viewAudit: role === 'GERENTE_VENDAS' ? 'CONSULTAR_LOGS_ANALISTAS' : 'CONSULTAR_LOGS_AUTORIZADOS' }[action]
   return matrix[action]?.includes(role) === true && (!permission || permissions === null || permissions.includes(permission))
 }
 export function stepAccessMessage(role, step) {

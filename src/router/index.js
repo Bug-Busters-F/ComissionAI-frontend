@@ -6,6 +6,7 @@ import ProfileView from '@/views/ProfileView.vue'
 import UserManagementView from '@/views/UserManagementView.vue'
 import AccessDeniedView from '@/views/AccessDeniedView.vue'
 import HomeView from '@/views/HomeView.vue'
+import AuditView from '@/views/AuditView.vue'
 import DataView from '@/views/DataView.vue'
 import CompetenceCalculationView from '@/views/CompetenceCalculationView.vue'
 import CampaignsView from '@/views/CampaignsPrototypeView.vue'
@@ -27,6 +28,12 @@ const routes = [
     name: 'home',
     component: HomeView,
     meta: { section: 'home', label: 'Home' }
+  },
+  {
+    path: '/auditoria',
+    name: 'auditoria',
+    component: AuditView,
+    meta: { section: 'auditoria', label: 'Auditoria', permission: 'viewAudit' }
   },
   {
     path: '/dados',
