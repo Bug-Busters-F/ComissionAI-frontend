@@ -1,11 +1,13 @@
 <template>
   <div
     v-if="open"
-    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 sm:p-6"
+    class="fixed inset-0 !m-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 outline-none sm:p-6"
     role="dialog"
     aria-modal="true"
     aria-labelledby="risk-accept-title"
-    @keydown.esc="$emit('cancel')"
+    ref="dialogRoot"
+    tabindex="-1"
+    @keydown="onDialogKeydown"
   >
     <div class="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl space-y-5">
       <div class="flex items-start justify-between border-b border-sage-border-light pb-4">
@@ -112,6 +114,7 @@
 import { ref, computed, watch } from 'vue'
 import { ShieldCheck, ShieldAlert, X, AlertOctagon, RefreshCw } from 'lucide-vue-next'
 import { useSafeAuthStore } from '@/stores/authStore'
+import { useDialogFocus } from '@/services/dialogFocus'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -122,6 +125,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['confirm-accept', 'confirm-revoke', 'cancel'])
+
+// FRONT-14: foco entra no diálogo ao abrir (sem isso o Esc não funcionava), Tab fica preso e o foco volta ao fechar.
+const dialogRoot = ref(null)
+const { onDialogKeydown } = useDialogFocus(dialogRoot, () => props.open, { onClose: () => emit('cancel'), isBusy: () => props.processando })
 
 const authStore = useSafeAuthStore()
 const motivo = ref('')

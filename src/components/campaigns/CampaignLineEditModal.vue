@@ -1,11 +1,13 @@
 <template>
   <div
     v-if="open"
-    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 sm:p-6"
+    class="fixed inset-0 !m-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 outline-none sm:p-6"
     role="dialog"
     aria-modal="true"
     aria-labelledby="edit-line-title"
-    @keydown.esc="$emit('cancel')"
+    ref="dialogRoot"
+    tabindex="-1"
+    @keydown="onDialogKeydown"
   >
     <div class="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl space-y-5 max-h-[90vh] overflow-y-auto">
       <div class="flex items-start justify-between border-b border-sage-border-light pb-4">
@@ -64,8 +66,8 @@
         <div class="grid gap-4 sm:grid-cols-2">
           <!-- Matrícula -->
           <div>
-            <label class="block font-bold text-sage-muted uppercase tracking-wider">Matrícula</label>
-            <input
+            <label for="line-edit-matricula" class="block font-bold text-sage-muted uppercase tracking-wider">Matrícula</label>
+            <input id="line-edit-matricula"
               type="text"
               v-model="form.matricula"
               class="focus-ring mt-1 block w-full rounded-xl border border-sage-border-dark px-3 py-2 font-bold text-brand-dark"
@@ -75,8 +77,8 @@
 
           <!-- Cargo -->
           <div>
-            <label class="block font-bold text-sage-muted uppercase tracking-wider">Descrição do Cargo</label>
-            <input
+            <label for="line-edit-descricao-do-cargo" class="block font-bold text-sage-muted uppercase tracking-wider">Descrição do Cargo</label>
+            <input id="line-edit-descricao-do-cargo"
               type="text"
               v-model="form.descrCargo"
               class="focus-ring mt-1 block w-full rounded-xl border border-sage-border-dark px-3 py-2 font-bold text-brand-dark"
@@ -86,8 +88,8 @@
 
           <!-- Loja -->
           <div>
-            <label class="block font-bold text-sage-muted uppercase tracking-wider">Código da Loja</label>
-            <input
+            <label for="line-edit-codigo-da-loja" class="block font-bold text-sage-muted uppercase tracking-wider">Código da Loja</label>
+            <input id="line-edit-codigo-da-loja"
               type="number"
               v-model.number="form.codLoja"
               class="focus-ring mt-1 block w-full rounded-xl border border-sage-border-dark px-3 py-2 font-bold text-brand-dark"
@@ -97,8 +99,8 @@
 
           <!-- Marca -->
           <div>
-            <label class="block font-bold text-sage-muted uppercase tracking-wider">Descrição da Marca</label>
-            <input
+            <label for="line-edit-descricao-da-marca" class="block font-bold text-sage-muted uppercase tracking-wider">Descrição da Marca</label>
+            <input id="line-edit-descricao-da-marca"
               type="text"
               v-model="form.descrMarca"
               class="focus-ring mt-1 block w-full rounded-xl border border-sage-border-dark px-3 py-2 font-bold text-brand-dark"
@@ -108,8 +110,8 @@
 
           <!-- Valor da Venda (Formato pt-BR) -->
           <div v-if="tipoBase !== 'HR'">
-            <label class="block font-bold text-sage-muted uppercase tracking-wider">Valor da Venda (R$)</label>
-            <input
+            <label for="line-edit-valor-da-venda-r" class="block font-bold text-sage-muted uppercase tracking-wider">Valor da Venda (R$)</label>
+            <input id="line-edit-valor-da-venda-r"
               type="text"
               v-model="form.valorVendaTexto"
               class="focus-ring mt-1 block w-full rounded-xl border border-sage-border-dark px-3 py-2 font-bold text-brand-dark"
@@ -119,8 +121,8 @@
 
           <!-- Data de Referência / Venda -->
           <div>
-            <label class="block font-bold text-sage-muted uppercase tracking-wider">Data de Referência</label>
-            <input
+            <label for="line-edit-data-de-referencia" class="block font-bold text-sage-muted uppercase tracking-wider">Data de Referência</label>
+            <input id="line-edit-data-de-referencia"
               type="date"
               v-model="form.dataReferencia"
               class="focus-ring mt-1 block w-full rounded-xl border border-sage-border-dark px-3 py-2 font-bold text-brand-dark"
@@ -129,8 +131,8 @@
 
           <!-- Datas de RH (Admissão / Demissão) -->
           <div v-if="tipoBase === 'HR'">
-            <label class="block font-bold text-sage-muted uppercase tracking-wider">Data de Admissão</label>
-            <input
+            <label for="line-edit-data-de-admissao" class="block font-bold text-sage-muted uppercase tracking-wider">Data de Admissão</label>
+            <input id="line-edit-data-de-admissao"
               type="date"
               v-model="form.dataAdmissao"
               class="focus-ring mt-1 block w-full rounded-xl border border-sage-border-dark px-3 py-2 font-bold text-brand-dark"
@@ -138,8 +140,8 @@
           </div>
 
           <div v-if="tipoBase === 'HR'">
-            <label class="block font-bold text-sage-muted uppercase tracking-wider">Data de Demissão</label>
-            <input
+            <label for="line-edit-data-de-demissao" class="block font-bold text-sage-muted uppercase tracking-wider">Data de Demissão</label>
+            <input id="line-edit-data-de-demissao"
               type="date"
               v-model="form.dataDemissao"
               class="focus-ring mt-1 block w-full rounded-xl border border-sage-border-dark px-3 py-2 font-bold text-brand-dark"
@@ -155,6 +157,7 @@
           </div>
           <input
             type="checkbox"
+            aria-label="Ignorar linha na efetivação"
             v-model="form.ignorarNaEfetivacao"
             class="h-4 w-4 rounded border-sage-border-dark text-brand focus:ring-brand"
           />
@@ -162,10 +165,11 @@
 
         <!-- Motivo da Alteração (Obrigatório) -->
         <div>
-          <label class="block font-bold text-sage-muted uppercase tracking-wider">
+          <label for="line-edit-motivo" class="block font-bold text-sage-muted uppercase tracking-wider">
             Motivo da Correção <span class="text-danger">*</span>
           </label>
           <textarea
+            id="line-edit-motivo"
             v-model="form.motivo"
             rows="2"
             required
@@ -205,6 +209,7 @@ import { ref, computed, watch } from 'vue'
 import { X, AlertTriangle, RefreshCw } from 'lucide-vue-next'
 import { createLineConflictReview } from '@/services/lineConflictReview'
 import { parseCurrencyPtBr, formatCurrencyPtBr } from '@/services/currencyUtils'
+import { useDialogFocus } from '@/services/dialogFocus'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -214,6 +219,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['save', 'cancel', 'refresh-line'])
+
+// FRONT-14: foco entra no diálogo ao abrir (sem isso o Esc não funcionava), Tab fica preso e o foco volta ao fechar.
+const dialogRoot = ref(null)
+const { onDialogKeydown } = useDialogFocus(dialogRoot, () => props.open, { onClose: () => emit('cancel'), isBusy: () => props.salvando })
 
 const form = ref({
   versao: 1,
