@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createStatisticalAlertsApi } from './statisticalAlertsApi'
+import { createStatisticalAlertsApi, fetchEffectivePreparationLots } from './statisticalAlertsApi'
 import { TIPO_ALERTA } from './statisticalAlertsLogic'
 
 describe('statisticalAlertsApi — Cliente de Alertas Estatísticos (FRONT-6)', () => {
@@ -91,5 +91,50 @@ describe('statisticalAlertsApi — Cliente de Alertas Estatísticos (FRONT-6)', 
   it('reprocessLote rejeita chamada sem identificador', async () => {
     const api = createStatisticalAlertsApi({})
     await expect(api.reprocessLote('')).rejects.toThrow('Identificador do lote')
+  })
+})
+
+describe('fetchEffectivePreparationLots — lotes efetivados para filtro e reprocessamento (FRONT-6)', () => {
+  const lots = [{ id: 'l1', tipoBase: 'SALES', status: 'EFETIVADO' }]
+
+  it('consulta GET /campanhas/{id}/preparacao-bases por tipoBase (SALES e HR), status EFETIVADO e competência', async () => {
+    const hrLot = { id: 'l2', tipoBase: 'HR', status: 'EFETIVADO' }
+    const service = { listBatches: vi.fn((_, { tipoBase }) => Promise.resolve(tipoBase === 'HR' ? [hrLot] : lots)) }
+    const res = await fetchEffectivePreparationLots(service, { campanhaId: 7, competencia: '2025-08', canViewLots: true })
+    // tipoBase sempre informado: o back responde 500 quando ele é omitido (UPPER de parâmetro nulo no PostgreSQL)
+    expect(service.listBatches).toHaveBeenCalledTimes(2)
+    expect(service.listBatches).toHaveBeenCalledWith(7, { tipoBase: 'SALES', status: 'EFETIVADO', competencia: '2025-08' })
+    expect(service.listBatches).toHaveBeenCalledWith(7, { tipoBase: 'HR', status: 'EFETIVADO', competencia: '2025-08' })
+    expect(res).toEqual({ lots: [...lots, hrLot], restricted: false, error: null })
+  })
+
+  it('não chama o backend quando o perfil não pode listar lotes (ex.: AUDITOR), evitando 403', async () => {
+    const service = { listBatches: vi.fn() }
+    const res = await fetchEffectivePreparationLots(service, { campanhaId: 7, competencia: '2025-08', canViewLots: false })
+    expect(service.listBatches).not.toHaveBeenCalled()
+    expect(res).toEqual({ lots: [], restricted: true, error: null })
+  })
+
+  it('trata 403 inesperado como lista vazia restrita, sem propagar erro', async () => {
+    const err = Object.assign(new Error('Forbidden'), { response: { status: 403 } })
+    const service = { listBatches: vi.fn().mockRejectedValue(err) }
+    const res = await fetchEffectivePreparationLots(service, { campanhaId: 7, competencia: '2025-08' })
+    expect(res).toEqual({ lots: [], restricted: true, error: null })
+  })
+
+  it('devolve o erro para log em falhas não relacionadas a permissão', async () => {
+    const err = Object.assign(new Error('boom'), { response: { status: 500 } })
+    const service = { listBatches: vi.fn().mockRejectedValue(err) }
+    const res = await fetchEffectivePreparationLots(service, { campanhaId: 7, competencia: '2025-08' })
+    expect(res.lots).toEqual([])
+    expect(res.error).toBe(err)
+  })
+
+  it('ignora chamadas sem campanha ou competência e respostas não-lista', async () => {
+    const service = { listBatches: vi.fn().mockResolvedValue(null) }
+    expect((await fetchEffectivePreparationLots(service, { campanhaId: null, competencia: '2025-08' })).lots).toEqual([])
+    expect((await fetchEffectivePreparationLots(service, { campanhaId: 7, competencia: '' })).lots).toEqual([])
+    expect(service.listBatches).not.toHaveBeenCalled()
+    expect((await fetchEffectivePreparationLots(service, { campanhaId: 7, competencia: '2025-08' })).lots).toEqual([])
   })
 })

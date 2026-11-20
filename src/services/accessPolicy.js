@@ -25,6 +25,8 @@ export function canAccess(role, action, permissions = null) {
     viewData: ['GERENTE_VENDAS', 'AUDITOR'],
     manageData: ['GERENTE_VENDAS'], calculate: ['GERENTE_VENDAS'],
     reprocessAnomalies: ['GERENTE_VENDAS'],
+    // Espelha SecurityConfig: /campanhas/*/preparacao-bases/** restrito a ADMIN, GERENTE e NEGOCIOS
+    viewPreparationLots: ['ANALISTA_NEGOCIOS', 'GERENTE_VENDAS'],
     manageUsers: []
   }
   const permission = {

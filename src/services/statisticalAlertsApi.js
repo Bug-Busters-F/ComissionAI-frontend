@@ -2,6 +2,7 @@ import defaultHttp from './api'
 import {
   buildAlertQueryParams,
   isNewCase48h,
+  isForbiddenError,
   TIPO_ALERTA
 } from './statisticalAlertsLogic'
 
@@ -80,11 +81,11 @@ export function createStatisticalAlertsApi(http = defaultHttp) {
 
     /**
      * Solicita o reprocessamento de anomalias para um lote de preparação efetivado.
-     * Conforme SoD e SecurityConfig.java:42, restrito a ADMIN e GERENTE.
+     * Conforme SoD e SecurityConfig.java, restrito a ADMINISTRADOR e GERENTE_VENDAS; o lote precisa estar EFETIVADO.
      * Dispara POST para /api/v1/alertas-estatisticos/reprocessar com { lotePreparacaoId } no corpo.
      *
      * @param {string} loteId
-     * @returns {Promise<Object>}
+     * @returns {Promise<{ lotePreparacaoId: string, versaoBases: string, alertasGerados: number, alertasSubstituidos: number, semAmostra: boolean }>}
      */
     async reprocessLote(loteId) {
       if (!loteId) throw new Error('Identificador do lote de preparação é obrigatório.')
@@ -93,6 +94,35 @@ export function createStatisticalAlertsApi(http = defaultHttp) {
       })
       return res.data
     }
+  }
+}
+
+/** Tipos de base cujos lotes efetivados geram alertas estatísticos no backend. */
+export const ALERT_LOT_BASE_TYPES = Object.freeze(['SALES', 'HR'])
+
+/**
+ * Busca os lotes de preparação EFETIVADO da campanha na competência, usados como filtro e alvo do reprocessamento.
+ * GET /campanhas/{id}/preparacao-bases é restrito a ADMIN, GERENTE e NEGOCIOS no SecurityConfig:
+ * quando o perfil não tem acesso a chamada nem é feita, e um 403 inesperado vira lista vazia (restricted = true).
+ *
+ * @param {{ listBatches: Function }} preparationService
+ * @param {{ campanhaId: number|string, competencia?: string, canViewLots?: boolean }} options
+ * @returns {Promise<{ lots: Array, restricted: boolean, error: unknown }>}
+ */
+export async function fetchEffectivePreparationLots(preparationService, { campanhaId, competencia, canViewLots = true } = {}) {
+  if (!campanhaId || !competencia) return { lots: [], restricted: false, error: null }
+  if (!canViewLots) return { lots: [], restricted: true, error: null }
+  try {
+    // Consulta por tipoBase: só lotes HR e SALES geram alertas (AlertaEstatisticoService.analisar) e, além disso,
+    // o back responde 500 quando tipoBase é omitido (LotePreparacaoRepository: UPPER(:tipoBase) com nulo vira bytea no PostgreSQL).
+    const results = await Promise.all(
+      ALERT_LOT_BASE_TYPES.map(tipoBase => preparationService.listBatches(campanhaId, { tipoBase, status: 'EFETIVADO', competencia }))
+    )
+    const lots = results.flatMap(r => (Array.isArray(r) ? r : []))
+    return { lots, restricted: false, error: null }
+  } catch (error) {
+    if (isForbiddenError(error)) return { lots: [], restricted: true, error: null }
+    return { lots: [], restricted: false, error }
   }
 }
 
