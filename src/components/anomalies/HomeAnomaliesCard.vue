@@ -6,8 +6,9 @@
     aria-labelledby="home-anomalies-heading"
     :aria-busy="summary.loading ? 'true' : 'false'"
   >
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex items-start sm:items-center gap-3">
+    <!-- Em linha só a partir de lg: em md a sidebar ocupa espaço e o link "nowrap" saía do card. -->
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div class="flex min-w-0 items-start gap-3 lg:items-center">
         <div
           class="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
           :class="showNewCases ? 'bg-danger/10 text-danger-dark' : 'bg-sage-light text-brand-dark'"
@@ -21,9 +22,11 @@
             </h2>
             <span
               v-if="showNewCases"
-              class="inline-flex items-center gap-1 rounded-full bg-danger px-2.5 py-0.5 text-xs font-black text-white motion-safe:animate-pulse"
+              class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-danger px-2.5 py-0.5 text-xs font-black text-white"
             >
-              ● Novos casos nas últimas 48h
+              <!-- Só o ponto pulsa: pulsar o selo inteiro derrubava o contraste do texto abaixo de 4,5:1. -->
+              <span class="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-pulse" aria-hidden="true"></span>
+              Novos casos nas últimas 48h
             </span>
           </div>
 
@@ -49,7 +52,7 @@
 
       <RouterLink
         to="/campanhas"
-        class="focus-ring inline-flex items-center gap-1 text-sm font-bold text-brand-dark underline underline-offset-4 hover:text-brand-dark/80 whitespace-nowrap"
+        class="focus-ring inline-flex shrink-0 items-center gap-1 self-start text-sm font-bold text-brand-dark underline underline-offset-4 hover:text-brand-dark/80 lg:self-auto lg:whitespace-nowrap"
       >
         <span>Conferir anomalias nas campanhas →</span>
       </RouterLink>
