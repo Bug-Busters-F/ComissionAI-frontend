@@ -3,6 +3,9 @@ import {
   buildAlertQueryParams,
   isNewCase48h,
   isForbiddenError,
+  extractAlertCompetence,
+  pickActiveCampaignCompetence,
+  currentCompetence,
   TIPO_ALERTA
 } from './statisticalAlertsLogic'
 
@@ -94,6 +97,32 @@ export function createStatisticalAlertsApi(http = defaultHttp) {
       })
       return res.data
     }
+  }
+}
+
+/**
+ * Resumo do card da Home. Competência: informada → campanha ATIVA mais recente → último alerta → mês corrente.
+ *
+ * @param {ReturnType<typeof createStatisticalAlertsApi>} api
+ * @param {{ competence?: string, campaigns?: Array, now?: Date }} [options]
+ * @returns {Promise<{ competencia: string, hasNewCases48h: boolean, totalOutliers: number, totalInconsistencias: number, totalGeral: number }>}
+ */
+export async function loadHomeAnomalySummary(api, { competence = '', campaigns = [], now = new Date() } = {}) {
+  let competencia = competence || pickActiveCampaignCompetence(campaigns)
+  if (!competencia) {
+    const latest = await api.listAlerts({ size: 1, sort: 'dataReferencia,desc' })
+    competencia = extractAlertCompetence(latest?.content?.[0]) || currentCompetence(now)
+  }
+  const [newCases, counts] = await Promise.all([
+    api.checkNewCases48h(competencia),
+    api.countAlertsByType({ competencia })
+  ])
+  return {
+    competencia,
+    hasNewCases48h: Boolean(newCases?.hasNewCases48h),
+    totalOutliers: counts?.totalOutliers ?? 0,
+    totalInconsistencias: counts?.totalInconsistencias ?? 0,
+    totalGeral: counts?.totalGeral ?? 0
   }
 }
 

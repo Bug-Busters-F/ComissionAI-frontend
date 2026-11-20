@@ -207,7 +207,7 @@
         <div class="flex items-center gap-2">
           <button
             type="button"
-            @click="store.setTabAtiva('EFETIVADOS')"
+            @click="setDataTab('EFETIVADOS')"
             :class="[
               'focus-ring flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition',
               store.tabAtiva === 'EFETIVADOS'
@@ -221,7 +221,7 @@
 
           <button
             type="button"
-            @click="store.setTabAtiva('ENVIOS')"
+            @click="setDataTab('ENVIOS')"
             :class="[
               'focus-ring flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition',
               store.tabAtiva === 'ENVIOS'
@@ -231,16 +231,15 @@
           >
             <FileSpreadsheet class="h-4 w-4" />
             <span>Histórico de Envios & Validação</span>
-            <span class="rounded-full bg-sage-pill px-2 py-0.5 text-[10px] font-bold text-brand-dark">
-              {{ store.enviosHistorico.length }}
-            </span>
           </button>
         </div>
       </div>
 
       <!-- Conteúdo da Aba Ativa -->
       <EfetivadosTable v-if="store.tabAtiva === 'EFETIVADOS'" />
-      <EnviosList v-else />
+      <ImportHistoryPanel v-else prefix="envios_" :refresh-key="`${store.activeJob.status}-${store.historicoRevisao}`">
+        <template #actions="{ batch }"><button v-if="access.can('manageData') && batch.status !== 'EXCLUIDO'" type="button" class="focus-ring rounded-full border border-danger/30 px-3 py-2 text-xs font-semibold text-danger-dark hover:bg-danger-bg" @click="store.abrirModalExclusaoEnvio(batch)">Remover dados</button></template>
+      </ImportHistoryPanel>
     </section>
 
     <!-- Modais de Suporte -->
@@ -253,18 +252,25 @@
 import { useAccessPolicy } from '@/services/useAccessPolicy'
 const access = useAccessPolicy()
 import { userFacingText } from '@/services/userFacingText'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { RefreshCw, Trash2, Database, FileSpreadsheet, Lock } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import EfetivadosTable from '@/components/data/EfetivadosTable.vue'
-import EnviosList from '@/components/data/EnviosList.vue'
+import ImportHistoryPanel from '@/components/audit/ImportHistoryPanel.vue'
 import ConfirmDeleteModal from '@/components/data/ConfirmDeleteModal.vue'
 import EnvioReportModal from '@/components/data/EnvioReportModal.vue'
 import { useDataStore } from '@/stores/dataStore'
 import { listClosings, mapClosedCompetences } from '@/services/closingService'
 
 const store = useDataStore()
+const route = useRoute(), router = useRouter()
+const setDataTab = tab => router.push({ query: { ...route.query, abaDados: tab === 'ENVIOS' ? 'envios' : undefined } })
+watch(() => route.query.abaDados, tab => {
+  const target = tab === 'envios' ? 'ENVIOS' : 'EFETIVADOS'
+  if (store.tabAtiva !== target) store.setTabAtiva(target)
+}, { immediate: true })
 const closedCompetences = ref({})
 
 async function loadClosings() {

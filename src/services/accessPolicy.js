@@ -23,6 +23,7 @@ export function canAccess(role, action, permissions = null) {
     returnProposal: ['GERENTE_VENDAS'],
     activateCampaign: ['GERENTE_VENDAS'],
     viewData: ['GERENTE_VENDAS', 'AUDITOR'],
+    viewAudit: ['GERENTE_VENDAS', 'AUDITOR'],
     manageData: ['GERENTE_VENDAS'], calculate: ['GERENTE_VENDAS'],
     reprocessAnomalies: ['GERENTE_VENDAS'],
     // Espelha SecurityConfig: /campanhas/*/preparacao-bases/** restrito a ADMIN, GERENTE e NEGOCIOS
@@ -34,7 +35,8 @@ export function canAccess(role, action, permissions = null) {
     removeCampaign: 'EDITAR_CAMPANHAS',
     manageData: 'IMPORTAR_BASES',
     calculate: 'CALCULAR_COMPETENCIA',
-    reprocessAnomalies: 'IMPORTAR_BASES'
+    reprocessAnomalies: 'IMPORTAR_BASES',
+    viewAudit: role === 'GERENTE_VENDAS' ? 'CONSULTAR_LOGS_ANALISTAS' : 'CONSULTAR_LOGS_AUTORIZADOS'
   }[action]
   return matrix[action]?.includes(role) === true && (!permission || permissions === null || permissions.includes(permission))
 }

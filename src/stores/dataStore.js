@@ -80,6 +80,7 @@ export const useDataStore = defineStore('data', {
 
     // Histórico de Envios e seus relatórios de validação
     enviosHistorico: [],
+    historicoRevisao: 0,
 
     // Estado da Consulta de Dados Efetivados
     dadosEfetivados: {
@@ -1045,8 +1046,8 @@ export const useDataStore = defineStore('data', {
       this.modalExclusao = {
         isOpen: true,
         tipo: 'ENVIO',
-        titulo: 'Excluir Envio do Histórico',
-        mensagem: 'Deseja remover este registro de envio do histórico da aplicação?',
+        titulo: 'Remover dados do envio',
+        mensagem: 'Os dados importados desta carga serão removidos. O histórico, o arquivo original e as validações serão preservados.',
         detalhes: `Arquivo: ${envio.nomeArquivo} (${envio.competencia || 'Sem competência'})`,
         item: envio,
         loading: false
@@ -1154,10 +1155,11 @@ export const useDataStore = defineStore('data', {
           if (!item?.reportId) throw new Error('Este envio não possui um identificador único de lote. Use a exclusão da base ou dos registros correspondentes.')
           await dataService.excluirLote(item.reportId, 'Exclusão solicitada pelo usuário')
           invalidateCalculationCache()
+          this.historicoRevisao += 1
 
           const id = item?.id
           this.enviosHistorico = this.enviosHistorico.filter(e => e.id !== id)
-          notifStore.success('Envio Excluído', 'O registro de envio e seus dados correspondentes foram removidos com sucesso.')
+          notifStore.success('Dados removidos', 'Os dados do envio foram removidos. A carga e suas validações permanecem disponíveis no histórico.')
           this.fecharModalExclusao()
           await this.loadCompetenciasFromSales()
           await this.carregarDadosEfetivados()

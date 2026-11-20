@@ -496,6 +496,29 @@ export function reprocessDeniedMessage(role) {
   return 'Reprocessamento restrito a gerente de vendas ou administrador.'
 }
 
+/**
+ * Competência exibida no card da Home: início da campanha ATIVA mais recente (AAAA-MM) ou vazio.
+ *
+ * @param {Array} campaigns
+ * @returns {string}
+ */
+export function pickActiveCampaignCompetence(campaigns) {
+  const ativa = (Array.isArray(campaigns) ? campaigns : [])
+    .filter(c => c?.estado === 'ATIVA' && c?.dataInicio)
+    .sort((a, b) => String(b.dataInicio).localeCompare(String(a.dataInicio)))[0]
+  return ativa ? String(ativa.dataInicio).slice(0, 7) : ''
+}
+
+/**
+ * Mês corrente no formato AAAA-MM.
+ *
+ * @param {Date} [now]
+ * @returns {string}
+ */
+export function currentCompetence(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 // ---------------------------------------------------------------------------
 // Controle de concorrência de requisições
 // ---------------------------------------------------------------------------
