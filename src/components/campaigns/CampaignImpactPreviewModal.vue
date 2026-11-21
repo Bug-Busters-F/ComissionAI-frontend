@@ -59,13 +59,27 @@
         </div>
 
         <!-- Alerta de Bloqueios Impeditivos -->
-        <div v-if="preview?.possuiBloqueioFechamento" class="rounded-xl border border-danger/40 bg-danger-bg p-4 space-y-1">
+        <div v-if="bloqueios.fechamento.length || preview?.possuiBloqueioFechamento" class="rounded-xl border border-danger/40 bg-danger-bg p-4 space-y-1" role="alert">
           <p class="font-extrabold text-danger-dark flex items-center gap-1.5">
             <AlertOctagon class="h-4 w-4" />
             Bloqueios Impeditivos de Fechamento Detectados
           </p>
           <ul class="list-disc pl-4 text-danger-dark space-y-0.5">
-            <li v-for="(b, i) in preview.bloqueiosFechamento" :key="i">{{ b }}</li>
+            <li v-for="(b, i) in bloqueios.fechamento" :key="i">{{ b }}</li>
+          </ul>
+        </div>
+
+        <!-- Chave de venda ambígua: a efetivação seria recusada (409), então o bloqueio aparece já na prévia -->
+        <div v-if="bloqueios.totalChaveAmbigua || preview?.possuiBloqueioChaveAmbigua" class="rounded-xl border border-danger/40 bg-danger-bg p-4 space-y-2" role="alert" data-testid="bloqueio-chave-ambigua">
+          <p class="font-extrabold text-danger-dark flex items-center gap-1.5">
+            <AlertOctagon class="h-4 w-4" />
+            {{ bloqueios.totalChaveAmbigua || 'Há' }} linha(s) não podem ser efetivadas: mais de uma venda corresponde a elas
+          </p>
+          <p class="text-danger-dark">
+            Para não duplicar vendas, corrija a partir do anexo usando <strong>Auditar e Corrigir Linhas</strong>, assim cada linha aponta para a venda exata.
+          </p>
+          <ul v-if="bloqueios.chaveAmbigua.length" class="list-disc pl-4 text-danger-dark space-y-0.5">
+            <li v-for="(b, i) in bloqueios.chaveAmbigua" :key="i">{{ b }}</li>
           </ul>
         </div>
 
@@ -178,6 +192,7 @@
 import { ref, computed, watch } from 'vue'
 import { Globe2, X, AlertOctagon, RefreshCw } from 'lucide-vue-next'
 import { useDialogFocus } from '@/services/dialogFocus'
+import { describePreviewBlockers } from '@/services/campaignPreparationService'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -197,8 +212,10 @@ const { onDialogKeydown } = useDialogFocus(dialogRoot, () => props.open, { onClo
 const motivo = ref('')
 const confirmado = ref(false)
 
+const bloqueios = computed(() => describePreviewBlockers(props.preview))
+
 const podeEfetivar = computed(() => {
-  return props.preview != null && !props.carregando && !props.erroEfetivacao && !props.preview.possuiBloqueioFechamento && confirmado.value && motivo.value.trim().length >= 5
+  return props.preview != null && !props.carregando && !props.erroEfetivacao && !bloqueios.value.bloqueado && confirmado.value && motivo.value.trim().length >= 5
 })
 
 watch(() => props.open, () => { motivo.value = ''; confirmado.value = false })

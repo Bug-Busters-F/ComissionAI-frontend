@@ -5,7 +5,7 @@ import {
   POST_EFFECTIVE_POLL_DELAYS_MS,
   POST_EFFECTIVE_REPROCESS_HINT
 } from './statisticalAlertsLogic'
-import { describeCommitError } from './campaignPreparationService'
+import { describeCommitError, describePreviewBlockers } from './campaignPreparationService'
 
 // Ajustes do front para as correções do back (branch fix/ignora-competencia-venda, pendências da FRONT-6).
 
@@ -83,5 +83,41 @@ describe('describeCommitError — 409 de chave de venda ambígua (pendência 2)'
   it('ignora entradas sem motivo e preserva campo não numérico', () => {
     const res = describeCommitError(conflito([{ campo: 'linha:3' }, null, { campo: 'arquivo', motivo: 'Arquivo divergente.' }]))
     expect(res.details).toEqual(['Arquivo divergente.'])
+  })
+})
+
+describe('describePreviewBlockers — prévia avisa da chave ambígua antes de efetivar (ponto D)', () => {
+  const ambigua = n => `Linha ${n}: chave de venda ambígua para matrícula MATRIC-${n} em 2025-07-01 (loja 59, marca 50) — 2 vendas candidatas na base.`
+
+  it('bloqueia e lista as linhas quando o back informa chave ambígua', () => {
+    const res = describePreviewBlockers({ possuiBloqueioChaveAmbigua: true, bloqueiosChaveAmbigua: [ambigua(3), ambigua(7)] })
+    expect(res.bloqueado).toBe(true)
+    expect(res.totalChaveAmbigua).toBe(2)
+    expect(res.chaveAmbigua).toEqual([ambigua(3), ambigua(7)])
+    expect(res.fechamento).toEqual([])
+  })
+
+  it('limita a lista a 10 linhas e informa o restante', () => {
+    const linhas = Array.from({ length: 13 }, (_, i) => ambigua(i + 1))
+    const res = describePreviewBlockers({ possuiBloqueioChaveAmbigua: true, bloqueiosChaveAmbigua: linhas })
+    expect(res.totalChaveAmbigua).toBe(13)
+    expect(res.chaveAmbigua).toHaveLength(11)
+    expect(res.chaveAmbigua.at(-1)).toBe('… e mais 3 linha(s).')
+  })
+
+  it('mantém o bloqueio por fechamento', () => {
+    const res = describePreviewBlockers({ possuiBloqueioFechamento: true, bloqueiosFechamento: ['Competência 2025-07 fechada.'] })
+    expect(res).toMatchObject({ bloqueado: true, fechamento: ['Competência 2025-07 fechada.'], totalChaveAmbigua: 0 })
+  })
+
+  it('não bloqueia prévia limpa nem versões do back sem os campos novos', () => {
+    expect(describePreviewBlockers({ possuiBloqueioFechamento: false, bloqueiosFechamento: [] }).bloqueado).toBe(false)
+    expect(describePreviewBlockers({ possuiBloqueioChaveAmbigua: false, bloqueiosChaveAmbigua: [] }).bloqueado).toBe(false)
+    expect(describePreviewBlockers(null)).toEqual({ fechamento: [], chaveAmbigua: [], totalChaveAmbigua: 0, bloqueado: false })
+  })
+
+  it('bloqueia mesmo se só a flag vier, ignorando itens vazios', () => {
+    const res = describePreviewBlockers({ possuiBloqueioChaveAmbigua: true, bloqueiosChaveAmbigua: ['', null, '  '] })
+    expect(res).toMatchObject({ bloqueado: true, totalChaveAmbigua: 0, chaveAmbigua: [] })
   })
 })
