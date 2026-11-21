@@ -44,20 +44,22 @@
         <span
           v-if="selectedLot"
           class="inline-block"
-          :title="canReprocess ? 'Reprocessar anomalias para o lote selecionado' : deniedMessage"
+          :title="!canReprocess ? deniedMessage : (isAwaitingPostEffectiveAnalysis ? POST_EFFECTIVE_REPROCESS_HINT : 'Reprocessar anomalias para o lote selecionado')"
         >
+          <!-- Bloqueado durante a análise automática pós-efetivação: rodar as duas ao mesmo tempo duplica alertas no back. -->
           <button
             ref="reprocessTriggerRef"
             type="button"
             class="focus-ring inline-flex items-center gap-2 rounded-full border border-warning-border bg-warning-bg px-4 py-2 text-xs font-bold text-warning-dark transition hover:bg-warning-bg/80 disabled:cursor-not-allowed disabled:opacity-50 pointer-events-auto"
-            :disabled="isReprocessing || !canReprocess"
-            :aria-describedby="!canReprocess ? 'reprocess-denied-hint' : undefined"
+            :disabled="isReprocessing || !canReprocess || isAwaitingPostEffectiveAnalysis"
+            :aria-describedby="!canReprocess ? 'reprocess-denied-hint' : (isAwaitingPostEffectiveAnalysis ? 'reprocess-wait-hint' : undefined)"
             @click="openReprocessModal"
           >
             <RefreshCw class="h-3.5 w-3.5" :class="{ 'animate-spin': isReprocessing }" aria-hidden="true" />
             <span>{{ isReprocessing ? 'Reprocessando…' : 'Reprocessar Lote' }}</span>
           </button>
           <span v-if="!canReprocess" id="reprocess-denied-hint" class="sr-only">{{ deniedMessage }}</span>
+          <span v-else-if="isAwaitingPostEffectiveAnalysis" id="reprocess-wait-hint" class="sr-only">{{ POST_EFFECTIVE_REPROCESS_HINT }}</span>
         </span>
 
         <button
@@ -71,6 +73,16 @@
           <span>Atualizar</span>
         </button>
       </div>
+    </div>
+
+    <!-- Análise estatística assíncrona após efetivação (o back calcula os alertas depois do commit) -->
+    <div
+      v-if="isAwaitingPostEffectiveAnalysis"
+      class="flex items-center gap-2 rounded-xl border border-sage-border bg-sage-light p-3.5 text-xs font-bold text-brand-dark"
+      role="status"
+    >
+      <RefreshCw class="h-3.5 w-3.5 shrink-0 motion-safe:animate-spin" aria-hidden="true" />
+      <span>Base efetivada. A análise estatística roda em segundo plano; os alertas serão atualizados automaticamente em instantes.</span>
     </div>
 
     <!-- Feedback de Reprocessamento -->
@@ -108,7 +120,7 @@
           >
             <span v-if="chip.dot" class="h-2 w-2 rounded-full shrink-0" :class="chip.dot" aria-hidden="true"></span>
             <span>{{ chip.label }}</span>
-            <span class="rounded-full bg-brand-dark/10 px-1.5 py-0.5 text-[11px] font-extrabold">
+            <span class="rounded-full bg-brand-dark/10 px-1.5 py-0.5 text-[11px] font-extrabold text-brand-dark">
               {{ counts[chip.countKey] }}
             </span>
           </button>
@@ -135,7 +147,7 @@
             <select
               id="anomaly-lot-filter"
               v-model="selectedLot"
-              class="campaign-control text-xs max-w-[260px]"
+              class="campaign-control text-xs w-full max-w-full sm:w-auto sm:max-w-[380px]"
               @change="handleFilterChange"
             >
               <option value="">Todos os lotes da competência</option>
@@ -224,8 +236,11 @@
     <div v-else class="space-y-4">
       <p v-if="isLoading" class="sr-only" role="status">Atualizando alertas estatísticos…</p>
       <div
-        class="overflow-x-auto rounded-2xl border border-sage-border transition-opacity"
+        class="focus-ring overflow-x-auto rounded-2xl border border-sage-border transition-opacity"
         :class="{ 'opacity-60': isLoading }"
+        tabindex="0"
+        role="region"
+        aria-label="Tabela de alertas estatísticos (role horizontalmente para ver todas as colunas)"
         :aria-busy="isLoading ? 'true' : 'false'"
       >
         <table class="w-full min-w-[960px] text-left text-xs">
@@ -352,7 +367,7 @@
     <Teleport to="body">
     <div
       v-if="showReprocessModal"
-      class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 sm:p-6"
+      class="fixed inset-0 !m-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 sm:p-6"
       @click.self="closeReprocessModal"
     >
       <div
@@ -435,7 +450,10 @@ import {
   describeAlertsError,
   describeReprocessResult,
   reprocessDeniedMessage,
-  createLatestGuard
+  createLatestGuard,
+  POST_EFFECTIVE_POLL_DELAYS_MS,
+  POST_EFFECTIVE_REPROCESS_HINT,
+  alertsListSignature
 } from '@/services/statisticalAlertsLogic'
 import {
   isAnomaliesDemoEnabled,
@@ -663,8 +681,48 @@ async function reloadAlerts() {
   await loadData()
 }
 
+// A análise estatística roda no back depois do commit da efetivação: a primeira consulta pode
+// ainda não trazer os alertas novos. Reconsulta com intervalos crescentes até a listagem mudar.
+const isAwaitingPostEffectiveAnalysis = ref(false)
+let postEffectiveTimer = null
+let postEffectiveRun = 0
+
+function stopPostEffectiveWatch() {
+  postEffectiveRun++
+  clearTimeout(postEffectiveTimer)
+  postEffectiveTimer = null
+  isAwaitingPostEffectiveAnalysis.value = false
+}
+
+async function reloadAfterEffective() {
+  if (isDemoMode.value) return reloadAlerts()
+  stopPostEffectiveWatch()
+  const run = postEffectiveRun
+  const before = alertsListSignature(counts.value, alerts.value)
+  isAwaitingPostEffectiveAnalysis.value = true
+  await loadData()
+  const changed = () => alertsListSignature(counts.value, alerts.value) !== before
+  if (run !== postEffectiveRun) return
+  if (!loadError.value && changed()) { isAwaitingPostEffectiveAnalysis.value = false; return }
+
+  let attempt = 0
+  const scheduleNext = () => {
+    if (run !== postEffectiveRun) return
+    if (attempt >= POST_EFFECTIVE_POLL_DELAYS_MS.length) { isAwaitingPostEffectiveAnalysis.value = false; return }
+    postEffectiveTimer = setTimeout(async () => {
+      attempt++
+      if (run !== postEffectiveRun) return
+      await loadData()
+      if (run !== postEffectiveRun) return
+      if (!loadError.value && changed()) { isAwaitingPostEffectiveAnalysis.value = false; return }
+      scheduleNext()
+    }, POST_EFFECTIVE_POLL_DELAYS_MS[attempt])
+  }
+  scheduleNext()
+}
+
 function openReprocessModal() {
-  if (!canReprocess.value || isReprocessing.value || !selectedLot.value) return
+  if (!canReprocess.value || isReprocessing.value || !selectedLot.value || isAwaitingPostEffectiveAnalysis.value) return
   showReprocessModal.value = true
   void nextTick(() => reprocessDialogRef.value?.focus?.())
 }
@@ -739,10 +797,13 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearTimeout(debounceTimeout)
+  stopPostEffectiveWatch()
 })
 
 defineExpose({
   reloadAlerts,
+  reloadAfterEffective,
+  isAwaitingPostEffectiveAnalysis,
   loadData,
   selectedCompetence,
   selectedType,

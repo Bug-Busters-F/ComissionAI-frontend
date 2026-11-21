@@ -219,3 +219,59 @@ export function createCampaignPreparationService(http = api) {
 }
 
 export const campaignPreparationService = createCampaignPreparationService()
+
+const MAX_COMMIT_ERROR_DETAILS = 10
+
+/**
+ * Traduz o erro da efetivação em mensagem + lista de linhas afetadas.
+ * O back responde 409 com `validacoes: [{ campo: 'linha:12', motivo }]` quando a chave de uma venda é ambígua
+ * (mais de uma venda candidata na base geral): a efetivação é bloqueada para não duplicar vendas.
+ *
+ * @param {any} err
+ * @param {string} [fallback]
+ * @returns {{ message: string, details: string[] }}
+ */
+export function describeCommitError(err, fallback = 'Falha ao efetivar lote na base geral.') {
+  const data = err?.response?.data
+  const message = (typeof data?.message === 'string' && data.message.trim()) || err?.message || fallback
+  const validacoes = Array.isArray(data?.validacoes) ? data.validacoes : []
+  const lines = validacoes
+    .filter(v => v && typeof v.motivo === 'string' && v.motivo.trim())
+    .map(v => {
+      const linha = /^linha:(\d+)$/i.exec(String(v.campo || '').trim())
+      return linha ? `Linha ${linha[1]}: ${v.motivo.trim()}` : v.motivo.trim()
+    })
+  return { message, details: limitDetails(lines) }
+}
+
+function limitDetails(lines) {
+  const details = lines.slice(0, MAX_COMMIT_ERROR_DETAILS)
+  if (lines.length > MAX_COMMIT_ERROR_DETAILS) details.push(`… e mais ${lines.length - MAX_COMMIT_ERROR_DETAILS} linha(s).`)
+  return details
+}
+
+function cleanList(list) {
+  return Array.isArray(list) ? list.filter(b => typeof b === 'string' && b.trim()).map(b => b.trim()) : []
+}
+
+/**
+ * Lê os bloqueios da prévia de impacto (`GET .../previa-impacto`).
+ * Além do fechamento, o back informa as linhas com chave de venda ambígua
+ * (`possuiBloqueioChaveAmbigua` + `bloqueiosChaveAmbigua`), que a efetivação recusaria com 409.
+ * Compatível com versões do back que ainda não enviam os campos de chave ambígua.
+ *
+ * @param {any} preview
+ * @returns {{ fechamento: string[], chaveAmbigua: string[], totalChaveAmbigua: number, bloqueado: boolean }}
+ */
+export function describePreviewBlockers(preview) {
+  const fechamentoLines = cleanList(preview?.bloqueiosFechamento)
+  const ambiguaLines = cleanList(preview?.bloqueiosChaveAmbigua)
+  const temFechamento = Boolean(preview?.possuiBloqueioFechamento) || fechamentoLines.length > 0
+  const temAmbigua = Boolean(preview?.possuiBloqueioChaveAmbigua) || ambiguaLines.length > 0
+  return {
+    fechamento: fechamentoLines,
+    chaveAmbigua: limitDetails(ambiguaLines),
+    totalChaveAmbigua: ambiguaLines.length,
+    bloqueado: temFechamento || temAmbigua
+  }
+}

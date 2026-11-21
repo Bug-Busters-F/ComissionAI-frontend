@@ -314,6 +314,7 @@
       :carregando="carregandoPrevia"
       :efetivando="efetivandoLote"
       :erro-efetivacao="erroEfetivacao"
+      :erro-efetivacao-detalhes="erroEfetivacaoDetalhes"
       @confirm="efetivarLoteConfirmado"
       @cancel="modalImpactoAberto = false"
     />
@@ -342,7 +343,7 @@ import {
 } from 'lucide-vue-next'
 import { userFacingText } from '@/services/userFacingText'
 import { useSafeAuthStore } from '@/stores/authStore'
-import { campaignPreparationService } from '@/services/campaignPreparationService'
+import { campaignPreparationService, describeCommitError } from '@/services/campaignPreparationService'
 import { formatCurrencyPtBr } from '@/services/currencyUtils'
 import CampaignLineEditModal from './CampaignLineEditModal.vue'
 import CampaignLineHistoryModal from './CampaignLineHistoryModal.vue'
@@ -389,6 +390,7 @@ const previaImpacto = ref(null)
 const carregandoPrevia = ref(false)
 const efetivandoLote = ref(false)
 const erroEfetivacao = ref('')
+const erroEfetivacaoDetalhes = ref([])
 
 const modalRiscoAberto = ref(false)
 const pendenciaSelecionada = ref(null)
@@ -548,6 +550,7 @@ async function abrirPreviaImpacto() {
   modalImpactoAberto.value = true
   carregandoPrevia.value = true
   erroEfetivacao.value = ''
+  erroEfetivacaoDetalhes.value = []
   try {
     previaImpacto.value = await campaignPreparationService.getImpactPreview(
       props.campanhaId,
@@ -566,6 +569,7 @@ async function efetivarLoteConfirmado({ motivo, confirmarPropagacaoImpacto }) {
   operationError.value = ''
   efetivandoLote.value = true
   erroEfetivacao.value = ''
+  erroEfetivacaoDetalhes.value = []
   try {
     const res = await campaignPreparationService.commitBatch(props.campanhaId, props.preparacaoId, {
       responsavel: authStore.currentUser?.email,
@@ -576,7 +580,9 @@ async function efetivarLoteConfirmado({ motivo, confirmarPropagacaoImpacto }) {
     emit('batch-committed', res)
   } catch (err) {
     showError(err)
-    erroEfetivacao.value = err.response?.data?.message || err.message || 'Falha ao efetivar lote na base geral.'
+    const descricao = describeCommitError(err)
+    erroEfetivacao.value = descricao.message
+    erroEfetivacaoDetalhes.value = descricao.details
   } finally {
     efetivandoLote.value = false
   }

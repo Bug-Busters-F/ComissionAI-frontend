@@ -1,11 +1,13 @@
 <template>
   <div
     v-if="open"
-    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 sm:p-6"
+    class="fixed inset-0 !m-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 outline-none sm:p-6"
     role="dialog"
     aria-modal="true"
     aria-labelledby="impact-preview-title"
-    @keydown.esc="$emit('cancel')"
+    ref="dialogRoot"
+    tabindex="-1"
+    @keydown="onDialogKeydown"
   >
     <div class="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl space-y-5 max-h-[90vh] overflow-y-auto">
       <div class="flex items-start justify-between border-b border-sage-border-light pb-4">
@@ -57,13 +59,27 @@
         </div>
 
         <!-- Alerta de Bloqueios Impeditivos -->
-        <div v-if="preview?.possuiBloqueioFechamento" class="rounded-xl border border-danger/40 bg-danger-bg p-4 space-y-1">
+        <div v-if="bloqueios.fechamento.length || preview?.possuiBloqueioFechamento" class="rounded-xl border border-danger/40 bg-danger-bg p-4 space-y-1" role="alert">
           <p class="font-extrabold text-danger-dark flex items-center gap-1.5">
             <AlertOctagon class="h-4 w-4" />
             Bloqueios Impeditivos de Fechamento Detectados
           </p>
           <ul class="list-disc pl-4 text-danger-dark space-y-0.5">
-            <li v-for="(b, i) in preview.bloqueiosFechamento" :key="i">{{ b }}</li>
+            <li v-for="(b, i) in bloqueios.fechamento" :key="i">{{ b }}</li>
+          </ul>
+        </div>
+
+        <!-- Chave de venda ambígua: a efetivação seria recusada (409), então o bloqueio aparece já na prévia -->
+        <div v-if="bloqueios.totalChaveAmbigua || preview?.possuiBloqueioChaveAmbigua" class="rounded-xl border border-danger/40 bg-danger-bg p-4 space-y-2" role="alert" data-testid="bloqueio-chave-ambigua">
+          <p class="font-extrabold text-danger-dark flex items-center gap-1.5">
+            <AlertOctagon class="h-4 w-4" />
+            {{ bloqueios.totalChaveAmbigua || 'Há' }} linha(s) não podem ser efetivadas: mais de uma venda corresponde a elas
+          </p>
+          <p class="text-danger-dark">
+            Para não duplicar vendas, corrija a partir do anexo usando <strong>Auditar e Corrigir Linhas</strong>, assim cada linha aponta para a venda exata.
+          </p>
+          <ul v-if="bloqueios.chaveAmbigua.length" class="list-disc pl-4 text-danger-dark space-y-0.5">
+            <li v-for="(b, i) in bloqueios.chaveAmbigua" :key="i">{{ b }}</li>
           </ul>
         </div>
 
@@ -139,9 +155,13 @@
           </label>
         </div>
 
-        <p v-if="erroEfetivacao" class="text-danger font-bold text-xs" role="alert">
-          {{ erroEfetivacao }}
-        </p>
+        <div v-if="erroEfetivacao" class="space-y-2 rounded-xl border border-danger/30 bg-danger-bg/40 p-3 text-xs text-danger-dark" role="alert">
+          <p class="font-bold">{{ erroEfetivacao }}</p>
+          <!-- 409 de chave de venda ambígua: lista as linhas que impedem a efetivação -->
+          <ul v-if="erroEfetivacaoDetalhes.length" class="list-disc space-y-1 pl-4 font-medium">
+            <li v-for="(detalhe, i) in erroEfetivacaoDetalhes" :key="i">{{ detalhe }}</li>
+          </ul>
+        </div>
 
         <!-- Botões de Ação -->
         <div class="flex items-center justify-end gap-3 pt-3 border-t border-sage-border-light">
@@ -171,22 +191,31 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { Globe2, X, AlertOctagon, RefreshCw } from 'lucide-vue-next'
+import { useDialogFocus } from '@/services/dialogFocus'
+import { describePreviewBlockers } from '@/services/campaignPreparationService'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   preview: { type: Object, default: null },
   carregando: { type: Boolean, default: false },
   efetivando: { type: Boolean, default: false },
-  erroEfetivacao: { type: String, default: '' }
+  erroEfetivacao: { type: String, default: '' },
+  erroEfetivacaoDetalhes: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['confirm', 'cancel'])
 
+// FRONT-14: foco entra no diálogo ao abrir (sem isso o Esc não funcionava), Tab fica preso e o foco volta ao fechar.
+const dialogRoot = ref(null)
+const { onDialogKeydown } = useDialogFocus(dialogRoot, () => props.open, { onClose: () => emit('cancel'), isBusy: () => props.efetivando })
+
 const motivo = ref('')
 const confirmado = ref(false)
 
+const bloqueios = computed(() => describePreviewBlockers(props.preview))
+
 const podeEfetivar = computed(() => {
-  return props.preview != null && !props.carregando && !props.erroEfetivacao && !props.preview.possuiBloqueioFechamento && confirmado.value && motivo.value.trim().length >= 5
+  return props.preview != null && !props.carregando && !props.erroEfetivacao && !bloqueios.value.bloqueado && confirmado.value && motivo.value.trim().length >= 5
 })
 
 watch(() => props.open, () => { motivo.value = ''; confirmado.value = false })

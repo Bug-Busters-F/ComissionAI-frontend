@@ -3,10 +3,11 @@
     <!-- Cabeçalho e Seleção de Base -->
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <!-- Seletor de Base (Abas estilizadas Wise) -->
-      <div class="flex items-center gap-1.5 rounded-2xl bg-sage-light p-1.5 w-fit">
+      <div class="flex max-w-full flex-wrap items-center gap-1.5 rounded-2xl bg-sage-light p-1.5 w-fit" role="group" aria-label="Base exibida">
         <button
           type="button"
           @click="store.mudarTipoBaseEfetivados('RH')"
+          :aria-pressed="store.dadosEfetivados.tipoBaseAtiva === 'RH'"
           :class="[
             'focus-ring flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition',
             store.dadosEfetivados.tipoBaseAtiva === 'RH'
@@ -27,6 +28,7 @@
         <button
           type="button"
           @click="store.mudarTipoBaseEfetivados('VENDAS')"
+          :aria-pressed="store.dadosEfetivados.tipoBaseAtiva === 'VENDAS'"
           :class="[
             'focus-ring flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition',
             store.dadosEfetivados.tipoBaseAtiva === 'VENDAS'
@@ -47,6 +49,7 @@
         <button
           type="button"
           @click="store.mudarTipoBaseEfetivados('COMISS')"
+          :aria-pressed="store.dadosEfetivados.tipoBaseAtiva === 'COMISS'"
           :class="[
             'focus-ring flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition',
             store.dadosEfetivados.tipoBaseAtiva === 'COMISS'
@@ -91,6 +94,7 @@
             :value="store.dadosEfetivados.termoBusca"
             @input="store.setTermoBusca($event.target.value)"
             placeholder="Filtrar matrícula, cargo..."
+            aria-label="Filtrar dados efetivados por matrícula, cargo ou loja"
             class="focus-ring rounded-xl border border-sage-border bg-white pl-8 pr-4 py-2 text-xs text-brand-dark outline-none w-48 sm:w-56"
           />
         </div>
@@ -382,8 +386,9 @@
         <div class="flex items-center gap-3">
           <!-- Tamanho da página -->
           <div class="flex items-center gap-1.5">
-            <span>Exibir:</span>
+            <label for="efetivados-page-size">Exibir:</label>
             <select
+              id="efetivados-page-size"
               :value="store.dadosEfetivados.size"
               @change="store.mudarTamanhoPaginaEfetivados($event.target.value)"
               class="rounded-lg border border-sage-border bg-white px-2 py-1 font-semibold text-brand-dark outline-none"

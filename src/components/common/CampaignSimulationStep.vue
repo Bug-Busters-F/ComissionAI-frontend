@@ -832,7 +832,7 @@
     <!-- 8. Modal de Memória do Cálculo da Venda ([FRONT-5]) -->
     <div
       v-if="selectedRow"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+      class="fixed inset-0 !m-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="calculation-memory-title"

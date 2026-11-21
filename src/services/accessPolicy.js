@@ -28,6 +28,8 @@ export function canAccess(role, action, permissions = null) {
     reprocessAnomalies: ['GERENTE_VENDAS'],
     // Espelha SecurityConfig: /campanhas/*/preparacao-bases/** restrito a ADMIN, GERENTE e NEGOCIOS
     viewPreparationLots: ['ANALISTA_NEGOCIOS', 'GERENTE_VENDAS'],
+    // GET /comissoes/fechamento responde 403 aos analistas; consultar só quando o perfil pode ver o resultado.
+    viewClosings: ['GERENTE_VENDAS', 'AUDITOR'],
     manageUsers: []
   }
   const permission = {

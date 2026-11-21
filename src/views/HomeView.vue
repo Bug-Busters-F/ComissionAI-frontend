@@ -31,8 +31,8 @@
 
     <HomeAnomaliesCard v-if="access.can('viewAnomalies')" :campaigns="campaigns" :campaigns-loading="campaignsLoading" />
 
-    <section class="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
-      <article class="rounded-2xl bg-white p-6 sm:p-7" :aria-busy="campaignsLoading">
+    <section class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+      <article class="min-w-0 rounded-2xl bg-white p-6 sm:p-7" :aria-busy="campaignsLoading">
         <div class="flex items-center justify-between gap-4">
           <h2 class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Campanhas recentes</h2>
           <RouterLink to="/campanhas" class="focus-ring text-sm font-semibold underline underline-offset-4 text-brand-dark">Ver todas →</RouterLink>
@@ -57,7 +57,7 @@
         </div>
       </article>
 
-      <article class="rounded-2xl bg-white p-6 sm:p-7" :aria-busy="indicatorsLoading">
+      <article class="min-w-0 rounded-2xl bg-white p-6 sm:p-7" :aria-busy="indicatorsLoading">
         <h2 class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Próximas ações</h2>
         <p class="mt-2 text-sm text-sage-muted">Atividades disponíveis para o seu perfil.</p>
         <p v-if="indicatorsLoading" class="mt-6 text-sm text-sage-muted" role="status">Consultando atividades…</p>

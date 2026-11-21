@@ -1,10 +1,13 @@
 <template>
   <div
     v-if="open"
-    class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 sm:p-6"
+    class="fixed inset-0 !m-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 outline-none sm:p-6"
     role="dialog"
     aria-modal="true"
     :aria-labelledby="modalTitleId"
+    ref="dialogRoot"
+    tabindex="-1"
+    @keydown="onDialogKeydown"
   >
     <div
       class="relative w-full max-w-xl rounded-[28px] border border-sage-border bg-white p-6 shadow-2xl transition sm:p-8 space-y-6"
@@ -137,6 +140,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { X, AlertTriangle } from 'lucide-vue-next'
+import { useDialogFocus } from '@/services/dialogFocus'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -147,6 +151,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['confirm', 'cancel'])
+
+// FRONT-14: foco entra no diálogo ao abrir (sem isso o Esc não funcionava), Tab fica preso e o foco volta ao fechar.
+const dialogRoot = ref(null)
+const { onDialogKeydown } = useDialogFocus(dialogRoot, () => props.open, { onClose: () => emit('cancel'), isBusy: () => props.isSubmitting })
 
 const motivoText = ref('')
 const validationError = ref('')

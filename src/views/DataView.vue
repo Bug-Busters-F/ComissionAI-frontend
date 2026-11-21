@@ -3,7 +3,7 @@
     <p v-if="!access.can('manageData')" class="rounded-xl bg-white p-4 text-sm text-sage-muted">Modo consulta. Somente gerente e administrador podem importar, alterar ou excluir bases.</p>
     <PageHeader title="Dados da empresa" description="Organize e feche os ciclos mensais de dados de cada competência.">
       <template #action>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
           <button v-if="access.can('manageData')"
             type="button"
             @click="store.openComissModal(store.competencias[0]?.competenciaCodigo || null)"

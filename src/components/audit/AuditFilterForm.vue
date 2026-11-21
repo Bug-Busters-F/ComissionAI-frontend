@@ -17,5 +17,5 @@ const emit = defineEmits(['update:modelValue', 'apply', 'reset'])
 const update = (key, value) => emit('update:modelValue', { ...props.modelValue, [key]: value })
 </script>
 <style scoped>
-.audit-control { @apply focus-ring mt-2 w-full min-w-0 rounded-xl border border-sage-border bg-white px-3 py-2.5 text-sm font-normal text-brand-dark; }
+.audit-control { @apply focus:outline-none focus:ring-2 focus:ring-brand-ring focus:ring-offset-2 focus-within:outline-none focus-within:ring-2 focus-within:ring-brand-ring focus-within:ring-offset-2 mt-2 w-full min-w-0 rounded-xl border border-sage-border bg-white px-3 py-2.5 text-sm font-normal text-brand-dark; }
 </style>

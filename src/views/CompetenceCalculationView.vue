@@ -237,12 +237,13 @@
             type="button"
             class="focus-ring inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition"
             :class="activeReportTab === 'colaboradores' ? 'bg-brand text-brand-dark shadow-sm' : 'bg-white text-sage-muted hover:bg-sage-light hover:text-brand-dark'"
+            :aria-pressed="activeReportTab === 'colaboradores'"
             @click="activeReportTab = 'colaboradores'"
           >
             <span>Por Colaborador</span>
             <span
               v-if="collaboratorRows.length"
-              class="rounded-full bg-brand-dark/10 px-2 py-0.5 text-xs font-extrabold"
+              class="rounded-full bg-brand-dark/10 px-2 py-0.5 text-xs font-extrabold text-brand-dark"
             >
               {{ collaboratorRows.length }}
             </span>
@@ -252,12 +253,13 @@
             type="button"
             class="focus-ring inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition"
             :class="activeReportTab === 'regras' ? 'bg-brand text-brand-dark shadow-sm' : 'bg-white text-sage-muted hover:bg-sage-light hover:text-brand-dark'"
+            :aria-pressed="activeReportTab === 'regras'"
             @click="activeReportTab = 'regras'"
           >
             <span>Por Grupo de Regra</span>
             <span
               v-if="ruleRows.length"
-              class="rounded-full bg-brand-dark/10 px-2 py-0.5 text-xs font-extrabold"
+              class="rounded-full bg-brand-dark/10 px-2 py-0.5 text-xs font-extrabold text-brand-dark"
             >
               {{ ruleRows.length }}
             </span>
@@ -268,10 +270,11 @@
             type="button"
             class="focus-ring inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition"
             :class="activeReportTab === 'vendas' ? 'bg-brand text-brand-dark shadow-sm' : 'bg-white text-sage-muted hover:bg-sage-light hover:text-brand-dark'"
+            :aria-pressed="activeReportTab === 'vendas'"
             @click="activeReportTab = 'vendas'"
           >
             <span>Vendas Detalhadas</span>
-            <span class="rounded-full bg-brand-dark/10 px-2 py-0.5 text-xs font-extrabold">
+            <span class="rounded-full bg-brand-dark/10 px-2 py-0.5 text-xs font-extrabold text-brand-dark">
               {{ result.resultados.length }}
             </span>
           </button>
@@ -281,6 +284,7 @@
             type="button"
             class="focus-ring inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition"
             :class="activeReportTab === 'impedimentos' ? 'bg-brand text-brand-dark shadow-sm' : 'bg-white text-sage-muted hover:bg-sage-light hover:text-brand-dark'"
+            :aria-pressed="activeReportTab === 'impedimentos'"
             @click="activeReportTab = 'impedimentos'"
           >
             <span>Impedimentos</span>
@@ -512,8 +516,8 @@
       Nenhum cálculo foi executado nesta sessão. Use o botão acima para iniciar o processamento.
     </p>
 
-    <div v-if="showRecalculateConfirm && access.can('calculate')" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" role="presentation" @click.self="showRecalculateConfirm = false">
-      <section class="w-full max-w-lg rounded-[22px] bg-white p-6 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="recalculate-confirm-title">
+    <div v-if="showRecalculateConfirm && access.can('calculate')" class="fixed inset-0 !m-0 z-50 flex items-center justify-center bg-black/40 px-4" role="presentation" @click.self="showRecalculateConfirm = false">
+      <section ref="recalculateDialog" tabindex="-1" class="w-full max-w-lg rounded-[22px] bg-white p-6 shadow-2xl outline-none sm:p-7" role="dialog" aria-modal="true" aria-labelledby="recalculate-confirm-title" @keydown="onRecalculateDialogKeydown">
         <h2 id="recalculate-confirm-title" class="text-xl font-extrabold tracking-[-0.03em] text-brand-dark">Recalcular comissões?</h2>
         <p class="mt-3 text-sm leading-6 text-sage-muted">
           Serão usadas as regras atualmente cadastradas e aplicáveis às datas das vendas. Resultados anteriores bem-sucedidos serão substituídos; vendas impedidas manterão seus resultados anteriores no histórico.
@@ -546,6 +550,7 @@
 import { useAccessPolicy } from '@/services/useAccessPolicy'
 const access = useAccessPolicy()
 import { computed, defineComponent, h, onBeforeUnmount, ref, watch } from 'vue'
+import { useDialogFocus } from '@/services/dialogFocus'
 import { useRoute, useRouter } from 'vue-router'
 import { RefreshCw, FileSpreadsheet } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -604,6 +609,9 @@ const result = ref(null)
 const lastOperation = ref(CALCULATION_OPERATION.NORMAL)
 const restoredResult = ref(null)
 const showRecalculateConfirm = ref(false)
+// FRONT-14: o diálogo de recálculo não recebia foco nem fechava com Esc.
+const recalculateDialog = ref(null)
+const { onDialogKeydown: onRecalculateDialogKeydown } = useDialogFocus(recalculateDialog, () => showRecalculateConfirm.value, { onClose: () => { showRecalculateConfirm.value = false } })
 const salesQueryState = ref(SALES_QUERY_STATE.IDLE)
 const salesQueryError = ref('')
 const historyLoading = ref(false)

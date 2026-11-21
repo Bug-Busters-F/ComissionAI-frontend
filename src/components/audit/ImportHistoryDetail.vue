@@ -79,7 +79,7 @@ async function downloadOriginal() {
 }
 </script>
 <style scoped>
-.audit-detail-control { @apply focus-ring mt-2 block rounded-xl border border-sage-border bg-white px-3 py-2 text-sm font-normal; }
+.audit-detail-control { @apply focus:outline-none focus:ring-2 focus:ring-brand-ring focus:ring-offset-2 focus-within:outline-none focus-within:ring-2 focus-within:ring-brand-ring focus-within:ring-offset-2 mt-2 block rounded-xl border border-sage-border bg-white px-3 py-2 text-sm font-normal; }
 .validation-table { @apply w-full min-w-[600px] text-left text-sm; }
 .validation-table th { @apply bg-sage-pill px-3 py-3 text-xs font-semibold text-sage-muted; }
 .validation-table td { @apply border-b border-sage-border-light px-3 py-3 align-top; }

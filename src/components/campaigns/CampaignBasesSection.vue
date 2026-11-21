@@ -296,15 +296,16 @@
         <!-- Input Arquivo RH -->
         <div class="rounded-xl border border-dashed border-sage-border-dark p-4 bg-sage-light/20 flex flex-col justify-between">
           <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-sage-muted">
+            <label for="campaign-bases-rh-file" class="block text-xs font-bold uppercase tracking-wider text-sage-muted">
               1. Planilha de RH / Colaboradores (.xlsx)
             </label>
             <input
+              id="campaign-bases-rh-file"
               type="file"
               accept=".xlsx,.xls"
               :disabled="!authStore.canUploadBases || isUploading"
               @change="onRhFileSelect"
-              class="mt-2.5 block w-full text-xs text-sage-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-brand file:text-brand-dark hover:file:bg-brand-hover cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              class="focus-ring rounded-full mt-2.5 block w-full text-xs text-sage-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-brand file:text-brand-dark hover:file:bg-brand-hover cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
           <p v-if="rhFile" class="mt-2 text-xs font-semibold text-brand-dark truncate">
@@ -315,15 +316,16 @@
         <!-- Input Arquivo Vendas -->
         <div class="rounded-xl border border-dashed border-sage-border-dark p-4 bg-sage-light/20 flex flex-col justify-between">
           <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-sage-muted">
+            <label for="campaign-bases-sales-file" class="block text-xs font-bold uppercase tracking-wider text-sage-muted">
               2. Planilha de Vendas (.xlsx)
             </label>
             <input
+              id="campaign-bases-sales-file"
               type="file"
               accept=".xlsx,.xls"
               :disabled="!authStore.canUploadBases || isUploading"
               @change="onVendasFileSelect"
-              class="mt-2.5 block w-full text-xs text-sage-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-brand file:text-brand-dark hover:file:bg-brand-hover cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              class="focus-ring rounded-full mt-2.5 block w-full text-xs text-sage-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-brand file:text-brand-dark hover:file:bg-brand-hover cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
           <p v-if="vendasFile" class="mt-2 text-xs font-semibold text-brand-dark truncate">
