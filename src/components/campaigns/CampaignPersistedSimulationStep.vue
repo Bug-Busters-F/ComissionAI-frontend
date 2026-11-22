@@ -5,6 +5,7 @@
 
     <!-- Área de Bases da Campanha com Deduplicação, Upload Sequencial e Diagnóstico ([FRONT-4]) -->
     <CampaignBasesSection
+      :auto-select-competence="false"
       :campanha-id="form?.id"
       :competencia="simulation.selectedCompetencia"
       @competence-selected="$emit('select-competence', $event)"

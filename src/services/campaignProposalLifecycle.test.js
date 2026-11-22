@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
 import { effectScope, reactive } from 'vue'
-import { campaignFixture, savedResponse } from './campaignLifecycleTestFixtures'
+import { campaignFixture, savedResponse, programFixture } from './campaignLifecycleTestFixtures'
 import { createCampaignProposalLifecycle } from './campaignProposalLifecycle'
 
 function deferred() { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
 const scenario = { totalVendas: '1000', totalComissaoBase: '20', totalComissaoProposta: '40', deltaComissao: '20', deltaPercentual: '100', comissaoProjetada: '40', deltaProjetado: '20', qtdVendasComMudancaFaixa: 0 }
-function simulationRaw(id = 'sim-id') { return { id, protocolo: 'protocol', campanhaId: 42, competencia: '2026-09', totalVendasRecortadas: 1, fatorProjecao: '1', diasInclusivos: 30, cenario100: scenario, cenario80: scenario, cenario120: scenario, cenario150: scenario, vendas: [], avisosGerais: [] } }
+function simulationRaw(id = 'sim-id') { return { executadoViaPython: true, versaoProgramaPython: 1, checksumPython: 'a'.repeat(64), id, protocolo: 'protocol', campanhaId: 42, competencia: '2026-09', totalVendasRecortadas: 1, fatorProjecao: '1', diasInclusivos: 30, cenario100: scenario, cenario80: scenario, cenario120: scenario, cenario150: scenario, vendas: [], avisosGerais: [] } }
 function setup(overrides = {}, permissions = {}) {
   const campaign = reactive(campaignFixture()); const scope = effectScope()
   campaign.propostas[2].campos.taxaPercentual = '4'; campaign.propostas[2].pendenciasRemotas = []; campaign.propostas[2].metadadosRecebidos.validacaoPendente = false
-  const api = { load: vi.fn(async () => savedResponse(campaign)), save: vi.fn(async () => savedResponse(campaign)), competences: vi.fn(async () => [{ competencia: '2026-09', totalVendas: 1 }]), cut: vi.fn(async () => ({ competencia: '2026-09', totalVendasRecortadas: 1, totalVendasComImpedimento: 0, impedimentosGerais: [], possuiAmbiguidadeCritica: false })), simulate: vi.fn(async () => simulationRaw()), sales: vi.fn(async (id, page) => ({ simulacaoId: id, paginaAtual: page - 1, totalElementos: 1, totalPaginas: 1, vendas: [] })), accept: vi.fn(async () => ({ simulacaoId: 'sim-id', campanhaId: 42, statusAceite: 'ACEITA', aceitoPor: 'Pessoa teste' })), readiness: vi.fn(async () => ({ aptaParaAtivacao: true, simulacaoId: 'sim-id', aceitoPor: 'Pessoa teste' })), activate: vi.fn(async () => ({ ...savedResponse(campaign), estado: 'ATIVA' })), simulation: vi.fn(async () => simulationRaw()), ...overrides }
-  const flow = scope.run(() => createCampaignProposalLifecycle({ campaign, api, ...permissions }))
+  const api = { program: vi.fn(async () => programFixture()), programHistory: vi.fn(async () => [programFixture()]), load: vi.fn(async () => savedResponse(campaign)), save: vi.fn(async () => savedResponse(campaign)), competences: vi.fn(async () => [{ competencia: '2026-09', totalVendas: 1 }]), cut: vi.fn(async () => ({ competencia: '2026-09', totalVendasRecortadas: 1, totalVendasComImpedimento: 0, impedimentosGerais: [], possuiAmbiguidadeCritica: false })), simulatePython: vi.fn(async () => simulationRaw()), sales: vi.fn(async (id, page) => ({ simulacaoId: id, paginaAtual: page - 1, totalElementos: 1, totalPaginas: 1, vendas: [] })), accept: vi.fn(async () => ({ simulacaoId: 'sim-id', campanhaId: 42, statusAceite: 'ACEITA', aceitoPor: 'Pessoa teste' })), readiness: vi.fn(async () => ({ aptaParaAtivacao: true, simulacaoId: 'sim-id', aceitoPor: 'Pessoa teste' })), activate: vi.fn(async () => ({ ...savedResponse(campaign), estado: 'ATIVA' })), simulation: vi.fn(async () => simulationRaw()), ...overrides }
+  const flow = scope.run(() => createCampaignProposalLifecycle({ campaign, api, canSimulate: () => true, canReviewProgram: () => true, ...permissions }))
   return { campaign, api, flow, scope }
 }
 async function ready(s) { expect(await s.flow.save()).toBe(true); await s.flow.selectCompetence('2026-09'); expect(await s.flow.runSimulation()).toBe(true); s.flow.simulation.aceitoPor = 'Pessoa teste'; expect(await s.flow.accept()).toBe(true) }
@@ -55,7 +55,7 @@ describe('draft, persisted simulation, formal acceptance and activation lifecycl
     expect(await s.flow.save()).toBe(false)
     expect(s.flow.state.error).toContain('Reconstrua/reinicie o backend')
     expect(s.flow.state.uncertainCreate).toBe(true)
-    expect(s.api.simulate).not.toHaveBeenCalled()
+    expect(s.api.simulatePython).not.toHaveBeenCalled()
     s.scope.stop()
   })
   it('creates once, skips unchanged PUT and preserves all rules after reloading', async () => {
@@ -92,23 +92,23 @@ describe('draft, persisted simulation, formal acceptance and activation lifecycl
   })
   it('uses the saved campaign id and real protocol and never saves between acceptance and activation', async () => {
     const s = setup(); await ready(s)
-    expect(s.api.simulate).toHaveBeenCalledWith(42, '2026-09')
+    expect(s.api.simulatePython).toHaveBeenCalledWith(42, expect.objectContaining({ competencia: '2026-09', versaoPrograma: 1, calibrar: true }))
     expect(s.api.accept).toHaveBeenCalledWith('sim-id', { campanhaId: 42, motivo: null })
     expect(s.flow.simulation.result.protocolo).toBe('protocol'); expect(s.flow.canReview.value).toBe(true)
     expect(await s.flow.activate()).toBe(true); expect(s.api.activate).toHaveBeenCalledWith(42, null, null)
     expect(s.api.save).toHaveBeenCalledOnce(); expect(s.flow.state.estado).toBe('ATIVA'); s.scope.stop()
   })
   it('blocks acceptance and activation when an API operation fails, without fallback results', async () => {
-    const s = setup({ simulate: vi.fn(async () => { throw new Error('Backend indisponível') }) }); await s.flow.save(); await s.flow.selectCompetence('2026-09')
+    const s = setup({ simulatePython: vi.fn(async () => { throw new Error('Backend indisponível') }) }); await s.flow.save(); await s.flow.selectCompetence('2026-09')
     expect(await s.flow.runSimulation()).toBe(false); expect(s.flow.simulation.result).toBeNull(); expect(s.flow.simulation.status).toBe('FALHOU')
     expect(await s.flow.accept()).toBe(false); expect(await s.flow.activate()).toBe(false); expect(s.api.accept).not.toHaveBeenCalled(); expect(s.api.activate).not.toHaveBeenCalled(); s.scope.stop()
   })
   it('does not accept a simulation belonging to another campaign or a malformed response', async () => {
-    const s = setup({ simulate: vi.fn(async () => ({ ...simulationRaw(), campanhaId: 77 })) }); await s.flow.save(); await s.flow.selectCompetence('2026-09')
+    const s = setup({ simulatePython: vi.fn(async () => ({ ...simulationRaw(), campanhaId: 77 })) }); await s.flow.save(); await s.flow.selectCompetence('2026-09')
     expect(await s.flow.runSimulation()).toBe(false); expect(s.flow.simulation.result).toBeNull(); s.scope.stop()
   })
   it('rejects a late simulation after the form changes', async () => {
-    const d = deferred(), s = setup({ simulate: vi.fn(() => d.promise) }); await s.flow.save(); await s.flow.selectCompetence('2026-09')
+    const d = deferred(), s = setup({ simulatePython: vi.fn(() => d.promise) }); await s.flow.save(); await s.flow.selectCompetence('2026-09')
     const running = s.flow.runSimulation(); await Promise.resolve(); await Promise.resolve(); s.campaign.propostas[0].campos.taxaPercentual = '6'; d.resolve(simulationRaw())
     expect(await running).toBe(false); expect(s.flow.simulation.result).toBeNull(); s.scope.stop()
   })
@@ -151,7 +151,7 @@ describe('concurrency and validation guards', () => {
   })
   it('does not simulate a campaign changed remotely after its recorte', async () => {
     const s = setup(); await s.flow.save(); await s.flow.selectCompetence('2026-09'); const concurrent = savedResponse(s.campaign); concurrent.titulo += ' outra sessão'; s.api.load.mockResolvedValue(concurrent)
-    expect(await s.flow.runSimulation()).toBe(false); expect(s.api.simulate).not.toHaveBeenCalled(); expect(s.flow.simulation.accepted).toBe(false); s.scope.stop()
+    expect(await s.flow.runSimulation()).toBe(false); expect(s.api.simulatePython).not.toHaveBeenCalled(); expect(s.flow.simulation.accepted).toBe(false); s.scope.stop()
   })
   it('invalidates previously accepted readiness when reference checking finds impediments', async () => {
     const s = setup(); await ready(s); s.api.cut.mockResolvedValue({ competencia: '2026-09', totalVendasRecortadas: 1, totalVendasComImpedimento: 1, possuiAmbiguidadeCritica: false, impedimentosGerais: [] })
@@ -159,7 +159,7 @@ describe('concurrency and validation guards', () => {
   })
   it('does not run simulation for an incomplete saved draft even when called directly', async () => {
     const s = setup(); s.campaign.propostas[0].campos.taxaPercentual = ''; await s.flow.save(); await s.flow.selectCompetence('2026-09')
-    expect(await s.flow.runSimulation()).toBe(false); expect(s.api.simulate).not.toHaveBeenCalled(); s.scope.stop()
+    expect(await s.flow.runSimulation()).toBe(false); expect(s.api.simulatePython).not.toHaveBeenCalled(); s.scope.stop()
   })
   it('preserves defaults after reload without persisting an already-resolved missing-period blocker', async () => {
     const s = setup(); s.campaign.dataInicio = ''; s.campaign.dataFim = ''; s.campaign.pendenciasCampanha = [{ codigo: 'VIGENCIA_NAO_CONSOLIDADA', severidade: 'IMPEDITIVO', mensagem: 'Vigência ausente' }]
@@ -176,7 +176,7 @@ it('adapta impedimentos de cobertura para o bloqueio da tela da dev, preservando
   expect(await s.flow.selectCompetence('2026-09')).toBe(false)
   expect(s.flow.simulation.referenceValidation.canExecute).toBe(false)
   expect(s.flow.simulation.referenceValidation.missingBases[0]).toMatchObject({ marca: 'PRETO', cargo: 'VENDEDOR' })
-  expect(s.api.simulate).not.toHaveBeenCalled()
+  expect(s.api.simulatePython).not.toHaveBeenCalled()
   s.scope.stop()
 })
 
@@ -289,7 +289,7 @@ describe('profile-aware lifecycle callbacks', () => {
     expect(await s.flow.runSimulation()).toBe(false)
     expect(await s.flow.recordProgress(2)).toBe(false)
     expect(s.api.save).not.toHaveBeenCalled()
-    expect(s.api.simulate).not.toHaveBeenCalled()
+    expect(s.api.simulatePython).not.toHaveBeenCalled()
     expect(s.api.progress).not.toHaveBeenCalled()
     s.scope.stop()
   })
@@ -301,21 +301,15 @@ describe('governance, budget limits and code approval ([FRONT-9])', () => {
     await ready(s)
     expect(s.flow.canActivate.value).toBe(true)
 
-    s.flow.state.codeApproval = { statusAprovacaoCodigo: 'PENDENTE', regras: [] }
+    s.flow.program.current = programFixture(42, { statusAprovacao: 'PENDENTE_REVISAO', validoParaExecucao: false })
     expect(s.flow.isCodeApproved.value).toBe(false)
     expect(s.flow.canActivate.value).toBe(false)
 
-    s.flow.state.codeApproval = {
-      statusAprovacaoCodigo: 'APROVADO',
-      regras: [{ regraId: 1, statusAprovacaoCodigo: 'INVALIDADO' }]
-    }
+    s.flow.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: false })
     expect(s.flow.isCodeApproved.value).toBe(false)
     expect(s.flow.canActivate.value).toBe(false)
 
-    s.flow.state.codeApproval = {
-      statusAprovacaoCodigo: 'APROVADO',
-      regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
-    }
+    s.flow.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: true })
     expect(s.flow.isCodeApproved.value).toBe(true)
     expect(s.flow.canActivate.value).toBe(true)
     s.scope.stop()
@@ -460,10 +454,7 @@ describe('governance, budget limits and code approval ([FRONT-9])', () => {
   it('strictly blocks activation when simulation acceptance is missing even if code and budget are approved', async () => {
     const s = setup()
     await s.flow.save()
-    s.flow.state.codeApproval = {
-      statusAprovacaoCodigo: 'APROVADO',
-      regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
-    }
+    s.flow.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: true })
     s.flow.simulation.accepted = false
     expect(s.flow.isCodeApproved.value).toBe(true)
     expect(s.flow.canActivate.value).toBe(false)
