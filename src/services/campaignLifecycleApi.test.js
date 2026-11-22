@@ -25,3 +25,37 @@ it('carries edit revisions and reads immutable published versions', async () => 
   expect(http.delete).toHaveBeenCalledWith('/campanhas/7/proposta', expect.objectContaining({ headers: { 'X-Campanha-Revisao': 13 } }))
   expect(http.get).toHaveBeenCalledWith('/campanhas/7/versoes/2', expect.any(Object))
 })
+
+it('integrates code approval, manager forwarding, budget and version comparison', async () => {
+  const http = {
+    get: vi.fn(async () => ({ data: {} })),
+    post: vi.fn(async () => ({ data: {} })),
+    patch: vi.fn(async () => ({ data: {} }))
+  }
+  const api = createCampaignLifecycleApi(http)
+
+  await api.approveCode(7, { aprovado: true, aprovadoPor: 'dev@empresa.com' })
+  await api.getCodeApproval(7)
+  await api.forwardToManager(7, { versaoEsperada: 1 })
+  await api.compareVersions(7, 1, 2)
+  await api.updateBudget(7, { orcamento: 50000, confirmar: true })
+  await api.returnProposal(7, { etapaDestino: 1, motivo: 'Regra incorreta' })
+
+  expect(http.post).toHaveBeenCalledWith('/campanhas/7/aprovacao-codigo', { aprovado: true, aprovadoPor: 'dev@empresa.com' }, expect.any(Object))
+  expect(http.get).toHaveBeenCalledWith('/campanhas/7/aprovacao-codigo', expect.any(Object))
+  expect(http.post).toHaveBeenCalledWith('/campanhas/7/encaminhar-gerente', { versaoEsperada: 1 }, expect.any(Object))
+  expect(http.get).toHaveBeenCalledWith('/campanhas/7/versoes/comparacao', expect.objectContaining({ params: { versaoBase: 1, versaoComparada: 2 } }))
+  expect(http.patch).toHaveBeenCalledWith('/campanhas/7/orcamento', { orcamento: 50000, confirmar: true }, expect.any(Object))
+  expect(http.post).toHaveBeenCalledWith('/campanhas/7/devolver', { etapaDestino: 1, motivo: 'Regra incorreta' }, expect.any(Object))
+})
+
+it('consulta a aprovação do programa da versão exibida sem usar o controle antigo por regra', async () => {
+  const approved = { campanhaId: 7, versaoCampanhaNumero: 1, statusAprovacao: 'APROVADO', validoParaExecucao: true }
+  const http = { get: vi.fn(async () => ({ data: approved })) }
+  const api = createCampaignLifecycleApi(http)
+  expect(await api.program(7, 1)).toEqual(approved)
+  expect(http.get).toHaveBeenLastCalledWith('/campanhas/7/versoes/1/programa-python', expect.any(Object))
+  await api.program(7)
+  expect(http.get).toHaveBeenLastCalledWith('/campanhas/7/programa-python', expect.any(Object))
+  expect(http.get.mock.calls.every(([url]) => !url.includes('aprovacao-codigo'))).toBe(true)
+})

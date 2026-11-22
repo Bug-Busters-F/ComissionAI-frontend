@@ -28,7 +28,7 @@ export function proposalFieldId(clientId, field) {
   return 'proposal-field-' + encodeURIComponent(clientId) + '-' + field
 }
 
-export function useCampaignProposalFlow() {
+export function useCampaignProposalFlow({ canEditStep = () => true, canWrite = () => true, canSave = () => true, canStartProposal = () => true, canReviewProgram = () => false, canSimulate = () => false } = {}) {
   const route = useRoute()
   const router = useRouter()
   const campaign = reactive(createCampaignProposalForm())
@@ -54,7 +54,7 @@ export function useCampaignProposalFlow() {
     interpretation.status = 'ready'
   } })
   const integrationState = integration.state
-  const lifecycle = createCampaignProposalLifecycle({ campaign, enabled: provider.mode === 'api', currentStep: () => activeStepIndex.value + 1, processing: () => interpretation.isProcessing || integrationState.busy || Boolean(integrationState.review) || campaignReinterpretationOpen.value, onLoaded: () => {
+  const lifecycle = createCampaignProposalLifecycle({ campaign, canWrite, canSave, canStartProposal, canReviewProgram, canSimulate, canRecordProgress: step => canEditStep(CAMPAIGN_PROPOSAL_STEPS[step - 1]?.key), enabled: provider.mode === 'api', currentStep: () => activeStepIndex.value + 1, processing: () => interpretation.isProcessing || integrationState.busy || Boolean(integrationState.review) || campaignReinterpretationOpen.value, onLoaded: () => {
     descriptionAtProposalSource.value = campaign.textoOriginal
     descriptionNeedsConfirmation.value = false
   } })
@@ -66,11 +66,12 @@ export function useCampaignProposalFlow() {
     if (!id || String(id) === String(persistence.id)) return
     if (await lifecycle.load(id)) {
       reachedStep.value = persistence.etapaMaisAvancada
-      const resumed = CAMPAIGN_PROPOSAL_STEPS[(persistence.etapaMaisAvancada || 1) - 1].key
+      const resumeNumber = lifecycle.canReview.value && canEditStep('conferencia') ? 4 : (persistence.etapaMaisAvancada || 1)
+      const resumed = CAMPAIGN_PROPOSAL_STEPS[resumeNumber - 1].key
       activeStep.value = requiredStep(normalizeProposalStep(route.query.etapa || resumed))
       reachedStep.value = Math.max(reachedStep.value, activeStepIndex.value + 1)
       void lifecycle.recordProgress(activeStepIndex.value + 1)
-      if (activeStep.value === 'simulacao') void lifecycle.loadCompetences()
+      if (activeStep.value === 'simulacao' && canSimulate()) void lifecycle.loadCompetences()
       await router.replace({ query: { ...route.query, etapa: activeStep.value } })
     }
   }, { immediate: true })
@@ -106,10 +107,15 @@ export function useCampaignProposalFlow() {
       if (persistence.loading) return
       const navigation = ++navigationSequence
       const normalized = normalizeProposalStep(requested)
+      if (lifecycle.program.changed && normalized !== activeStep.value) {
+        message.value = 'Salve ou descarte a edição do programa antes de mudar de etapa.'
+        await router.replace({ query: { ...route.query, etapa: activeStep.value } })
+        return
+      }
       if (normalized !== 'dados' && commonValidation.value.pending.some((item) => item.severidade === 'IMPEDITIVO')) {
         commonValidationAttempted.value = true
       }
-      if (provider.mode === 'api' && !lifecycle.readOnly.value && !persistence.loading && ['simulacao', 'conferencia'].includes(normalized) && !integrationState.busy && !integrationState.review && !campaignReinterpretationOpen.value) await integration.prepareReview()
+      if (provider.mode === 'api' && canSave() && canEditStep(normalized) && !lifecycle.readOnly.value && !persistence.loading && ['simulacao', 'conferencia'].includes(normalized) && !integrationState.busy && !integrationState.review && !campaignReinterpretationOpen.value) await integration.prepareReview()
       if (navigation !== navigationSequence || requested !== route.query.etapa) return
       const allowed = requiredStep(normalized)
       activeStep.value = allowed
@@ -129,7 +135,7 @@ export function useCampaignProposalFlow() {
   function requiredStep(target) {
     if (provider.mode === 'api' && !lifecycle.readOnly.value) {
       if (target === 'conferencia' && !lifecycle.canReview.value) target = 'simulacao'
-      if (['simulacao', 'conferencia'].includes(target) && (!persistence.id || lifecycle.dirty.value)) return 'propostas'
+      if (['simulacao', 'conferencia'].includes(target) && (!persistence.id || lifecycle.dirty.value || !lifecycle.isCodeApproved.value)) return 'propostas'
     }
     return getRequiredProposalStep(target, validation.value, campaign, {
       descriptionNeedsConfirmation: descriptionNeedsConfirmation.value,
@@ -139,6 +145,7 @@ export function useCampaignProposalFlow() {
   }
 
   async function saveDraft(options = {}) {
+    if (!canEditStep(activeStep.value)) return false
     if (descriptionNeedsConfirmation.value) {
       message.value = 'Reinterprete o texto alterado ou confirme que deseja manter as regras atuais antes de salvar.'
       await navigateTo('dados')
@@ -148,6 +155,7 @@ export function useCampaignProposalFlow() {
   }
 
   async function applyIntegrationReview() {
+    if (!canEditStep(activeStep.value)) return false
     return integration.applyReview()
   }
 
@@ -160,19 +168,21 @@ export function useCampaignProposalFlow() {
 
   async function navigateTo(step, { replace = false } = {}) {
     if (campaignReinterpretationOpen.value || lifecycle.busy.value) return false
+    if (lifecycle.program.changed && step !== activeStep.value) { message.value = 'Salve a revisão do código antes de mudar de etapa.'; return false }
     const navigation = ++navigationSequence
     const target = normalizeProposalStep(step)
     if (target !== 'dados' && commonValidation.value.pending.some((item) => item.severidade === 'IMPEDITIVO')) {
       commonValidationAttempted.value = true
     }
-    if (provider.mode === 'api' && !lifecycle.readOnly.value && ['simulacao', 'conferencia'].includes(target)) {
+    if (provider.mode === 'api' && canSave() && (canEditStep(activeStep.value) || canEditStep(target)) && !lifecycle.readOnly.value && ['simulacao', 'conferencia'].includes(target)) {
       if (!await integration.prepareReview()) {
         message.value = 'Valide as regras e confirme os resultados pendentes antes de continuar.'
       }
     }
     if (navigation !== navigationSequence) return false
-    if (provider.mode === 'api' && ['simulacao', 'conferencia'].includes(target) && !descriptionNeedsConfirmation.value && validation.value.canAdvanceLocally && !integrationState.review && !lifecycle.readOnly.value) {
+    if (provider.mode === 'api' && canSave() && (canEditStep(activeStep.value) || canEditStep(target)) && ['simulacao', 'conferencia'].includes(target) && !descriptionNeedsConfirmation.value && validation.value.canAdvanceLocally && !integrationState.review && !lifecycle.readOnly.value) {
       if (lifecycle.dirty.value && !await lifecycle.save()) return false
+      if (!lifecycle.program.current && persistence.id) await lifecycle.loadProgram()
       if (target === 'simulacao' && !simulation.competences.length) void lifecycle.loadCompetences()
     }
     const allowed = requiredStep(target)
@@ -192,6 +202,8 @@ export function useCampaignProposalFlow() {
         message.value = 'Informe uma vigência comum no texto da campanha e reinterprete.'
       } else if (provider.mode === 'api' && campaign.propostas.some((p) => !ruleArtifactsCurrent(p, campaign))) {
         message.value = 'Valide as regras alteradas antes de continuar. Seus dados foram preservados.'
+      } else if (provider.mode === 'api' && !lifecycle.isCodeApproved.value) {
+        message.value = 'Salve a proposta e conclua a revisão técnica do programa antes de simular.'
       } else {
         const blockingCount = validation.value.blockers.length
         message.value = 'Corrija ' + blockingCount + (blockingCount === 1 ? ' pendência impeditiva' : ' pendências impeditivas') + ' antes de continuar.'
@@ -218,7 +230,7 @@ export function useCampaignProposalFlow() {
   }
 
   function updateCampaign(field, value) {
-    if (lifecycle.busy.value || lifecycle.readOnly.value) return
+    if (!canEditStep(activeStep.value) || lifecycle.busy.value || lifecycle.readOnly.value) return
     if (!['titulo', 'textoOriginal', 'dataInicio', 'dataFim'].includes(field)) return
     const previousDescription = campaign.textoOriginal
     campaign[field] = value
@@ -234,6 +246,7 @@ export function useCampaignProposalFlow() {
   }
 
   function confirmRetainProposals() {
+    if (!canEditStep(activeStep.value)) return
     descriptionAtProposalSource.value = campaign.textoOriginal
     descriptionNeedsConfirmation.value = false
     campaign.propostas.forEach((proposal) => { proposal.revisaoLocal += 1 })
@@ -258,7 +271,7 @@ export function useCampaignProposalFlow() {
   }
 
   function addProposal() {
-    if (lifecycle.busy.value || lifecycle.readOnly.value) return
+    if (!canEditStep(activeStep.value) || lifecycle.busy.value || lifecycle.readOnly.value) return
     const proposal = createCampaignProposal({ origem: 'manual' })
     campaign.propostas.push(proposal)
     markChanged()
@@ -266,7 +279,7 @@ export function useCampaignProposalFlow() {
   }
 
   function updateProposal(clientId, field, value) {
-    if (lifecycle.busy.value || lifecycle.readOnly.value) return
+    if (!canEditStep(activeStep.value) || lifecycle.busy.value || lifecycle.readOnly.value) return
     if (!['codMarca', 'descrMarca', 'codCargo', 'descriCargo', 'codLoja', 'canal', 'matricula', 'publicoTodasVendas', 'taxaPercentual', 'valorMinimo', 'minimoInclusivo', 'valorMaximo', 'maximoInclusivo'].includes(field)) return
     const proposal = campaign.propostas.find((item) => item.clientId === clientId)
     if (!proposal) return
@@ -287,7 +300,7 @@ export function useCampaignProposalFlow() {
   }
 
   function applyReinterpretation(updated) {
-    if (lifecycle.busy.value || lifecycle.readOnly.value) return
+    if (!canEditStep(activeStep.value) || lifecycle.busy.value || lifecycle.readOnly.value) return
     const proposal = campaign.propostas.find((item) => item.clientId === updated.clientId)
     if (!proposal || proposal.origem === 'manual') return
     Object.assign(proposal, updated)
@@ -295,7 +308,7 @@ export function useCampaignProposalFlow() {
   }
 
   function setAllSales(clientId, enabled) {
-    if (lifecycle.busy.value || lifecycle.readOnly.value) return
+    if (!canEditStep(activeStep.value) || lifecycle.busy.value || lifecycle.readOnly.value) return
     const proposal = campaign.propostas.find((item) => item.clientId === clientId)
     if (!proposal) return
     if (enabled) {
@@ -308,7 +321,7 @@ export function useCampaignProposalFlow() {
   }
 
   function requestRemoveProposal(clientId) {
-    if (lifecycle.busy.value || lifecycle.readOnly.value) return
+    if (!canEditStep(activeStep.value) || lifecycle.busy.value || lifecycle.readOnly.value) return
     const proposal = campaign.propostas.find((item) => item.clientId === clientId)
     if (!proposal) return null
     if (isProposalBlank(proposal)) return removeProposal(clientId)
@@ -327,7 +340,7 @@ export function useCampaignProposalFlow() {
   }
 
   function confirmRemoveProposal() {
-    if (lifecycle.busy.value || lifecycle.readOnly.value || !pendingRemovalId.value) return null
+    if (!canEditStep(activeStep.value) || lifecycle.busy.value || lifecycle.readOnly.value || !pendingRemovalId.value) return null
     return removeProposal(pendingRemovalId.value)
   }
 
@@ -336,6 +349,7 @@ export function useCampaignProposalFlow() {
   }
 
   function loadExample(key) {
+    if (!canEditStep(activeStep.value)) return false
     if (!provider.capabilities.examples) return false
     if (hasCampaignContent(campaign) && typeof globalThis.confirm === 'function' &&
         !globalThis.confirm('Carregar este exemplo substituirá os dados da campanha atual. Deseja continuar?')) return false
@@ -360,6 +374,7 @@ export function useCampaignProposalFlow() {
   }
 
   async function interpretDescription() {
+    if (!canEditStep(activeStep.value)) return false
     commonValidationAttempted.value = true
     if (lifecycle.busy.value || lifecycle.readOnly.value || interpretation.isProcessing || integrationState.busy || integrationState.review || campaignReinterpretationOpen.value) return false
     if (campaign.propostas.length && campaign.titulo.trim() && campaign.textoOriginal.trim() && provider.capabilities.interpret) {
@@ -376,6 +391,7 @@ export function useCampaignProposalFlow() {
   }
 
   async function confirmCampaignReinterpretation() {
+    if (!canEditStep(activeStep.value)) return false
     if (!campaignReinterpretationOpen.value) return false
     const unchanged = campaignConfirmationFingerprint === JSON.stringify(campaign)
     cancelCampaignReinterpretation()
@@ -389,7 +405,12 @@ export function useCampaignProposalFlow() {
   async function executeCampaignInterpretation() {
     if (provider.mode === 'api') {
       const applied = await integration.interpretCampaign()
-      if (applied && !integrationState.review) await navigateTo('propostas')
+      if (applied && !integrationState.review) {
+        // Persist the interpreted proposal before another responsible user opens it.
+        if (canSave() && !await lifecycle.save()) { message.value = persistence.error || 'Salve a proposta antes de continuar.'; return false }
+        reachedStep.value = Math.max(reachedStep.value, 2)
+        await navigateTo('propostas')
+      }
       return applied
     }
     if (!provider.capabilities.interpret) {

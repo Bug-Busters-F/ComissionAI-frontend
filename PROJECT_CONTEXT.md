@@ -55,7 +55,11 @@
     - **Limite do resultado disponível**: o backend atual devolve contagens no campo `resultado`, não totais financeiros ou listas completas. O resumo mostra apenas dados confirmados e mantém o histórico acessível, sem fabricar R$ 0,00.
     - **Recuperação global**: Topbar e tela de apuração compartilham um monitor; navegação e F5 na mesma aba preservam a consulta. SessionStorage não garante recuperação depois de encerrar a sessão/aba.
 - Sprint 3:
-  - Detecção estatística de anomalias/outliers em vendas (3 desvios padrão acima da média).
+  - **Alertas Estatísticos e Anomalias de Vendas (Sprint 3 · FRONT-6)** — detalhes técnicos na seção *Alertas Estatísticos (Sprint 3 · FRONT-6)* em Padrões Técnicos:
+    - `OUTLIER_VENDA`: Z-score Leave-One-Out com **|Z| ≥ 3** nos dois sentidos (vendas muito acima ou estornos/valores muito abaixo) contra o grupo comparável `competencia|loja|cargo|marca`.
+    - `SEM_VENDAS_PARA_RH`: colaborador do lote de RH sem vendas associadas (inconsistência de carga).
+    - `AMOSTRA_INSUFICIENTE`: grupo comparável com menos de 4 vendas (contando a própria), sem distribuição confiável.
+    - Reprocessamento por lote de preparação com Segregação de Funções (auditor apenas consulta) e card executivo na Home com indicador de novos casos em 48h.
   - Explainable AI (XAI): sugestões automáticas de redução de percentuais para adequação orçamentária em caso de estouro de teto.
   - Relatório de fechamento de ciclo financeiro consolidado por canal.
   - Histórico de auditoria e versionamento das regras.
@@ -68,6 +72,7 @@ A organização do diretório `src/` segue uma arquitetura modular baseada em re
 src/
 ├── assets/                  # Arquivos estáticos e estilos globais (Tailwind CSS, ícones, imagens)
 ├── components/              # Componentes Vue reutilizáveis organizados por domínio
+│   ├── anomalies/           # Alertas estatísticos e anomalias de vendas (CampaignAnomaliesSection.vue — Sprint 3 · FRONT-6)
 │   ├── audit/               # Componentes de auditoria, rastreabilidade e logs imutáveis de comissões
 │   ├── common/              # Componentes de UI e etapas do fluxo de campanha (CampaignSimulationStep.vue, CampaignReviewStep.vue, StatusBadge.vue, ToastContainer.vue)
 │   ├── data/                # Ingestão de dados (UploadBaseModal.vue, ValidationReport.vue, MissingBasesCard.vue)
@@ -76,7 +81,7 @@ src/
 │   └── simulation/          # Componentes da sandbox de simulação de impacto financeiro e métricas de XAI
 ├── layouts/                 # Estruturas de layout complementares
 ├── router/                  # Definição e configuração de rotas via Vue Router (index.js)
-├── services/                # Camada de serviços HTTP e domínio (api.js, dataService.js, coverageService.js, campaignSimulationService.js, asyncExecutionService.js, useCampaignFlow.js)
+├── services/                # Camada de serviços HTTP e domínio (api.js, dataService.js, coverageService.js, campaignSimulationService.js, asyncExecutionService.js, useCampaignFlow.js, statisticalAlertsApi.js, statisticalAlertsLogic.js, statisticalAlertsDemo.js)
 ├── stores/                  # Gerenciamento de estado global com Pinia (dataStore.js, notificationStore.js, calculationStore.js)
 ├── views/                   # Telas/páginas principais conectadas às rotas (HomeView, DataView, CampaignsView, CampaignFlowView.vue, CompetenceCalculationView.vue)
 ├── App.vue                  # Componente raiz da aplicação
@@ -132,3 +137,23 @@ src/
   - **Compatibilidade com o Contrato Multi-Regras do Backend**: `campaignMappers.js` e `campaignService.js` enviam `regras: List<RegraItemRequest>` compatível com o `CampanhaController` atualizado na `dev` do backend, mantendo retrocompatibilidade na leitura de `regras` e `regra`.
   - **Fidelidade Matemática**: Cálculo monetário com arredondamento `HALF_UP` (2 casas decimais) por venda, projeção proporcional pelo mês comercial de **30 dias** (`(soma * dias) / 30` sem arredondamento precoce do fator) e recálculo individual de faixa de valor nos cenários de `80%`, `120%` e `150%`.
   - **Rastreabilidade de Aceite (Fingerprint)**: `createSimulationFingerprint` gera assinatura canônica cobrindo competência, vigência, regras/filtros/taxas e hash de `tb_basecomiss`. Qualquer divergência invalida imediatamente o aceite e bloqueia a ativação até nova simulação e confirmação explícita do usuário.
+- **Alertas Estatísticos (Sprint 3 · FRONT-6)**:
+  - **Origem dos alertas**: o backend (`AlertaEstatisticoService`) analisa automaticamente cada **lote de preparação efetivado** (`POST /campanhas/{id}/preparacao-bases/{preparacaoId}/efetivar`). Uploads diretos por `/imports/upload` **não** geram alertas. O frontend nunca calcula estatística: apenas apresenta e explica os alertas persistidos.
+  - **Consulta**: `GET /api/v1/alertas-estatisticos` (todos os perfis) com filtros `competencia` (AAAA-MM, pela `dataReferencia`), `matricula` (igualdade exata), `tipo`, `lotePreparacaoId`, `incluirSubstituidos` (padrão `false`), paginação e ordenação restrita a `geradoEm`, `dataReferencia`, `tipo`, `matricula`, `tamanhoAmostra` e `score` (outros campos retornam 400). Contadores por tipo via 4 consultas `size=1` (`countAlertsByType`).
+  - **Contrato de `AlertaEstatisticoResponse`**: `score` é sempre absoluto (|Z|); a direção (acima/abaixo) é derivada de `valorObservado` vs `mediaGrupo`. Com desvio zero no grupo o backend grava Z = 3 como sentinela — a UI exibe "Valor uniforme no grupo" sem citar o Z. `SEM_VENDAS_PARA_RH` vem com `dataReferencia` no dia 1 da competência, `grupoComparavel = SEM_VENDAS_ASSOCIADAS`, `tamanhoAmostra = 0` e `metodo = Z_SCORE_LEAVE_ONE_OUT_V2` (a UI mostra a competência, "Sem vendas associadas" e "Cruzamento RH × Vendas"). `tamanhoAmostra` inclui a própria venda (mínimo 4 → ao menos 3 referências). A faixa esperada `[μ − 3σ, μ + 3σ]` não é truncada em zero.
+  - **Reprocessamento**: `POST /api/v1/alertas-estatisticos/reprocessar` com `{ lotePreparacaoId }`, apenas para lote `EFETIVADO`. Resposta `{ alertasGerados, alertasSubstituidos, semAmostra }`; `0/0` significa bases inalteradas (feedback neutro). Erros: 400 (lote não efetivado/competência inválida — mensagem do back exibida), 403 (SoD), 404 (lote inexistente).
+  - **Lotes do seletor**: `GET /campanhas/{id}/preparacao-bases?status=EFETIVADO&competencia=` carregado pela tela da campanha e recarregado após nova efetivação (`base-effective`). A competência é sincronizada com a seção de bases (`competence-selected`) e com o seletor da própria seção (`v-model:competence`).
+  - **Segregação de Funções**: reprocessar exige `GERENTE_VENDAS` com permissão `IMPORTAR_BASES` ou `ADMINISTRADOR` com `ACESSO_COMPLETO` (o backend exige apenas o papel; o front é mais restritivo, no mesmo padrão de `manageData`). A rota de lotes de preparação é restrita a `ADMINISTRADOR`, `GERENTE_VENDAS` e `ANALISTA_NEGOCIOS` (`viewPreparationLots`): para o `AUDITOR` a chamada nem é feita, o seletor de lotes fica oculto e a consulta de alertas segue disponível.
+  - **Home**: componente `HomeAnomaliesCard.vue` (encaixado na Home de indicadores reais da FRONT-13), com contadores da competência (campanha ATIVA mais recente → competência do último alerta → mês atual) e selo pulsante quando o alerta mais recente foi gerado há até 48h.
+  - **Robustez e acessibilidade**: respostas obsoletas são descartadas (`createLatestGuard`), erros são traduzidos por status (`describeAlertsError`) e o modal de reprocessamento recebe foco, fecha com ESC/clique externo e devolve o foco ao botão.
+  - **Modo demonstração**: `VITE_ANOMALIES_DEMO=true` habilita o botão "Carregar Dados de Exemplo" no estado vazio. Os dados (`statisticalAlertsDemo.js`) seguem o contrato real, ficam na competência selecionada e nunca são enviados ao servidor nem emitidos para outros indicadores. Desligado por padrão.
+  - **Limitação conhecida (backend)**: `SEM_VENDAS_PARA_RH` considera vendas da matrícula em qualquer competência (`findByRegistrationIdIn` sem filtro de período); colaborador sem vendas no mês, mas com vendas em outro mês, não gera alerta. Correção solicitada ao time de backend.
+
+
+## FRONT-7 e FRONT-8 — revisão executável e orçamento (20/11/2026)
+
+Branch conjunta `feat/revisao-python-simulacao-calibracoes`, a partir da dev `1d22f98`. A revisão técnica na etapa 2 usa `/programa-python` (código completo, versão, assinatura, histórico, edição, aprovação por checksum e devolução justificada). Identidade vem da sessão. Não usa a aprovação legada por regra para autorizar a execução. Alterações nos campos/artefatos devem ser preparadas e salvas antes da aprovação.
+
+Na etapa 3, orçamento interpretado é preservado, mas exige confirmação explícita. A simulação usa somente `/campanhas/{id}/simulacao-python`, com versão aprovada e chave por intenção/repetição após timeout. Resultado precisa confirmar executor e assinatura. Quatro cenários consultam `enquadramento` aninhado. As alternativas persistidas só são aplicadas mediante confirmação e retornam à revisão, invalidando aprovação, simulação e aceite da proposta. Não há fallback local/Java. Calibração de código personalizado depende dos serviços; indisponibilidade e ausência de solução são distintas.
+
+O painel de bases preserva suas funcionalidades; neste fluxo não escolhe automaticamente uma competência diferente da selecionada na simulação. Guias: `docs/GUIA-FRONT-7-REVISAO-PYTHON.md` e `docs/GUIA-FRONT-8-ORCAMENTO-CALIBRACOES.md`. Dependências: backend BACK-11 em `feat/simulacao-python-calibracoes`, V45, IA dev `7b1a182` (PR #18).

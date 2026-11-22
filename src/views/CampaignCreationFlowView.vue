@@ -11,7 +11,7 @@
       </div>
     </header>
 
-    <section v-if="provider.mode === 'demo'" class="flex flex-wrap items-end gap-3 rounded-2xl border border-warning-border bg-warning-bg p-4">
+    <section v-if="provider.mode === 'demo' && access.editStep(activeStep)" class="flex flex-wrap items-end gap-3 rounded-2xl border border-warning-border bg-warning-bg p-4">
       <div class="min-w-0 flex-1">
         <label for="proposal-demo-example" class="block text-xs font-bold text-warning-text">Carregar campanha demonstrativa (substitui os dados após confirmação)</label>
         <select id="proposal-demo-example" v-model="demoExample" class="focus-ring mt-2 w-full rounded-xl border border-warning-border bg-white p-3 text-sm">
@@ -24,10 +24,12 @@
     <section v-if="persistence.versaoVigente" class="rounded-2xl border border-sage-border bg-white p-5 text-sm">
       <p class="font-bold">Versão vigente {{ persistence.versaoVigente }}<span v-if="persistence.editingPublished"> · Proposta {{ persistence.versaoProposta }} baseada na versão {{ persistence.versaoOrigem }}</span></p>
       <p class="mt-2 text-sage-muted">As alterações ficam separadas da versão vigente e dos seus resultados até a publicação. Toda alteração exige nova simulação.</p>
-      <button v-if="persistence.editingPublished && !persistence.remoteChanged" type="button" class="focus-ring mt-3 rounded-full border border-danger/30 px-4 py-2 font-bold text-danger-dark hover:bg-danger-bg disabled:opacity-50" :disabled="persistenceBusy" @click="cancelProposalOpen = true">Descartar proposta de alteração</button>
+      <button v-if="persistence.editingPublished && !persistence.remoteChanged && access.can('createCampaign')" type="button" class="focus-ring mt-3 rounded-full border border-danger/30 px-4 py-2 font-bold text-danger-dark hover:bg-danger-bg disabled:opacity-50" :disabled="persistenceBusy" @click="cancelProposalOpen = true">Descartar proposta de alteração</button>
     </section>
-    <CampaignStepNav :steps="steps" :current-step="activeStep" :current-step-number="activeStepIndex + 1" :reached-step="reachedStep" @select="navigateTo" />
+    <CampaignStepNav :steps="steps" :current-step="activeStep" :current-step-number="activeStepIndex + 1" :reached-step="navigableReachedStep" @select="navigateTo" />
 
+    <CampaignStageAccess :step="activeStep" :available="!lifecycle.readOnly.value" />
+    <button v-if="!access.participateStep(activeStep) && ownStep && !lifecycle.readOnly.value" type="button" class="focus-ring w-fit rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-bold" @click="navigateTo(ownStep.key)">Acessar {{ ownStep.label.toLocaleLowerCase('pt-BR') }} →</button>
     <p v-if="persistence.loading" role="status" class="rounded-2xl bg-white p-5 text-sm">Carregando campanha e todas as regras…</p>
     <div v-if="persistence.error" role="alert" class="rounded-2xl bg-danger-bg p-4 text-sm text-danger-dark">
       <p>{{ userFacingText(persistence.error) }}</p>
@@ -37,9 +39,10 @@
     </div>
     <p v-if="persistence.progressError" role="status" class="rounded-2xl bg-warning-bg p-4 text-sm text-warning-text">{{ userFacingText(persistence.progressError) }} <button type="button" class="font-bold underline" @click="lifecycle.recordProgress(activeStepIndex + 1)">Tentar novamente</button></p>
     <p v-if="lifecycle.readOnly.value" class="rounded-xl bg-warning-bg p-4 text-sm text-warning-text">{{ userFacingText(persistence.motivoBloqueioEdicao || (persistence.remoteChanged ? 'A proposta está desatualizada. Consulte a versão atual antes de continuar.' : 'Campanha disponível somente para consulta.')) }}</p>
-    <CampaignVersionComparison v-if="activeStep === 'conferencia' && persistence.editingPublished" :published="persistence.published" :campaign="campaign" :proposed-number="persistence.versaoProposta" :source-number="persistence.versaoOrigem" />
+    <CampaignVersionComparison v-if="activeStep === 'conferencia' && persistence.editingPublished" :published="persistence.published" :campaign="campaign" :proposed-number="persistence.versaoProposta" :source-number="persistence.versaoOrigem" :base-competence="persistence.published?.competencia" :proposed-competence="simulation.selectedCompetencia" />
+    <CampaignPythonBudget panel="budget" v-if="activeStep === 'simulacao' && provider.mode === 'api'" :campaign="campaign" :persistence="persistence" :simulation="simulation" :editable="access.editStep('simulacao') && !lifecycle.readOnly.value" :approved="lifecycle.isCodeApproved.value" :busy="persistenceBusy" :unsaved="isDirty" @confirm-budget="confirmBudget" @apply-calibration="applyCalibration" />
     <main data-campaign-main tabindex="-1" class="outline-none">
-      <CampaignProposalReviewSummary v-if="lifecycle.readOnly.value" :campaign="campaign" :validation="validation" :show-python="true" :impact="lifecycle.currentSimulation.value && simulation.accepted ? simulation.result : null" />
+      <CampaignProposalReviewSummary v-if="lifecycle.readOnly.value || !access.editStep(activeStep)" :campaign="campaign" :validation="validation" :review-mode="true" :impact="lifecycle.currentSimulation.value && simulation.accepted ? simulation.result : null" />
       <fieldset v-else :disabled="persistenceBusy || Boolean(route.params.id && !persistence.id)" class="min-w-0 border-0 p-0">
       <CampaignCommonFieldsStep
         v-if="activeStep === 'dados'"
@@ -66,10 +69,14 @@
         @request-remove="requestRemove"
         @interpret="interpretDescription"
         @cancel-interpretation="cancelInterpretation"
-      />
+      >
+        <template #footer>
+      <CampaignCodeApprovalStatus v-if="activeStep === 'propostas' && provider.mode === 'api' && access.role.value === 'ANALISTA_NEGOCIOS'" :approved="lifecycle.isCodeApproved.value" :error="lifecycle.program.error" :needs-preparation="needsProgramPreparation" :can-prepare="!lifecycle.readOnly.value" :busy="persistenceBusy || integrationState.busy || Boolean(integrationState.review)" @prepare="prepareProgram" @refresh="lifecycle.loadProgram" />
+        </template>
+      </CampaignProposalCollectionStep>
       <CampaignPersistedSimulationStep
         v-else-if="activeStep === 'simulacao' && provider.mode === 'api'"
-        :form="campaign" :simulation="simulation"
+        :form="campaign" :budget="persistence.orcamento" :simulation="simulation"
         @refresh-competences="lifecycle.loadCompetences"
         @select-competence="lifecycle.selectCompetence"
         @run-simulation="runSimulation"
@@ -77,19 +84,59 @@
         @change-page="lifecycle.changePage"
         @change-page-size="(size) => lifecycle.changePage(1, size)"
         @back-to-rules="navigateTo('propostas')"
-      />
+      >
+        <template #after-results>
+          <CampaignPythonBudget panel="results" :campaign="campaign" :persistence="persistence" :simulation="simulation" :editable="access.editStep('simulacao') && !lifecycle.readOnly.value" :approved="lifecycle.isCodeApproved.value" :busy="persistenceBusy" :unsaved="isDirty" @confirm-budget="confirmBudget" @apply-calibration="applyCalibration" />
+        </template>
+      </CampaignPersistedSimulationStep>
       <CampaignProposalHandoffStep v-else-if="activeStep === 'simulacao'" :campaign="campaign" :validation="validation" :snapshot="canonicalSnapshot" :can-run-simulation="false" />
       <CampaignProposalReviewSummary
         v-else
-        :show-python="true" :impact="lifecycle.currentSimulation.value && simulation.accepted ? simulation.result : null"
+        :review-mode="true" :impact="lifecycle.currentSimulation.value && simulation.accepted ? simulation.result : null"
         :campaign="campaign"
         :validation="validation"
       />
       </fieldset>
-      <section v-if="activeStep === 'conferencia' && simulation.accepted" class="mt-5 rounded-2xl border border-sage-border bg-white p-5 text-sm">
-        <h2 class="text-lg font-extrabold">Simulação aceita</h2>
-        <p class="mt-2">Protocolo: {{ simulation.result?.protocolo }} · Competência: {{ simulation.result?.competencia }}</p>
-        <p class="mt-1">Responsável: {{ simulation.acceptance?.aceitoPor }} · Aceite: {{ simulation.acceptance?.aceitoEm }}</p>
+      <CampaignProgramReview class="mt-5" v-if="activeStep === 'propostas' && provider.mode === 'api' && persistence.id && access.role.value !== 'ANALISTA_NEGOCIOS'" :model="lifecycle.program" :can-prepare="access.editStep('propostas') && !lifecycle.readOnly.value" :editable="canApproveCode && !lifecycle.readOnly.value" :busy="persistenceBusy" :unsaved="isDirty" :needs-preparation="needsProgramPreparation" :preparation-reason="programPreparationReason" @prepare="prepareProgram" @refresh="refreshProgramReview" @changed="lifecycle.program.changed = $event" @decide="decideProgram" />
+      <CampaignCodeApprovalStatus v-if="lifecycle.readOnly.value && activeStep === 'propostas' && provider.mode === 'api' && access.role.value === 'ANALISTA_NEGOCIOS'" :approved="lifecycle.isCodeApproved.value" :error="lifecycle.program.error" :needs-preparation="needsProgramPreparation" :can-prepare="!lifecycle.readOnly.value" :busy="persistenceBusy || integrationState.busy || Boolean(integrationState.review)" @prepare="prepareProgram" @refresh="lifecycle.loadProgram" />
+      <section v-if="activeStep === 'conferencia' && simulation.accepted" class="mt-5 rounded-2xl border border-sage-border bg-white p-5 text-sm space-y-4">
+        <div>
+          <h2 class="text-lg font-extrabold text-brand-dark">Simulação aceita</h2>
+          <p class="mt-1 text-xs text-sage-muted">Protocolo: {{ simulation.result?.protocolo }} · Competência: {{ simulation.result?.competencia }}</p>
+          <p class="mt-1 text-xs text-sage-muted">Responsável: {{ simulation.acceptance?.aceitoPor }} · Aceite: {{ simulation.acceptance?.aceitoEm }}</p>
+        </div>
+
+        <!-- Enquadramento Orçamentário da Proposta (BACK-8) -->
+        <div v-if="simulation.result?.cenario100" class="rounded-xl border p-4 space-y-2" :class="simulation.result.cenario100.dentroDoOrcamento === false ? 'border-danger/40 bg-danger-bg/20' : 'border-success/30 bg-success-bg/20'">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-sage-muted">Enquadramento Orçamentário (100% da Meta)</span>
+            <span class="rounded-full px-2.5 py-0.5 text-xs font-bold" :class="simulation.result.cenario100.dentroDoOrcamento === false ? 'bg-danger text-white' : 'bg-success text-white'">
+              {{ simulation.result.cenario100.dentroDoOrcamento === false ? 'ACIMA DO TETO' : 'DENTRO DO ORÇAMENTO' }}
+            </span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1">
+            <div>
+              <p class="text-sage-muted">Teto Orçamentário:</p>
+              <p class="font-extrabold text-brand-dark">{{ formatCurrency(simulation.result.cenario100.orcamentoTeto || persistence.orcamento) }}</p>
+            </div>
+            <div>
+              <p class="text-sage-muted">Custo Projetado (100%):</p>
+              <p class="font-extrabold text-brand-dark">{{ formatCurrency(simulation.result.cenario100.custoTotalProjetado || simulation.result.cenario100.comissaoProjetada) }}</p>
+            </div>
+            <div>
+              <p class="text-sage-muted">Saldo Restante:</p>
+              <p class="font-bold text-brand-dark">{{ formatCurrency(simulation.result.cenario100.saldoOrcamento) }}</p>
+            </div>
+            <div>
+              <p class="text-sage-muted">Excedente:</p>
+              <p class="font-bold text-danger-dark">{{ formatCurrency(simulation.result.cenario100.excedenteOrcamento) }}</p>
+            </div>
+          </div>
+          <p v-if="simulation.result.cenario100.dentroDoOrcamento === false" class="text-xs font-semibold text-danger-dark pt-1">
+            Bloqueio de ativação: o custo projetado excede o orçamento estabelecido em {{ formatCurrency(simulation.result.cenario100.excedenteOrcamento) }}.
+          </p>
+        </div>
+
         <p class="mt-2">{{ userFacingText(persistence.readiness?.mensagem) }}</p>
         <p v-for="(difference, index) in persistence.readiness?.divergencias" :key="index" class="mt-2 text-danger-dark">{{ userFacingText(difference) }}</p>
       </section>
@@ -99,48 +146,151 @@
     <p class="text-sm text-sage-muted">{{ persistence.id ? `${isDirty ? 'Existem alterações ainda não salvas.' : persistence.editingPublished ? 'Proposta de alteração salva.' : 'Rascunho salvo.'}` : 'Os dados estão somente nesta página e ainda não foram salvos.' }}</p>
     <p v-if="message" class="rounded-2xl border border-warning-border bg-warning-bg px-4 py-3 text-sm leading-6 text-warning-text" role="alert">{{ userFacingText(message) }}</p>
 
-    <footer v-if="!lifecycle.readOnly.value" class="flex flex-col gap-4 border-t border-sage-border pt-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+    <footer v-if="!lifecycle.readOnly.value && access.editStep(activeStep)" class="flex flex-col gap-4 border-t border-sage-border pt-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <CampaignRequestStatus v-if="activeStep === 'dados' && integrationState.busy" class="w-full" message="Interpretando o texto da campanha…" @cancel="integration.cancel" />
       <div class="order-2 flex items-center justify-between gap-3 sm:order-1 sm:justify-start">
         <button v-if="activeStep !== 'dados'" type="button" class="focus-ring rounded-full border border-sage-border-dark px-5 py-3 text-sm font-bold text-brand-dark" @click="backOneStep">← Voltar</button>
         <button type="button" class="focus-ring rounded-full px-5 py-3 text-sm font-semibold text-sage-subtle transition hover:bg-white" @click="requestLeave('/campanhas')">Cancelar</button>
       </div>
       <div class="order-1 grid gap-3 sm:order-2 sm:flex sm:items-center sm:justify-end">
-        <button v-if="provider.mode === 'api'" type="button" class="focus-ring rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-sage-light disabled:opacity-50" :disabled="persistenceBusy || integrationState.busy || Boolean(integrationState.review) || persistence.uncertainCreate || Boolean(route.params.id && !persistence.id)" @click="saveDraft">{{ persistence.saving ? 'Salvando…' : persistence.editingPublished ? 'Salvar proposta' : 'Salvar rascunho' }}</button>
+        <button v-if="provider.mode === 'api' && access.can('saveCampaign')" type="button" class="focus-ring rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-sage-light disabled:opacity-50" :disabled="persistenceBusy || integrationState.busy || Boolean(integrationState.review) || persistence.uncertainCreate || Boolean(route.params.id && !persistence.id)" @click="saveDraft">{{ persistence.saving ? 'Salvando…' : persistence.editingPublished ? 'Salvar proposta' : 'Salvar rascunho' }}</button>
         <template v-if="activeStep === 'dados'">
           <button type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50" :disabled="persistenceBusy || Boolean(route.params.id && !persistence.id) || !provider.capabilities.interpret || integrationState.busy || Boolean(integrationState.review)" @click="interpretDescription">{{ integrationState.busy ? 'Interpretando…' : 'Interpretar e continuar →' }}</button>
         </template>
         <template v-else-if="activeStep === 'propostas'">
-          <button type="button" class="focus-ring whitespace-nowrap rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="!canAdvanceLocally" :aria-describedby="!canAdvanceLocally ? 'advance-blocked-reason' : undefined" @click="navigateTo('simulacao')">{{ canAdvanceLocally && validation.blockers.length ? 'Verificar correções →' : 'Ir para simulação →' }}</button>
+          <button type="button" class="focus-ring whitespace-nowrap rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" :disabled="!canAdvanceToSimulation" :aria-describedby="!canAdvanceToSimulation ? 'advance-blocked-reason' : undefined" @click="navigateTo('simulacao')">{{ canAdvanceLocally && validation.blockers.length ? 'Verificar correções →' : 'Ir para simulação →' }}</button>
         </template>
         <template v-else-if="activeStep === 'simulacao'">
-          <button v-if="provider.mode === 'api' && !simulation.accepted" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50" :disabled="persistenceBusy || integrationState.busy || !lifecycle.currentSimulation.value" @click="requestAccept">Aceitar simulação e continuar →</button>
+          <button v-if="provider.mode === 'api' && !simulation.accepted" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50" :disabled="persistenceBusy || integrationState.busy || !lifecycle.currentSimulation.value || !lifecycle.isBudgetWithinLimit.value" :aria-describedby="!lifecycle.isBudgetWithinLimit.value ? 'simulation-budget-blocked' : undefined" @click="requestAccept">Aceitar simulação e continuar →</button>
           <button v-else type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover disabled:opacity-50" :disabled="provider.mode === 'api' && !lifecycle.canReview.value" @click="navigateTo('conferencia')">Conferir regras →</button>
         </template>
         <template v-else>
-          <button v-if="provider.mode === 'api'" type="button" class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold transition hover:bg-brand-hover disabled:opacity-50" :disabled="!lifecycle.canActivate.value" @click="persistence.activationOpen = true">{{ persistence.editingPublished ? 'Publicar nova versão' : 'Aprovar e ativar campanha' }}</button>
+          <button
+            v-if="provider.mode === 'api' && !persistence.encaminhadaGerente && access.role.value === 'ANALISTA_NEGOCIOS'"
+            type="button"
+            class="focus-ring rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-sage-light disabled:opacity-50"
+            :disabled="!lifecycle.isBudgetWithinLimit.value || persistence.working"
+            @click="handleForwardToManager"
+          >
+            Encaminhar ao Gerente →
+          </button>
+          <button
+            v-if="provider.mode === 'api' && canReturnProposal"
+            type="button"
+            class="focus-ring rounded-full border border-danger/40 bg-white px-5 py-3 text-sm font-bold text-danger-dark transition hover:bg-danger-bg disabled:opacity-50"
+            :disabled="persistence.working"
+            @click="openReturnModal"
+          >
+            Devolver proposta
+          </button>
+          <button
+            v-if="provider.mode === 'api' && canActivateCampaign"
+            type="button"
+            class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold transition hover:bg-brand-hover disabled:opacity-50"
+            :disabled="!lifecycle.canActivate.value || persistence.working"
+            @click="persistence.activationOpen = true"
+          >
+            {{ persistence.editingPublished ? 'Publicar nova versão' : isAdministrator ? 'Concluir e ativar campanha' : 'Aprovar e ativar campanha' }}
+          </button>
         </template>
       </div>
-      <p v-if="activeStep === 'propostas' && !canAdvanceLocally" id="advance-blocked-reason" class="order-3 w-full text-sm font-semibold text-danger-dark">
-        {{ validation.blockers.length ? 'Corrija ' + validation.blockers.length + (validation.blockers.length === 1 ? ' pendência impeditiva' : ' pendências impeditivas') + ' para continuar.' : integrationState.busy || integrationState.review ? 'Conclua ou cancele a solicitação/revisão pendente para continuar.' : 'Adicione ao menos uma regra para continuar.' }}
+      <div v-if="activeStep === 'conferencia'" class="order-3 w-full space-y-1 text-sm font-semibold">
+        <p v-if="!lifecycle.isCodeApproved.value" class="text-warning-text">
+          Aprovação do código pendente ou invalidada por alterações. A publicação exige aprovação pelo Analista de Código.
+        </p>
+        <p v-if="!lifecycle.isBudgetWithinLimit.value" class="text-danger-dark">
+          Ativação bloqueada: o custo projetado excede o teto orçamentário da campanha.
+        </p>
+      </div>
+      <p v-else-if="activeStep === 'propostas' && !canAdvanceToSimulation" id="advance-blocked-reason" class="order-3 w-full text-sm font-semibold text-danger-dark">
+        {{ validation.blockers.length ? 'Corrija ' + validation.blockers.length + (validation.blockers.length === 1 ? ' pendência impeditiva' : ' pendências impeditivas') + ' para continuar.' : integrationState.busy || integrationState.review ? 'Conclua ou cancele a solicitação/revisão pendente para continuar.' : provider.mode === 'api' && !lifecycle.isCodeApproved.value ? isAdministrator ? 'Valide as regras e aprove o código acima para continuar.' : 'Aguarde a aprovação do código pelo analista de código para continuar.' : 'Adicione ao menos uma regra para continuar.' }}
       </p>
     </footer>
 
+    <p v-if="activeStep === 'simulacao' && simulation.result && !lifecycle.isBudgetWithinLimit.value" id="simulation-budget-blocked" role="alert" class="rounded-xl border border-danger/30 bg-danger-bg p-4 text-sm font-bold text-danger-dark">Aceite bloqueado: o custo do cenário de referência (100%) ultrapassa o orçamento. Aplique uma alternativa ou ajuste o orçamento e execute uma nova simulação.</p>
     <CampaignLifecycleDialog :open="persistence.defaultsOpen" title="Salvar com a vigência padrão?" confirm-label="Salvar rascunho" :busy="persistence.saving" @cancel="persistence.defaultsOpen = false" @confirm="saveDraft(true)">
       <p>O texto não forneceu uma vigência comum completa. Se o início estiver ausente, será usada a data de hoje. Se o fim estiver ausente, usará o início mais 30 dias.</p>
       <p class="mt-3 font-bold">O período confirmado será exibido após salvar. As explicações e validações dependentes serão verificadas antes da simulação.</p>
     </CampaignLifecycleDialog>
-    <CampaignLifecycleDialog :open="simulation.acceptOpen" title="Aceitar a simulação" confirm-label="Registrar aceite e continuar" :busy="persistence.working" :disabled="!simulation.aceitoPor.trim()" @cancel="simulation.acceptOpen = false" @confirm="acceptSimulation">
+    <CampaignLifecycleDialog :open="simulation.acceptOpen" title="Aceitar a simulação" confirm-label="Registrar aceite e continuar" :disabled="!lifecycle.isBudgetWithinLimit.value" :busy="persistence.working"  @cancel="simulation.acceptOpen = false" @confirm="acceptSimulation">
       <p>O aceite será registrado para esta campanha e para o protocolo {{ simulation.result?.protocolo }}.</p>
-      <label for="simulation-accepted-by" class="mt-4 block font-bold">Responsável pelo aceite *</label>
-      <input id="simulation-accepted-by" v-model="simulation.aceitoPor" class="focus-ring mt-2 w-full rounded-xl border border-sage-border p-3" autocomplete="name" :disabled="persistence.working" />
+      <label for="simulation-accepted-by" class="mt-4 block font-bold">Responsável pelo aceite</label>
+      <input id="simulation-accepted-by" :value="account.user?.name + ' · ' + account.user?.email" readonly class="focus-ring mt-2 w-full rounded-xl border border-sage-border p-3" autocomplete="name" :disabled="persistence.working" />
       <label for="simulation-accept-reason" class="mt-4 block font-bold">Observação (opcional)</label>
       <textarea id="simulation-accept-reason" v-model="simulation.motivo" rows="2" class="focus-ring mt-2 w-full rounded-xl border border-sage-border p-3" :disabled="persistence.working" />
       <p v-if="simulation.error" role="alert" class="mt-3 text-danger-dark">{{ userFacingText(simulation.error) }}</p>
     </CampaignLifecycleDialog>
     <CampaignLifecycleDialog :open="persistence.activationOpen" :title="persistence.editingPublished ? 'Publicar esta nova versão?' : 'Aprovar e ativar esta campanha?'" :confirm-label="persistence.editingPublished ? 'Confirmar publicação' : 'Confirmar ativação'" :busy="persistence.working" @cancel="persistence.activationOpen = false" @confirm="activateCampaign">
+      <p v-if="isAdministrator" class="mb-3">Como administrador, você confirma a conclusão do fluxo e a publicação nesta ação, sem precisar trocar de usuário.</p>
       <p v-if="persistence.editingPublished" class="mb-3 font-bold">A nova versão substituirá a vigente para todo o período da campanha. As versões anteriores continuarão disponíveis no histórico.</p>
       <p>Serão ativadas as {{ campaign.propostas.length }} regras da versão salva, com a vigência {{ campaign.dataInicio }} a {{ campaign.dataFim }} e o aceite registrado no protocolo {{ simulation.result?.protocolo }}.</p>
+    </CampaignLifecycleDialog>
+    <CampaignLifecycleDialog
+      :open="returnModalOpen"
+      title="Devolver proposta de campanha"
+      confirm-label="Confirmar devolução"
+      :busy="persistence.working"
+      @cancel="returnModalOpen = false"
+      @confirm="confirmReturnProposal"
+    >
+      <p class="text-sm text-sage-muted mb-4">
+        Ao devolver a proposta, o aceite de simulação será desvinculado e os responsáveis serão notificados para realizar os ajustes solicitados.
+      </p>
+      <div class="space-y-3">
+        <label class="block text-xs font-bold uppercase tracking-wider text-sage-muted">Etapa de destino para devolução</label>
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <label
+            class="flex cursor-pointer flex-col rounded-xl border p-3 text-sm transition"
+            :class="returnDestinationStep === 1 ? 'border-brand bg-brand-light/30 font-bold' : 'border-sage-border bg-white hover:bg-sage-light/20'"
+          >
+            <div class="flex items-center gap-2">
+              <input type="radio" v-model="returnDestinationStep" :value="1" class="text-brand focus:ring-brand" />
+              <span>Etapa 1</span>
+            </div>
+            <span class="mt-1 text-xs text-sage-muted">Proposta e Regras</span>
+          </label>
+          <label
+            class="flex cursor-pointer flex-col rounded-xl border p-3 text-sm transition"
+            :class="returnDestinationStep === 2 ? 'border-brand bg-brand-light/30 font-bold' : 'border-sage-border bg-white hover:bg-sage-light/20'"
+          >
+            <div class="flex items-center gap-2">
+              <input type="radio" v-model="returnDestinationStep" :value="2" class="text-brand focus:ring-brand" />
+              <span>Etapa 2</span>
+            </div>
+            <span class="mt-1 text-xs text-sage-muted">Revisão Técnica de Código</span>
+          </label>
+          <label
+            class="flex cursor-pointer flex-col rounded-xl border p-3 text-sm transition"
+            :class="returnDestinationStep === 3 ? 'border-brand bg-brand-light/30 font-bold' : 'border-sage-border bg-white hover:bg-sage-light/20'"
+          >
+            <div class="flex items-center gap-2">
+              <input type="radio" v-model="returnDestinationStep" :value="3" class="text-brand focus:ring-brand" />
+              <span>Etapa 3</span>
+            </div>
+            <span class="mt-1 text-xs text-sage-muted">Simulação e Orçamento</span>
+          </label>
+        </div>
+
+        <div class="pt-2">
+          <label for="return-proposal-reason" class="block text-xs font-bold uppercase tracking-wider text-sage-muted">
+            Justificativa formal de devolução <span class="text-danger">*</span>
+          </label>
+          <textarea
+            id="return-proposal-reason"
+            v-model="returnReason"
+            rows="3"
+            maxlength="500"
+            placeholder="Descreva detalhadamente o que deve ser corrigido antes da nova submissão..."
+            class="focus-ring mt-1 w-full rounded-xl border border-sage-border p-3 text-sm"
+            :disabled="persistence.working"
+          />
+          <div class="mt-1 flex justify-between text-xs text-sage-muted">
+            <span v-if="returnReasonError" class="font-semibold text-danger-dark">{{ returnReasonError }}</span>
+            <span v-else>Obrigatório para registro de auditoria</span>
+            <span>{{ returnReason.length }}/500</span>
+          </div>
+        </div>
+      </div>
     </CampaignLifecycleDialog>
     <CampaignReinterpretConfirmDialog :open="campaignReinterpretationOpen" @cancel="cancelCampaignReinterpretation" @confirm="confirmCampaignReinterpretation" />
     <CampaignApiRuleReviewDialog :integration="integration" :index="Math.max(0, campaign.propostas.findIndex((p) => p.clientId === integrationState.review?.targetId))" @confirm="applyIntegrationReview" />
@@ -163,8 +313,14 @@
 </template>
 
 <script setup>
+import { useAccountStore } from '@/stores/accountStore'
+import { useAccessPolicy } from '@/services/useAccessPolicy'
+import CampaignStageAccess from '@/components/campaigns/CampaignStageAccess.vue'
+const access = useAccessPolicy()
+const account = useAccountStore()
+const ownStep = computed(() => steps.find(step => access.participateStep(step.key)))
 import { userFacingText } from '@/services/userFacingText'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter, useRoute } from 'vue-router'
 import CampaignVersionComparison from '@/components/campaigns/CampaignVersionComparison.vue'
 import CampaignVersionHistory from '@/components/campaigns/CampaignVersionHistory.vue'
@@ -181,9 +337,14 @@ import CampaignApiRuleReviewDialog from '@/components/campaigns/CampaignApiRuleR
 import CampaignReinterpretConfirmDialog from '@/components/campaigns/CampaignReinterpretConfirmDialog.vue'
 import CampaignProposalRemoveDialog from '@/components/campaigns/CampaignProposalRemoveDialog.vue'
 import CampaignProposalReviewSummary from '@/components/campaigns/CampaignProposalReviewSummary.vue'
+import { ruleArtifactsCurrent } from '@/services/campaignRuleArtifacts'
+import CampaignCodeApprovalStatus from '@/components/campaigns/CampaignCodeApprovalStatus.vue'
+import CampaignProgramReview from '@/components/campaigns/CampaignProgramReview.vue'
+import CampaignPythonBudget from '@/components/campaigns/CampaignPythonBudget.vue'
 import { CAMPAIGN_PROPOSAL_SCENARIOS as demoExamples } from '@/services/campaignProposalFixtures'
 import { useCampaignProposalFlow } from '@/services/useCampaignProposalFlow'
 import { useNotificationStore } from '@/stores/notificationStore'
+import { completeCampaignPublication } from '@/services/campaignPublication'
 import { createCampaignActionFeedback } from '@/services/campaignActionFeedback'
 
 const router = useRouter()
@@ -196,22 +357,122 @@ const {
   updateProposal, setAllSales, requestRemoveProposal, confirmRemoveProposal, cancelRemoveProposal,
   interpretDescription: interpretCampaign, cancelInterpretation, applyReinterpretation, loadExample,
   campaignReinterpretationOpen, confirmCampaignReinterpretation: reinterpretCampaign, cancelCampaignReinterpretation
-} = useCampaignProposalFlow()
+} = useCampaignProposalFlow({ canEditStep: access.editStep, canWrite: () => access.can('editCampaign'), canSave: () => access.can('saveCampaign'), canStartProposal: () => access.can('createCampaign'), canReviewProgram: () => access.can('approveCode'), canSimulate: () => access.editStep('simulacao') })
 const feedback = createCampaignActionFeedback(useNotificationStore())
+const canAdvanceToSimulation = computed(() => canAdvanceLocally.value && (provider.mode !== 'api' || lifecycle.isCodeApproved.value))
+const navigableReachedStep = computed(() => provider.mode === 'api' && !lifecycle.isCodeApproved.value ? Math.min(reachedStep.value, 2) : lifecycle.canReview.value ? Math.max(reachedStep.value, 4) : reachedStep.value)
+const isAdministrator = computed(() => access.role.value === 'ADMINISTRADOR')
+const canApproveCode = computed(() => access.can('approveCode'))
+const canReturnProposal = computed(() => access.can('returnProposal'))
+const canActivateCampaign = computed(() => access.can('activateCampaign'))
+const returnModalOpen = ref(false)
+const returnDestinationStep = ref(1)
+const returnReason = ref('')
+const returnReasonError = ref('')
+
+function openReturnModal() {
+  returnDestinationStep.value = 1
+  returnReason.value = ''
+  returnReasonError.value = ''
+  returnModalOpen.value = true
+}
+
+async function confirmReturnProposal() {
+  if (!returnReason.value.trim()) {
+    returnReasonError.value = 'A justificativa formal de devolução é obrigatória.'
+    return
+  }
+  returnReasonError.value = ''
+  const stepDest = Number(returnDestinationStep.value)
+  const success = await feedback('returnProposal', () => lifecycle.returnProposal({
+    etapaDestino: stepDest,
+    motivo: returnReason.value.trim()
+  }), {
+    error: () => persistence.error,
+    successMessage: () => persistence.notice
+  })
+  if (success) {
+    returnModalOpen.value = false
+    const stepKeys = { 1: 'dados', 2: 'propostas', 3: 'simulacao' }
+    await navigateTo(stepKeys[stepDest] || 'dados')
+  }
+}
+
+function formatCurrency(val) {
+  if (val == null || val === '') return 'R$ 0,00'
+  try {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(val))
+  } catch {
+    return String(val)
+  }
+}
+
+watch(() => [activeStep.value, persistence.id], async ([step, id]) => {
+  if (step === 'propostas' && id && !lifecycle.program.current && !persistenceBusy.value) await lifecycle.loadProgram()
+})
+const needsProgramPreparation = computed(() => isDirty.value || !validation.value.canAdvanceLocally || campaign.propostas.some(p => !ruleArtifactsCurrent(p, campaign)))
+const programPreparationReason = computed(() => {
+  if (isDirty.value) return 'Existem alterações nas regras que ainda não foram salvas. Negócios deve validar e salvar a proposta antes da aprovação técnica.'
+  if (!validation.value.canAdvanceLocally) return 'As regras têm pendências impeditivas. Negócios precisa corrigi-las e salvar a proposta antes da aprovação técnica.'
+  const pending = campaign.propostas.flatMap((p, index) => ruleArtifactsCurrent(p, campaign) ? [] : [index + 1])
+  return pending.length ? `As regras ${pending.join(', ')} ainda precisam ter suas explicações e validações atualizadas e salvas. O analista de negócios deve usar “Validar e enviar para revisão”.` : ''
+})
+async function refreshProgramReview() {
+  if (lifecycle.program.changed || isDirty.value) {
+    lifecycle.program.error = 'Salve ou descarte suas alterações antes de atualizar a revisão.'
+    return false
+  }
+  if (!persistence.id || persistenceBusy.value) return false
+  return lifecycle.load(persistence.id)
+}
+
+async function prepareProgram() {
+  await feedback('prepareProgram', async () => {
+    if (!access.editStep('propostas') || lifecycle.program.changed || !await integration.prepareReview()) return false
+    if (isDirty.value && !await persistDraft()) return false
+    return lifecycle.loadProgram()
+  }, { error: () => integrationState.error || persistence.error || lifecycle.program.error })
+}
+async function decideProgram(action, payload) {
+  if (needsProgramPreparation.value && action !== 'reject') { lifecycle.program.error = 'Valide os dados e prepare a revisão antes de salvar ou aprovar o programa.'; return false }
+  const key = { save: 'saveProgram', approve: 'approveCode', reject: 'rejectCode' }[action]
+  if (await feedback(key, () => lifecycle.reviewProgram(action, payload), { error: () => lifecycle.program.error })) {
+    reachedStep.value = persistence.etapaMaisAvancada
+    if (action === 'reject') await navigateTo('dados')
+  }
+}
+async function confirmBudget(value) {
+  await feedback('budget', () => lifecycle.confirmBudget(value), { error: () => simulation.error })
+}
+async function applyCalibration(scenario) {
+  if (await feedback('calibration', () => lifecycle.applyCalibration(scenario), { error: () => simulation.error })) { reachedStep.value = 2; await navigateTo('propostas') }
+}
+
+async function handleForwardToManager() {
+  await feedback('forwardToManager', () => lifecycle.forwardToManager(), {
+    error: () => persistence.error,
+    successMessage: () => persistence.notice
+  })
+}
 const integrationError = () => integrationState.error || message.value
 async function interpretDescription() {
+  if (!access.editStep(activeStep.value)) return false
   return feedback('interpret', interpretCampaign, { error: () => campaignReinterpretationOpen.value ? '' : integrationError() })
 }
 async function confirmCampaignReinterpretation() {
+  if (!access.editStep(activeStep.value)) return false
   return feedback('reinterpret', reinterpretCampaign, { error: integrationError })
 }
 async function applyIntegrationReview() {
+  if (!access.editStep(activeStep.value)) return false
   return feedback('apply', applyReview, { error: integrationError })
 }
 async function runSimulation() {
+  if (!access.editStep(activeStep.value)) return false
   return feedback('simulate', () => lifecycle.runSimulation(), { error: () => simulation.error || persistence.error })
 }
 async function saveDraft(confirmDefaults = false) {
+  if (!access.editStep(activeStep.value)) return false
   const confirmed = confirmDefaults === true
   const saved = await feedback(persistence.editingPublished ? 'saveProposal' : 'save', () => persistDraft({ confirmDefaults: confirmed }), {
     error: () => persistence.defaultsOpen ? '' : persistence.error || message.value,
@@ -222,14 +483,18 @@ async function saveDraft(confirmDefaults = false) {
   }
 }
 async function requestAccept() {
+  if (!lifecycle.isBudgetWithinLimit.value) { simulation.error = 'Aceite bloqueado: o cenário de referência (100%) ultrapassa o orçamento.'; return false }
+  if (!access.editStep(activeStep.value)) return false
   if (simulation.accepted && lifecycle.canReview.value) await navigateTo('conferencia')
   else simulation.acceptOpen = true
 }
 async function acceptSimulation() {
+  if (!access.editStep(activeStep.value)) return false
   if (await feedback('accept', () => lifecycle.accept(), { error: () => simulation.error || persistence.error })) await navigateTo('conferencia')
 }
 async function activateCampaign() {
-  if (await feedback(persistence.editingPublished ? 'publish' : 'activate', () => lifecycle.activate(), { error: () => persistence.error })) await router.push('/campanhas/' + persistence.id)
+  if (!access.editStep(activeStep.value)) return false
+  if (await feedback(persistence.editingPublished ? 'publish' : 'activate', () => completeCampaignPublication(lifecycle, { administrator: isAdministrator.value }), { error: () => persistence.error })) await router.push('/campanhas/' + persistence.id)
 }
 const demoExample = ref('threeComplete')
 async function loadDemoExample() { if (loadExample(demoExample.value)) await navigateTo('propostas') }
@@ -243,6 +508,7 @@ async function reloadProposal() {
   }
 }
 async function cancelSavedProposal() {
+  if (!access.can('createCampaign')) return
   if (await feedback('discardProposal', () => lifecycle.cancelProposal(), { error: () => persistence.error })) {
     cancelProposalOpen.value = false
     allowLeave = true
@@ -254,15 +520,17 @@ const pendingRemovalIndex = computed(() => campaign.propostas.findIndex((item) =
 let allowLeave = false
 
 onBeforeRouteLeave((to) => {
+  if (!account.user) return true
   if (persistenceBusy.value) return false
-  if (allowLeave || !isDirty.value) return true
+  if (allowLeave || (!isDirty.value && !lifecycle.program.changed)) return true
   pendingRoute.value = to.fullPath
   discardDialogOpen.value = true
   return false
 })
 
 function handleBeforeUnload(event) {
-  if (!isDirty.value && !persistenceBusy.value) return
+  if (!account.user) return
+  if (!isDirty.value && !lifecycle.program.changed && !persistenceBusy.value) return
   event.preventDefault()
   event.returnValue = ''
 }
@@ -273,7 +541,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnl
 function requestLeave(path) {
   if (persistenceBusy.value) return
   pendingRoute.value = path
-  if (!isDirty.value) {
+  if (!isDirty.value && !lifecycle.program.changed) {
     allowLeave = true
     router.push(path).finally(() => { allowLeave = false })
     return
@@ -292,6 +560,7 @@ async function confirmDiscard() {
 }
 
 async function addProposal() {
+  if (!access.editStep(activeStep.value)) return
   const clientId = addProposalToCampaign()
   await nextTick()
   document.getElementById('proposal-card-' + encodeURIComponent(clientId))?.focus()

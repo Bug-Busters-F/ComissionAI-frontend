@@ -32,6 +32,7 @@ function pendingMessage(p, campaign = false) {
 export function campaignToDraftRequest(campaign) {
   const validation = validateCampaignProposalSet(campaign)
   return {
+    orcamento: campaign.orcamento ?? null, orcamentoExtraidoIa: campaign.orcamentoExtraidoIa ?? null, orcamentoConfirmado: campaign.orcamentoConfirmado === true,
     titulo: campaign.titulo.trim(), textoOriginal: campaign.textoOriginal, dataInicio: campaign.dataInicio || null, dataFim: campaign.dataFim || null, estado: 'DRAFT',
     regras: campaign.propostas.map((p, index) => {
       const dto = proposalToBackend(p, campaign)
@@ -72,6 +73,7 @@ export function persistedCampaignToProposal(raw, previous = null) {
   if (new Set(dbIds).size !== dbIds.length) throw new Error('A resposta repetiu o identificador de uma regra persistida. Os dados atuais foram preservados.')
   const clientIds = new Set()
   const result = { ...createCampaignProposalForm(), id: raw.id, estado: raw.estado, titulo: raw.titulo || '', textoOriginal: raw.textoOriginal || '', dataInicio: raw.dataInicio || '', dataFim: raw.dataFim || '' }
+  Object.assign(result, { orcamento: raw.orcamento ?? null, orcamentoExtraidoIa: raw.orcamentoExtraidoIa ?? null, orcamentoConfirmado: raw.orcamentoConfirmado === true })
   const general = new Map()
   result.propostas = raw.regras.map((r) => {
     if (!r.id) throw new Error('Uma regra persistida veio sem identificador. Consulte a campanha antes de repetir o salvamento.')

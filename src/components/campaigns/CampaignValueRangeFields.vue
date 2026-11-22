@@ -102,7 +102,7 @@ const rangeSummary = computed(() => {
 
 <style scoped>
 .campaign-label { @apply mb-2 block text-sm font-bold text-brand-dark; }
-.campaign-control { @apply focus-ring w-full rounded-xl border border-sage-border bg-white px-4 py-3 text-sm text-brand-dark outline-none transition placeholder:text-sage-muted disabled:cursor-not-allowed disabled:bg-sage-light disabled:text-sage-muted; }
+.campaign-control { @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ring focus-visible:ring-offset-2 w-full rounded-xl border border-sage-border bg-white px-4 py-3 text-sm text-brand-dark outline-none transition placeholder:text-sage-muted disabled:cursor-not-allowed disabled:bg-sage-light disabled:text-sage-muted; }
 .campaign-control-error { @apply border-danger; }
 .campaign-error { @apply mt-2 text-xs font-semibold leading-5 text-danger-dark; }
 </style>

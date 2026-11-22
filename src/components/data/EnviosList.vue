@@ -109,7 +109,7 @@
                   <span>Relatório</span>
                 </button>
 
-                <button
+                <button v-if="access.can('manageData')"
                   type="button"
                   @click="store.abrirModalExclusaoEnvio(envio)"
                   class="focus-ring inline-flex items-center rounded-lg p-1.5 text-sage-muted hover:bg-danger-bg hover:text-danger transition"
@@ -136,6 +136,8 @@
 </template>
 
 <script setup>
+import { useAccessPolicy } from '@/services/useAccessPolicy'
+const access = useAccessPolicy()
 import { FileSpreadsheet, Eye, Trash2, AlertCircle } from 'lucide-vue-next'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { useDataStore } from '@/stores/dataStore'

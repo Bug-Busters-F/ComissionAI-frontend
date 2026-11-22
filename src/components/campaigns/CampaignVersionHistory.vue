@@ -14,7 +14,7 @@
     <p v-if="detailLoading" role="status" class="mt-4 text-sm">Carregando a versão selecionada…</p>
     <div v-if="snapshot && !detailLoading" class="mt-5">
       <p class="mb-4 text-sm text-sage-muted">Versão {{ detail.numero }}{{ detail.numero === currentVersion ? ' · Atual' : '' }} · Publicada em {{ formatDateTime(detail.publicadoEm) }} · {{ detail.responsavel || 'Responsável não informado' }}</p>
-      <CampaignProposalReviewSummary :campaign="snapshot" :validation="validation" :show-python="true" hide-impact historical />
+      <CampaignProposalReviewSummary :campaign="snapshot" :validation="validation" :review-mode="true" hide-impact historical />
     </div>
   </section>
 </template>

@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="store.modalExclusao.isOpen"
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+    class="fixed inset-0 !m-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
     role="dialog"
     aria-modal="true"
   >
@@ -29,7 +29,7 @@
               {{ store.modalExclusao.detalhes }}
             </div>
             <p class="mt-3 text-[11px] font-semibold text-danger">
-              Esta ação removerá o registro do sistema e não poderá ser desfeita.
+              {{ store.modalExclusao.tipo === 'ENVIO' ? 'Os dados serão removidos; o registro histórico será mantido para consulta.' : 'Esta ação removerá o registro do sistema e não poderá ser desfeita.' }}
             </p>
           </div>
         </div>

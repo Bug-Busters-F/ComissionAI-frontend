@@ -1,10 +1,24 @@
 // Presentation only: keep original messages and evidence for validation and audit.
 export function userFacingText(value) {
   if (typeof value !== 'string') return value
+  if (/rate_limit_exceeded|Too Many Requests|(?:HTTP|status(?: code)?)\s*:?\s*429\b|cota excedida|limite de requisições/i.test(value)) return 'O serviço de interpretação atingiu o limite de uso. Aguarde alguns instantes e tente novamente. Seus dados foram preservados.'
+  if (/consultar_[a-z_]+[\s\S]*(?:não foi|nao foi|falhou)|modelo ficou indisponível|LLM_PROVIDER_ERROR|json_validate_failed|Failed to validate JSON/i.test(value)) return 'Não foi possível concluir a análise automática. Tente interpretar novamente antes de continuar. Seus dados foram preservados.'
+  if (/Network Error|Failed to fetch|ECONNREFUSED|ERR_NETWORK/i.test(value)) return 'Não foi possível conectar ao sistema. Verifique sua conexão e tente novamente.'
+  if (/timeout|ECONNABORTED|ETIMEDOUT/i.test(value)) return 'A operação demorou mais que o esperado. Tente novamente. Seus dados foram preservados.'
+  if (/Request failed with status code|AxiosError|Internal Server Error|Bad Gateway|Traceback|NullPointerException/i.test(value)) return 'Não foi possível concluir a operação. Tente novamente. Se o problema continuar, entre em contato com o suporte.'
+  if (/(?:hash|SHA-?256|assinatura).*(?:programa|código)|(?:programa|código).*(?:hash|SHA-?256|assinatura)/i.test(value)) return 'O programa foi alterado. Atualize a revisão e confira o código atual antes de aprovar ou continuar.'
   if (/SQLState|JDBC|Hibernate|could not execute statement|No static resource|org\.[\w.]+Exception/i.test(value)) return 'Não foi possível concluir a operação. Tente novamente. Se o problema continuar, entre em contato com o suporte.'
   if (/\bhash\b|SHA-?256|assinatura canônica|snapshot/i.test(value)) return 'Esta simulação precisa ser atualizada. Execute uma nova simulação e registre o aceite antes de continuar.'
   if (/Reconstrua\/reinicie o backend|backend em execução.*(?:disponibiliza|rastreabilidade)/i.test(value)) return 'Este recurso precisa de uma atualização do sistema. Recarregue a página. Se o problema continuar, entre em contato com o suporte.'
   return value
+    .replace(/\b(?:filtros|condicaoValor)\./g, '')
+    .replace(/\bvalorMinimo\b/g, 'Valor mínimo')
+    .replace(/\bvalorMaximo\b/g, 'Valor máximo')
+    .replace(/\bminInclusivo\b/g, 'Inclusão do limite mínimo')
+    .replace(/\bmaxInclusivo\b/g, 'Inclusão do limite máximo')
+    .replace(/\btaxaFinal\b/g, 'Taxa final')
+    .replace(/\btrechoOrigem\b/g, 'Texto da regra')
+    .replace(/\bMVP\b/g, 'sistema')
     .replace(/tb_basecomiss/gi, 'tabela de comissões')
     .replace(/\btb_[a-z_]+\b/gi, 'cadastro')
     .replace(/\bBASE_COMISS\b/g, 'Taxa contratual')

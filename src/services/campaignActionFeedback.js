@@ -1,4 +1,8 @@
 const actions = {
+  prepareProgram: { success: 'Revisão preparada', message: 'Confira o programa atualizado antes de aprovar.', error: 'Não foi possível preparar a revisão' },
+  saveProgram: { success: 'Nova revisão salva', message: 'Confira o programa antes de aprová-lo. É necessária uma nova simulação.', error: 'Não foi possível salvar o programa' },
+  budget: { success: 'Orçamento confirmado', message: 'O teto será utilizado na próxima simulação.', error: 'Não foi possível confirmar o orçamento' },
+  calibration: { success: 'Alternativa aplicada', message: 'A proposta precisa de nova revisão técnica e simulação.', error: 'Não foi possível aplicar a alternativa' },
   saveProposal: { success: 'Proposta salva', message: 'As alterações foram salvas separadamente da versão vigente.', error: 'Não foi possível salvar a proposta' },
   publish: { success: 'Nova versão publicada', message: 'A nova versão está vigente para todo o período da campanha. As anteriores permanecem no histórico.', error: 'Não foi possível publicar a nova versão' },
   discardProposal: { success: 'Proposta descartada', message: 'A campanha vigente e seus resultados foram preservados.', error: 'Não foi possível descartar a proposta' },
@@ -8,7 +12,11 @@ const actions = {
   apply: { success: 'Alterações aplicadas', message: 'Confira as regras atualizadas e salve o rascunho para guardar as alterações.', error: 'Não foi possível aplicar as alterações' },
   simulate: { success: 'Simulação concluída', message: 'Os resultados estão disponíveis para conferência.', error: 'Não foi possível concluir a simulação' },
   accept: { success: 'Simulação aceita', message: 'O aceite foi registrado. Confira a campanha antes de ativá-la.', error: 'Não foi possível registrar o aceite' },
-  activate: { success: 'Campanha ativada', message: 'A campanha foi aprovada e suas regras estão ativas para a vigência definida.', error: 'Não foi possível ativar a campanha' }
+  activate: { success: 'Campanha ativada', message: 'A campanha foi aprovada e suas regras estão ativas para a vigência definida.', error: 'Não foi possível ativar a campanha' },
+  approveCode: { success: 'Código aprovado', message: 'A aprovação técnica de código foi registrada.', error: 'Não foi possível aprovar o código' },
+  rejectCode: { success: 'Código rejeitado', message: 'A rejeição técnica de código foi registrada.', error: 'Não foi possível rejeitar o código' },
+  forwardToManager: { success: 'Encaminhado ao gerente', message: 'A campanha foi encaminhada para conferência do gerente.', error: 'Não foi possível encaminhar ao gerente' },
+  returnProposal: { success: 'Proposta devolvida', message: 'A proposta foi devolvida com sucesso para a etapa indicada.', error: 'Não foi possível devolver a proposta' }
 }
 
 // Only explicit actions produce feedback. Keep at most one campaign toast visible.

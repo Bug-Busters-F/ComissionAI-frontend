@@ -339,6 +339,10 @@ export function normalizeBackendCampaignResponse(raw) {
     throw new TypeError('O serviço não retornou propostas e pendências no contrato esperado. Seus dados foram preservados.')
   }
   const campaign = createCampaignProposalForm()
+  campaign.orcamento = raw.orcamentoExtraido?.valor ?? raw.orcamentoSugerido ?? null
+  campaign.orcamentoExtraidoIa = campaign.orcamento
+  campaign.orcamentoConfirmado = false
+  campaign.orcamentoTrecho = raw.orcamentoExtraido?.trechoOriginal || ''
   campaign.tituloSugerido = textValue(raw.tituloSugerido)
   campaign.pendenciasCampanha = raw.pendenciasGerais.map((p) => normalizeExternalPending({ ...p, origem: 'IA' }))
   campaign.propostas = raw.propostas.map((rawProposal, index) => {

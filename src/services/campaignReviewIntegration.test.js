@@ -32,14 +32,15 @@ describe('review artifacts and traceability', () => {
     const c = campaignFixture(), p = c.propostas[0]
     p.metadadosRecebidos.pythonAtualizado = 'def regra_atual(): return 35'
     p.metadadosRecebidos.assinaturaArtefatos = ruleArtifactSignature(p, c)
-    let html = await render(Review, { campaign: c, validation: validateCampaignProposalSet(c), showPython: true })
-    expect(html).toContain('def regra_atual(): return 35')
+    let html = await render(Review, { campaign: c, validation: validateCampaignProposalSet(c), reviewMode: true })
+    expect(html).not.toContain('def regra_atual(): return 35')
+    expect(html).not.toContain('Python da regra')
     expect(html).not.toContain('Código da campanha'); expect(html).not.toContain('EXEMPLO FIXO')
     p.campos.taxaPercentual = '8'
     expect(ruleArtifactsCurrent(p, c)).toBe(false)
     expect(campaignToDraftRequest(c).regras[0]).toMatchObject({ pythonEquivalente: null, explicacao: null, completa: false })
-    html = await render(Review, { campaign: c, validation: validateCampaignProposalSet(c), showPython: true })
-    expect(html).not.toContain('def regra_atual()'); expect(html).toContain('código anterior foi ocultado')
+    html = await render(Review, { campaign: c, validation: validateCampaignProposalSet(c), reviewMode: true })
+    expect(html).not.toContain('def regra_atual()'); expect(html).toContain('Explicação recebida desatualizada')
     expect(html).not.toContain('Explicação atual')
   })
   it('distinguishes a visited step from the current and future steps after going back', async () => {

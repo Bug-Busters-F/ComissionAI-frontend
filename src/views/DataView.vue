@@ -1,16 +1,17 @@
 <template>
   <div class="space-y-7">
+    <p v-if="!access.can('manageData')" class="rounded-xl bg-white p-4 text-sm text-sage-muted">Modo consulta. Somente gerente e administrador podem importar, alterar ou excluir bases.</p>
     <PageHeader title="Dados da empresa" description="Organize e feche os ciclos mensais de dados de cada competência.">
       <template #action>
-        <div class="flex items-center gap-3">
-          <button
+        <div class="flex flex-wrap items-center gap-3">
+          <button v-if="access.can('manageData')"
             type="button"
             @click="store.openComissModal(store.competencias[0]?.competenciaCodigo || null)"
             class="focus-ring rounded-full border border-sage-border-dark bg-white px-4 py-3 text-sm font-semibold text-brand-dark hover:bg-sage-light"
           >
             Tabelas de Comissão
           </button>
-          <button
+          <button v-if="access.can('manageData')"
             type="button"
             @click="store.openCicloModal(null)"
             class="focus-ring rounded-full bg-brand px-5 py-3 text-sm font-bold text-brand-dark transition hover:bg-brand-hover"
@@ -71,7 +72,17 @@
               <h2 class="mt-1 text-2xl font-extrabold tracking-[-0.04em] text-brand-dark">{{ period.name }}</h2>
               <span class="text-xs font-semibold text-sage-muted">({{ period.competenciaCodigo }})</span>
             </div>
-            <StatusBadge :label="period.status" :tone="period.tone" />
+            <div class="flex flex-col items-end gap-1.5">
+              <span
+                v-if="closedCompetences[period.competencia]"
+                class="inline-flex items-center gap-1 rounded-full bg-brand-dark px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm"
+                title="Fechamento contábil e apuração definitiva consolidados"
+              >
+                <Lock class="h-3 w-3" aria-hidden="true" />
+                <span>Liquidada</span>
+              </span>
+              <StatusBadge :label="period.status" :tone="period.tone" />
+            </div>
           </div>
 
           <!-- Card de progresso ativo se esta competência estiver processando -->
@@ -122,14 +133,17 @@
           <li v-for="(message, index) in period.mensagens" :key="index">{{ userFacingText(message) }}</li>
         </ul>
         <div class="mt-7 pt-4 border-t border-sage-border-light flex flex-col gap-2">
-          <button
+          <button v-if="access.can('manageData') && !closedCompetences[period.competencia]"
             type="button"
             @click="store.openCicloModal(period.competenciaCodigo)"
             class="focus-ring flex items-center justify-between rounded-xl bg-sage-light px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-sage-border transition"
           >
             <template v-if="store.activeJob.status === 'PROCESSING' && (store.activeJob.competencia === period.competenciaCodigo || store.activeJob.competenciaNome === period.name)">
-              <span>Acompanhar processamento</span>
-              <span>⏳</span>
+              <span class="inline-flex items-center gap-1.5">
+                <RefreshCw class="h-3.5 w-3.5 animate-spin text-brand-dark" aria-hidden="true" />
+                <span>Acompanhar processamento</span>
+              </span>
+              <span class="text-xs font-semibold">{{ store.activeJob.progress }}%</span>
             </template>
             <template v-else>
               <span>{{ period.cicloFechado ? 'Reenviar ciclo (RH + Vendas)' : 'Fechar ciclo (RH + Vendas)' }}</span>
@@ -140,9 +154,13 @@
           <RouterLink
             v-if="period.vendasCount > 0"
             :to="{ name: 'dados-calculo', params: { competencia: period.competencia } }"
-            class="focus-ring flex items-center justify-between rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-brand-dark hover:bg-brand-hover"
+            class="focus-ring flex items-center justify-between rounded-xl px-4 py-2.5 text-xs font-bold transition"
+            :class="closedCompetences[period.competencia] ? 'bg-sage-light text-brand-dark hover:bg-sage-border' : 'bg-brand text-brand-dark hover:bg-brand-hover'"
           >
-            <span>Calcular comissões</span>
+            <span class="inline-flex items-center gap-1.5">
+              <Lock v-if="closedCompetences[period.competencia]" class="h-3.5 w-3.5 text-brand-dark" aria-hidden="true" />
+              <span>{{ closedCompetences[period.competencia] ? 'Consultar fechamento' : (access.can('calculate') ? 'Calcular comissões' : 'Consultar cálculos') }}</span>
+            </span>
             <span>→</span>
           </RouterLink>
           <span v-else class="rounded-xl bg-sage-light px-4 py-2.5 text-xs font-semibold text-sage-muted text-center">
@@ -150,16 +168,19 @@
           </span>
 
           <div class="flex items-center justify-between pt-1 text-[11px]">
-            <button
+            <button v-if="access.can('manageData') && !closedCompetences[period.competencia]"
               type="button"
               @click="store.openComissModal(period.competenciaCodigo)"
               class="font-semibold text-sage-muted hover:text-brand-dark hover:underline"
             >
               Taxas de comissão
             </button>
+            <span v-else-if="closedCompetences[period.competencia]" class="font-semibold text-sage-muted">
+              Taxas congeladas
+            </span>
 
             <button
-              v-if="period.cicloFechado || period.status !== 'Ciclo Pendente'"
+              v-if="access.can('manageData') && !closedCompetences[period.competencia] && (period.cicloFechado || period.status !== 'Ciclo Pendente')"
               type="button"
               @click="store.abrirModalExclusaoBase(period.competenciaCodigo)"
               class="text-sage-muted hover:text-danger hover:underline transition flex items-center gap-1 font-semibold"
@@ -168,6 +189,12 @@
               <Trash2 class="h-3 w-3" />
               <span>Excluir base</span>
             </button>
+            <span
+              v-else-if="closedCompetences[period.competencia]"
+              class="text-[11px] font-semibold text-sage-muted italic"
+            >
+              Base bloqueada
+            </span>
           </div>
         </div>
       </article>
@@ -180,7 +207,7 @@
         <div class="flex items-center gap-2">
           <button
             type="button"
-            @click="store.setTabAtiva('EFETIVADOS')"
+            @click="setDataTab('EFETIVADOS')"
             :class="[
               'focus-ring flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition',
               store.tabAtiva === 'EFETIVADOS'
@@ -194,7 +221,7 @@
 
           <button
             type="button"
-            @click="store.setTabAtiva('ENVIOS')"
+            @click="setDataTab('ENVIOS')"
             :class="[
               'focus-ring flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition',
               store.tabAtiva === 'ENVIOS'
@@ -204,40 +231,62 @@
           >
             <FileSpreadsheet class="h-4 w-4" />
             <span>Histórico de Envios & Validação</span>
-            <span class="rounded-full bg-sage-pill px-2 py-0.5 text-[10px] font-bold text-brand-dark">
-              {{ store.enviosHistorico.length }}
-            </span>
           </button>
         </div>
       </div>
 
       <!-- Conteúdo da Aba Ativa -->
       <EfetivadosTable v-if="store.tabAtiva === 'EFETIVADOS'" />
-      <EnviosList v-else />
+      <ImportHistoryPanel v-else prefix="envios_" :refresh-key="`${store.activeJob.status}-${store.historicoRevisao}`">
+        <template #actions="{ batch }"><button v-if="access.can('manageData') && batch.status !== 'EXCLUIDO'" type="button" class="focus-ring rounded-full border border-danger/30 px-3 py-2 text-xs font-semibold text-danger-dark hover:bg-danger-bg" @click="store.abrirModalExclusaoEnvio(batch)">Remover dados</button></template>
+      </ImportHistoryPanel>
     </section>
 
     <!-- Modais de Suporte -->
-    <ConfirmDeleteModal />
+    <ConfirmDeleteModal v-if="access.can('manageData')" />
     <EnvioReportModal />
   </div>
 </template>
 
 <script setup>
+import { useAccessPolicy } from '@/services/useAccessPolicy'
+const access = useAccessPolicy()
 import { userFacingText } from '@/services/userFacingText'
-import { onMounted } from 'vue'
-import { RefreshCw, Trash2, Database, FileSpreadsheet } from 'lucide-vue-next'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { RefreshCw, Trash2, Database, FileSpreadsheet, Lock } from 'lucide-vue-next'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import EfetivadosTable from '@/components/data/EfetivadosTable.vue'
-import EnviosList from '@/components/data/EnviosList.vue'
+import ImportHistoryPanel from '@/components/audit/ImportHistoryPanel.vue'
 import ConfirmDeleteModal from '@/components/data/ConfirmDeleteModal.vue'
 import EnvioReportModal from '@/components/data/EnvioReportModal.vue'
 import { useDataStore } from '@/stores/dataStore'
+import { listClosings, mapClosedCompetences } from '@/services/closingService'
 
 const store = useDataStore()
+const route = useRoute(), router = useRouter()
+const setDataTab = tab => router.push({ query: { ...route.query, abaDados: tab === 'ENVIOS' ? 'envios' : undefined } })
+watch(() => route.query.abaDados, tab => {
+  const target = tab === 'envios' ? 'ENVIOS' : 'EFETIVADOS'
+  if (store.tabAtiva !== target) store.setTabAtiva(target)
+}, { immediate: true })
+const closedCompetences = ref({})
+
+async function loadClosings() {
+  try {
+    const data = await listClosings({ size: 100 })
+    closedCompetences.value = mapClosedCompetences(data)
+  } catch {
+    // Tratamento resiliente caso perfil não tenha permissão de fechamento (ex: 403 para analista)
+  }
+}
 
 onMounted(async () => {
-  await store.loadCompetenciasFromSales()
+  await Promise.all([
+    store.loadCompetenciasFromSales(),
+    loadClosings()
+  ])
   if (store.dadosEfetivados.itens.length === 0) {
     await store.carregarDadosEfetivados()
   }

@@ -65,13 +65,14 @@
               <select
                 id="simulation-competence-select"
                 :value="simulation.selectedCompetencia"
-                :disabled="simulation.isLoadingCompetences || simulation.isRunning || !competenceOptions.length"
+                :disabled="simulation.isLoadingCompetences || simulation.isRunning || simulation.isValidatingReference || !competenceOptions.length"
                 class="focus-ring w-full rounded-xl border border-sage-border-dark bg-white px-4 py-3 text-sm font-extrabold text-brand-dark shadow-sm transition hover:border-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
                 @change="$emit('select-competence', $event.target.value)"
               >
                 <option v-if="!competenceOptions.length" value="">
                   Nenhuma competência cadastrada
                 </option>
+                <option v-else disabled value="">Selecione a competência</option>
                 <option
                   v-for="item in competenceOptions"
                   :key="item.competencia"
@@ -173,11 +174,12 @@
         </div>
         <button
           type="button"
-          class="focus-ring shrink-0 self-start rounded-full bg-brand px-4 py-2 text-xs font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+          class="focus-ring shrink-0 self-start rounded-full bg-brand px-4 py-2 text-xs font-bold text-brand-dark transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60 inline-flex items-center gap-1.5"
           :disabled="!canRunSimulation || simulation.isRunning"
           @click="handleRunSimulation"
         >
-          Executar nova simulação
+          <RefreshCw v-if="simulation.isRunning" class="h-3.5 w-3.5 animate-spin" />
+          <span>{{ simulation.isRunning ? 'Processando…' : 'Executar nova simulação' }}</span>
         </button>
       </div>
     </section>
@@ -347,7 +349,8 @@
             :disabled="!canRunSimulation || simulation.isRunning || simulation.isValidatingReference"
             @click="handleRunSimulation"
           >
-            <Play class="h-4 w-4" aria-hidden="true" />
+            <RefreshCw v-if="simulation.isRunning" class="h-4 w-4 animate-spin" aria-hidden="true" />
+            <Play v-else class="h-4 w-4" aria-hidden="true" />
             <span>
               {{
                 simulation.isRunning
@@ -389,10 +392,10 @@
 
             <StatusBadge :label="executionStatusLabel" :tone="executionStatusTone" />
           </div>
-          <span class="text-xs font-extrabold text-brand-dark">{{ simulation.progress || 0 }}%</span>
+          <span v-if="!simulation.pythonExecution || !simulation.isRunning" class="text-xs font-extrabold text-brand-dark">{{ simulation.progress || 0 }}%</span>
         </div>
 
-        <div class="mt-3 h-2 overflow-hidden rounded-full bg-sage-pill">
+        <div v-if="!simulation.pythonExecution || !simulation.isRunning" class="mt-3 h-2 overflow-hidden rounded-full bg-sage-pill">
           <div
             class="h-full rounded-full transition-all duration-200"
             :class="simulation.status === 'FALHOU' ? 'bg-danger' : 'bg-brand'"
@@ -452,6 +455,7 @@
             </div>
           </div>
 
+          <p v-if="budgetStatus.known" class="mt-4 rounded-xl border px-4 py-3 text-sm font-bold" :class="budgetStatus.exceeded ? 'border-danger/40 bg-danger-bg text-danger-dark' : 'border-brand/30 text-brand'" role="status">{{ budgetStatus.exceeded ? 'Acima do orçamento' : 'Dentro do orçamento' }} · Cenário de referência (100%)<span v-if="budgetStatus.budget != null"> · Teto: {{ currency(budgetStatus.budget) }}</span><span v-if="budgetStatus.exceeded && budgetStatus.excess != null"> · Excedente: {{ currency(budgetStatus.excess) }}</span></p>
           <!-- Métrica Principal em Destaque: Diferença / Impacto Financeiro da Proposta -->
           <div class="mt-7 flex flex-wrap items-baseline gap-4 sm:gap-6">
             <div>
@@ -600,6 +604,7 @@
             </div>
 
             <div class="mt-4 rounded-xl bg-sage-light/80 px-3.5 py-2 text-xs text-sage-muted">
+              <p v-if="scenarioBudgetStatus(scenario.key).known" class="mb-2 text-xs font-bold" :class="scenarioBudgetStatus(scenario.key).exceeded ? 'text-danger-dark' : 'text-success-dark'">{{ scenarioBudgetStatus(scenario.key).exceeded ? 'Acima do orçamento' : 'Dentro do orçamento' }}<span v-if="scenarioBudgetStatus(scenario.key).exceeded && scenarioBudgetStatus(scenario.key).excess != null"> · Excedente: {{ currency(scenarioBudgetStatus(scenario.key).excess) }}</span></p>
               <span v-if="scenario.vendasQueMudaramDeFaixa > 0" class="font-bold text-brand-dark">
                 {{ scenario.vendasQueMudaramDeFaixa }} venda(s) migraram de faixa monetária neste cenário.
               </span>
@@ -662,6 +667,8 @@
           </div>
         </div>
       </section>
+
+      <slot name="after-results" />
 
       <!-- 7.3 TABELA PAGINADA DE VENDAS DO PÚBLICO -->
       <section class="rounded-[24px] border border-sage-border-light bg-white p-6 shadow-sm sm:p-7" aria-labelledby="simulation-table-heading">
@@ -786,6 +793,7 @@
           </div>
         </div>
 
+        <p v-if="budgetStatus.exceeded && showDecisionActions" role="alert" class="mt-5 rounded-xl border border-danger/30 bg-danger-bg p-4 text-sm font-bold text-danger-dark">Aceite bloqueado: o custo do cenário de referência (100%) ultrapassa o orçamento. Ajuste a proposta ou confirme outro orçamento e execute uma nova simulação.</p>
         <!-- 7.4 RODAPÉ DE DECISÃO DA SIMULAÇÃO ([FRONT-6]) -->
         <div class="mt-7 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-sage-border-light bg-sage-light/70 p-5">
           <div>
@@ -814,7 +822,7 @@
               type="button"
               data-testid="accept-simulation-btn"
               class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-6 py-2.5 text-sm font-black text-brand-dark shadow-md transition hover:bg-brand-hover hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="simulation.isRunning || hasInvalidation"
+              :disabled="simulation.isRunning || hasInvalidation || budgetStatus.exceeded"
               @click="$emit('accept-simulation')"
             >
               <CheckCircle2 class="h-4 w-4" aria-hidden="true" />
@@ -830,7 +838,7 @@
     <!-- 8. Modal de Memória do Cálculo da Venda ([FRONT-5]) -->
     <div
       v-if="selectedRow"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+      class="fixed inset-0 !m-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="calculation-memory-title"
@@ -866,6 +874,7 @@
 
 <script setup>
 import { userFacingText } from '@/services/userFacingText'
+import { simulationBudgetStatus } from '@/services/campaignSimulationBudget'
 import { computed, ref, nextTick } from 'vue'
 import CampaignSimulationMemory from '@/components/campaigns/CampaignSimulationMemory.vue'
 import {
@@ -893,6 +902,7 @@ import { checkProposalCoverage } from '@/services/coverageService'
 const showPremises = ref(false)
 
 const props = defineProps({
+  budget: { type: [Number, String], default: null },
   showDecisionActions: { type: Boolean, default: true },
   demo: { type: Object, default: () => ({}) },
   serverPagination: { type: Object, default: null },
@@ -1007,6 +1017,7 @@ const otherImpediments = computed(() =>
 
 const canRunSimulation = computed(() =>
   Boolean(
+    props.simulation?.executionAllowed !== false &&
     props.simulation?.selectedCompetencia &&
       !isMissingBaseBlocked.value &&
       !isInsufficientReference.value &&
@@ -1015,6 +1026,8 @@ const canRunSimulation = computed(() =>
   )
 )
 
+const budgetStatus = computed(() => simulationBudgetStatus(props.simulation?.result, props.budget ?? props.form?.orcamento))
+const scenarioBudgetStatus = key => simulationBudgetStatus(props.simulation?.result, props.budget ?? props.form?.orcamento, String(key))
 const simulationResult = computed(() => props.simulation?.result || null)
 const hasValidSimulationResult = computed(() =>
   Boolean(

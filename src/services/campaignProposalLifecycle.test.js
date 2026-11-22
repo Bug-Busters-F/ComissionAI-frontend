@@ -1,21 +1,37 @@
 import { describe, expect, it, vi } from 'vitest'
 import { effectScope, reactive } from 'vue'
-import { campaignFixture, savedResponse } from './campaignLifecycleTestFixtures'
+import { campaignFixture, savedResponse, programFixture } from './campaignLifecycleTestFixtures'
 import { createCampaignProposalLifecycle } from './campaignProposalLifecycle'
 
 function deferred() { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
 const scenario = { totalVendas: '1000', totalComissaoBase: '20', totalComissaoProposta: '40', deltaComissao: '20', deltaPercentual: '100', comissaoProjetada: '40', deltaProjetado: '20', qtdVendasComMudancaFaixa: 0 }
-function simulationRaw(id = 'sim-id') { return { id, protocolo: 'protocol', campanhaId: 42, competencia: '2026-09', totalVendasRecortadas: 1, fatorProjecao: '1', diasInclusivos: 30, cenario100: scenario, cenario80: scenario, cenario120: scenario, cenario150: scenario, vendas: [], avisosGerais: [] } }
-function setup(overrides = {}) {
+function simulationRaw(id = 'sim-id') { return { executadoViaPython: true, versaoProgramaPython: 1, checksumPython: 'a'.repeat(64), id, protocolo: 'protocol', campanhaId: 42, competencia: '2026-09', totalVendasRecortadas: 1, fatorProjecao: '1', diasInclusivos: 30, cenario100: scenario, cenario80: scenario, cenario120: scenario, cenario150: scenario, vendas: [], avisosGerais: [] } }
+function setup(overrides = {}, permissions = {}) {
   const campaign = reactive(campaignFixture()); const scope = effectScope()
   campaign.propostas[2].campos.taxaPercentual = '4'; campaign.propostas[2].pendenciasRemotas = []; campaign.propostas[2].metadadosRecebidos.validacaoPendente = false
-  const api = { load: vi.fn(async () => savedResponse(campaign)), save: vi.fn(async () => savedResponse(campaign)), competences: vi.fn(async () => [{ competencia: '2026-09', totalVendas: 1 }]), cut: vi.fn(async () => ({ competencia: '2026-09', totalVendasRecortadas: 1, totalVendasComImpedimento: 0, impedimentosGerais: [], possuiAmbiguidadeCritica: false })), simulate: vi.fn(async () => simulationRaw()), sales: vi.fn(async (id, page) => ({ simulacaoId: id, paginaAtual: page - 1, totalElementos: 1, totalPaginas: 1, vendas: [] })), accept: vi.fn(async () => ({ simulacaoId: 'sim-id', campanhaId: 42, statusAceite: 'ACEITA', aceitoPor: 'Pessoa teste' })), readiness: vi.fn(async () => ({ aptaParaAtivacao: true, simulacaoId: 'sim-id', aceitoPor: 'Pessoa teste' })), activate: vi.fn(async () => ({ ...savedResponse(campaign), estado: 'ATIVA' })), simulation: vi.fn(async () => simulationRaw()), ...overrides }
-  const flow = scope.run(() => createCampaignProposalLifecycle({ campaign, api }))
+  const api = { program: vi.fn(async () => programFixture()), programHistory: vi.fn(async () => [programFixture()]), load: vi.fn(async () => savedResponse(campaign)), save: vi.fn(async () => savedResponse(campaign)), competences: vi.fn(async () => [{ competencia: '2026-09', totalVendas: 1 }]), cut: vi.fn(async () => ({ competencia: '2026-09', totalVendasRecortadas: 1, totalVendasComImpedimento: 0, impedimentosGerais: [], possuiAmbiguidadeCritica: false })), simulatePython: vi.fn(async () => simulationRaw()), sales: vi.fn(async (id, page) => ({ simulacaoId: id, paginaAtual: page - 1, totalElementos: 1, totalPaginas: 1, vendas: [] })), accept: vi.fn(async () => ({ simulacaoId: 'sim-id', campanhaId: 42, statusAceite: 'ACEITA', aceitoPor: 'Pessoa teste' })), readiness: vi.fn(async () => ({ aptaParaAtivacao: true, simulacaoId: 'sim-id', aceitoPor: 'Pessoa teste' })), activate: vi.fn(async () => ({ ...savedResponse(campaign), estado: 'ATIVA' })), simulation: vi.fn(async () => simulationRaw()), ...overrides }
+  const flow = scope.run(() => createCampaignProposalLifecycle({ campaign, api, canSimulate: () => true, canReviewProgram: () => true, ...permissions }))
   return { campaign, api, flow, scope }
 }
 async function ready(s) { expect(await s.flow.save()).toBe(true); await s.flow.selectCompetence('2026-09'); expect(await s.flow.runSimulation()).toBe(true); s.flow.simulation.aceitoPor = 'Pessoa teste'; expect(await s.flow.accept()).toBe(true) }
 
 describe('draft, persisted simulation, formal acceptance and activation lifecycle', () => {
+  it('preserves the accepted result when the manager consults reference competences', async () => {
+    const s=setup({}, {canSimulate:()=>false,canSave:()=>false})
+    const saved={...savedResponse(s.campaign),simulacaoAceitaId:'sim-id',statusAceite:'ACEITA',etapaMaisAvancada:3}
+    s.api.load.mockResolvedValue(saved)
+    s.api.cut.mockRejectedValue({response:{status:403,data:{message:'Acesso negado'}}})
+    expect(await s.flow.load(42)).toBe(true)
+    expect(s.flow.canReview.value).toBe(true)
+    await s.flow.loadCompetences()
+    expect(s.api.cut).not.toHaveBeenCalled()
+    expect(await s.flow.selectCompetence('2026-08')).toBe(false)
+    expect(s.flow.simulation.selectedCompetencia).toBe('2026-09')
+    expect(s.flow.simulation.accepted).toBe(true)
+    expect(s.flow.canReview.value).toBe(true)
+    s.scope.stop()
+  })
+
   it('records progress without saving rules or invalidating an accepted simulation', async () => {
     const s = setup({ progress: vi.fn(async (id, payload) => payload) })
     await ready(s)
@@ -55,7 +71,7 @@ describe('draft, persisted simulation, formal acceptance and activation lifecycl
     expect(await s.flow.save()).toBe(false)
     expect(s.flow.state.error).toContain('Reconstrua/reinicie o backend')
     expect(s.flow.state.uncertainCreate).toBe(true)
-    expect(s.api.simulate).not.toHaveBeenCalled()
+    expect(s.api.simulatePython).not.toHaveBeenCalled()
     s.scope.stop()
   })
   it('creates once, skips unchanged PUT and preserves all rules after reloading', async () => {
@@ -92,23 +108,23 @@ describe('draft, persisted simulation, formal acceptance and activation lifecycl
   })
   it('uses the saved campaign id and real protocol and never saves between acceptance and activation', async () => {
     const s = setup(); await ready(s)
-    expect(s.api.simulate).toHaveBeenCalledWith(42, '2026-09')
-    expect(s.api.accept).toHaveBeenCalledWith('sim-id', { campanhaId: 42, aceitoPor: 'Pessoa teste', motivo: null })
+    expect(s.api.simulatePython).toHaveBeenCalledWith(42, expect.objectContaining({ competencia: '2026-09', versaoPrograma: 1, calibrar: true }))
+    expect(s.api.accept).toHaveBeenCalledWith('sim-id', { campanhaId: 42, motivo: null })
     expect(s.flow.simulation.result.protocolo).toBe('protocol'); expect(s.flow.canReview.value).toBe(true)
     expect(await s.flow.activate()).toBe(true); expect(s.api.activate).toHaveBeenCalledWith(42, null, null)
     expect(s.api.save).toHaveBeenCalledOnce(); expect(s.flow.state.estado).toBe('ATIVA'); s.scope.stop()
   })
   it('blocks acceptance and activation when an API operation fails, without fallback results', async () => {
-    const s = setup({ simulate: vi.fn(async () => { throw new Error('Backend indisponível') }) }); await s.flow.save(); await s.flow.selectCompetence('2026-09')
+    const s = setup({ simulatePython: vi.fn(async () => { throw new Error('Backend indisponível') }) }); await s.flow.save(); await s.flow.selectCompetence('2026-09')
     expect(await s.flow.runSimulation()).toBe(false); expect(s.flow.simulation.result).toBeNull(); expect(s.flow.simulation.status).toBe('FALHOU')
     expect(await s.flow.accept()).toBe(false); expect(await s.flow.activate()).toBe(false); expect(s.api.accept).not.toHaveBeenCalled(); expect(s.api.activate).not.toHaveBeenCalled(); s.scope.stop()
   })
   it('does not accept a simulation belonging to another campaign or a malformed response', async () => {
-    const s = setup({ simulate: vi.fn(async () => ({ ...simulationRaw(), campanhaId: 77 })) }); await s.flow.save(); await s.flow.selectCompetence('2026-09')
+    const s = setup({ simulatePython: vi.fn(async () => ({ ...simulationRaw(), campanhaId: 77 })) }); await s.flow.save(); await s.flow.selectCompetence('2026-09')
     expect(await s.flow.runSimulation()).toBe(false); expect(s.flow.simulation.result).toBeNull(); s.scope.stop()
   })
   it('rejects a late simulation after the form changes', async () => {
-    const d = deferred(), s = setup({ simulate: vi.fn(() => d.promise) }); await s.flow.save(); await s.flow.selectCompetence('2026-09')
+    const d = deferred(), s = setup({ simulatePython: vi.fn(() => d.promise) }); await s.flow.save(); await s.flow.selectCompetence('2026-09')
     const running = s.flow.runSimulation(); await Promise.resolve(); await Promise.resolve(); s.campaign.propostas[0].campos.taxaPercentual = '6'; d.resolve(simulationRaw())
     expect(await running).toBe(false); expect(s.flow.simulation.result).toBeNull(); s.scope.stop()
   })
@@ -120,10 +136,10 @@ describe('draft, persisted simulation, formal acceptance and activation lifecycl
     const s = setup(); await ready(s); await s.flow.selectCompetence('2026-08')
     expect(s.flow.simulation.accepted).toBe(false); expect(s.flow.canActivate.value).toBeFalsy(); s.scope.stop()
   })
-  it('requires explicit responsible identity and backend confirmation of the acceptance', async () => {
+  it('uses server identity and requires backend confirmation of the acceptance', async () => {
     const s = setup({ accept: vi.fn(async () => ({ statusAceite: 'INVALIDADA', simulacaoId: 'sim-id', campanhaId: 42 })) }); await s.flow.save(); await s.flow.selectCompetence('2026-09'); await s.flow.runSimulation()
-    expect(await s.flow.accept()).toBe(false); expect(s.api.accept).not.toHaveBeenCalled()
-    s.flow.simulation.aceitoPor = 'Responsável'; expect(await s.flow.accept()).toBe(false); expect(s.flow.simulation.accepted).toBe(false); s.scope.stop()
+    expect(await s.flow.accept()).toBe(false); expect(s.api.accept).toHaveBeenCalledWith('sim-id', { campanhaId: 42, motivo: null });
+    expect(s.api.accept.mock.calls[0][1]).not.toHaveProperty('aceitoPor'); expect(s.flow.simulation.accepted).toBe(false); s.scope.stop()
   })
   it('preserves an accepted result after activation rejection while displaying the backend reason', async () => {
     const s = setup({ activate: vi.fn(async () => { throw { response: { status: 409, data: { message: 'Proposta desatualizada' } } } }) }); await ready(s)
@@ -151,7 +167,7 @@ describe('concurrency and validation guards', () => {
   })
   it('does not simulate a campaign changed remotely after its recorte', async () => {
     const s = setup(); await s.flow.save(); await s.flow.selectCompetence('2026-09'); const concurrent = savedResponse(s.campaign); concurrent.titulo += ' outra sessão'; s.api.load.mockResolvedValue(concurrent)
-    expect(await s.flow.runSimulation()).toBe(false); expect(s.api.simulate).not.toHaveBeenCalled(); expect(s.flow.simulation.accepted).toBe(false); s.scope.stop()
+    expect(await s.flow.runSimulation()).toBe(false); expect(s.api.simulatePython).not.toHaveBeenCalled(); expect(s.flow.simulation.accepted).toBe(false); s.scope.stop()
   })
   it('invalidates previously accepted readiness when reference checking finds impediments', async () => {
     const s = setup(); await ready(s); s.api.cut.mockResolvedValue({ competencia: '2026-09', totalVendasRecortadas: 1, totalVendasComImpedimento: 1, possuiAmbiguidadeCritica: false, impedimentosGerais: [] })
@@ -159,7 +175,7 @@ describe('concurrency and validation guards', () => {
   })
   it('does not run simulation for an incomplete saved draft even when called directly', async () => {
     const s = setup(); s.campaign.propostas[0].campos.taxaPercentual = ''; await s.flow.save(); await s.flow.selectCompetence('2026-09')
-    expect(await s.flow.runSimulation()).toBe(false); expect(s.api.simulate).not.toHaveBeenCalled(); s.scope.stop()
+    expect(await s.flow.runSimulation()).toBe(false); expect(s.api.simulatePython).not.toHaveBeenCalled(); s.scope.stop()
   })
   it('preserves defaults after reload without persisting an already-resolved missing-period blocker', async () => {
     const s = setup(); s.campaign.dataInicio = ''; s.campaign.dataFim = ''; s.campaign.pendenciasCampanha = [{ codigo: 'VIGENCIA_NAO_CONSOLIDADA', severidade: 'IMPEDITIVO', mensagem: 'Vigência ausente' }]
@@ -176,14 +192,14 @@ it('adapta impedimentos de cobertura para o bloqueio da tela da dev, preservando
   expect(await s.flow.selectCompetence('2026-09')).toBe(false)
   expect(s.flow.simulation.referenceValidation.canExecute).toBe(false)
   expect(s.flow.simulation.referenceValidation.missingBases[0]).toMatchObject({ marca: 'PRETO', cargo: 'VENDEDOR' })
-  expect(s.api.simulate).not.toHaveBeenCalled()
+  expect(s.api.simulatePython).not.toHaveBeenCalled()
   s.scope.stop()
 })
 
 describe('published campaign edit sessions', () => {
   const copyJson = (value) => JSON.parse(JSON.stringify(value))
-  function publishedSetup() {
-    const s = setup()
+  function publishedSetup(permissions = {}) {
+    const s = setup({}, permissions)
     const base = { ...savedResponse(s.campaign), estado: 'ATIVA', versaoVigente: 1, versaoProposta: null, revisaoControle: 4 }
     let remote = copyJson(base)
     s.api.load.mockImplementation(async () => copyJson(remote))
@@ -256,6 +272,13 @@ describe('published campaign edit sessions', () => {
     expect(s.api.cancelProposal).not.toHaveBeenCalled()
     s.scope.stop()
   })
+  it('does not create a published edit proposal when the profile cannot initiate one', async () => {
+    const s = publishedSetup({ canStartProposal: () => false })
+    expect(await s.flow.load(42)).toBe(true)
+    expect(s.api.startProposal).not.toHaveBeenCalled()
+    expect(s.flow.readOnly.value).toBe(true)
+    s.scope.stop()
+  })
   it('opens closed campaigns for consultation and does not create an edit proposal', async () => {
     const s = publishedSetup()
     s.setRemote({ ...s.remote(), motivoBloqueioEdicao: 'Competência fechada.' })
@@ -264,6 +287,204 @@ describe('published campaign edit sessions', () => {
     expect(s.api.startProposal).not.toHaveBeenCalled()
     expect(await s.flow.save()).toBe(false)
     expect(await s.flow.runSimulation()).toBe(false)
+    s.scope.stop()
+  })
+})
+
+describe('profile-aware lifecycle callbacks', () => {
+  it('lets the manager review without sending a forbidden draft update', async () => {
+    const s = setup({}, { canSave: () => false })
+    expect(await s.flow.save()).toBe(false)
+    expect(s.api.save).not.toHaveBeenCalled()
+    s.scope.stop()
+  })
+  it('keeps denied profiles read-only and never writes progress on consultation', async () => {
+    const s = setup({ progress: vi.fn() }, { canWrite: () => false, canRecordProgress: () => false })
+    expect(await s.flow.load(42)).toBe(true)
+    expect(await s.flow.save()).toBe(false)
+    expect(await s.flow.runSimulation()).toBe(false)
+    expect(await s.flow.recordProgress(2)).toBe(false)
+    expect(s.api.save).not.toHaveBeenCalled()
+    expect(s.api.simulatePython).not.toHaveBeenCalled()
+    expect(s.api.progress).not.toHaveBeenCalled()
+    s.scope.stop()
+  })
+})
+
+describe('governance, budget limits and code approval ([FRONT-9])', () => {
+  it('blocks activation when code approval is missing or invalidated', async () => {
+    const s = setup()
+    await ready(s)
+    expect(s.flow.canActivate.value).toBe(true)
+
+    s.flow.program.current = programFixture(42, { statusAprovacao: 'PENDENTE_REVISAO', validoParaExecucao: false })
+    expect(s.flow.isCodeApproved.value).toBe(false)
+    expect(s.flow.canActivate.value).toBe(false)
+
+    s.flow.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: false })
+    expect(s.flow.isCodeApproved.value).toBe(false)
+    expect(s.flow.canActivate.value).toBe(false)
+
+    s.flow.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: true })
+    expect(s.flow.isCodeApproved.value).toBe(true)
+    expect(s.flow.canActivate.value).toBe(true)
+    s.scope.stop()
+  })
+
+  it('blocks activation and forwarding when scenario 100% exceeds budget', async () => {
+    const s = setup({
+      forwardToManager: vi.fn(async () => ({ id: 42, encaminhadaGerente: true }))
+    })
+    await ready(s)
+
+    s.flow.simulation.result.cenario100 = {
+      dentroDoOrcamento: false,
+      statusEnquadramento: 'ACIMA_DO_TETO',
+      excedenteOrcamento: '15000.00'
+    }
+
+    expect(s.flow.isBudgetWithinLimit.value).toBe(false)
+    expect(s.flow.canActivate.value).toBe(false)
+
+    expect(await s.flow.forwardToManager()).toBe(false)
+    expect(s.flow.state.error).toContain('Não é permitido encaminhar ao gerente')
+    expect(s.flow.state.error).toContain('15000.00')
+    expect(s.api.forwardToManager).not.toHaveBeenCalled()
+
+    // Now enquadrado
+    s.flow.simulation.result.cenario100 = {
+      dentroDoOrcamento: true,
+      statusEnquadramento: 'ENQUADRADO',
+      excedenteOrcamento: '0.00'
+    }
+    expect(s.flow.isBudgetWithinLimit.value).toBe(true)
+    expect(await s.flow.forwardToManager()).toBe(true)
+    expect(s.flow.state.encaminhadaGerente).toBe(true)
+    expect(s.api.forwardToManager).toHaveBeenCalledWith(42, expect.any(Object))
+    s.scope.stop()
+  })
+
+  it('approves and rejects code via lifecycle api calls', async () => {
+    const s = setup({
+      approveCode: vi.fn(async (id, payload) => ({
+        campanhaId: id,
+        statusAprovacaoCodigo: payload.aprovado ? 'APROVADO' : 'REJEITADO',
+        codigoAprovadoPor: payload.aprovadoPor
+      }))
+    })
+    await ready(s)
+
+    expect(await s.flow.approveCode('analista.codigo@empresa.com')).toBe(true)
+    expect(s.flow.state.codeApproval.statusAprovacaoCodigo).toBe('APROVADO')
+    expect(s.api.approveCode).toHaveBeenCalledWith(42, { aprovado: true, aprovadoPor: 'analista.codigo@empresa.com' })
+
+    expect(await s.flow.rejectCode('Taxa incorreta', 'analista.codigo@empresa.com')).toBe(true)
+    expect(s.flow.state.codeApproval.statusAprovacaoCodigo).toBe('REJEITADO')
+    s.scope.stop()
+  })
+
+  it('validates returnProposal input, submits payload and applies returned backend state', async () => {
+    let s
+    s = setup({
+      returnProposal: vi.fn(async (id, payload) => ({
+        ...savedResponse(s.campaign),
+        id,
+        ultimaEtapa: payload.etapaDestino,
+        revisaoControle: 45,
+        encaminhadaGerente: false
+      }))
+    })
+    await ready(s)
+
+    // Blank reason rejected
+    expect(await s.flow.returnProposal({ etapaDestino: 1, motivo: '   ' })).toBe(false)
+    expect(s.flow.state.error).toContain('A justificativa formal de devolução é obrigatória')
+    expect(s.api.returnProposal).not.toHaveBeenCalled()
+
+    // Invalid stage rejected
+    expect(await s.flow.returnProposal({ etapaDestino: 4, motivo: 'Inválido' })).toBe(false)
+    expect(s.flow.state.error).toContain('A etapa de destino da devolução deve ser entre 1 e 3')
+
+    // Successful return to stage 1
+    s.flow.state.encaminhadaGerente = true
+    const ok = await s.flow.returnProposal({ etapaDestino: 1, motivo: 'Ajustar limites da regra 2' })
+    expect(ok).toBe(true)
+    expect(s.api.returnProposal).toHaveBeenCalledWith(42, {
+      etapaDestino: 1,
+      motivo: 'Ajustar limites da regra 2'
+    })
+    expect(s.flow.state.ultimaEtapa).toBe(1)
+    expect(s.flow.state.revisaoControle).toBe(45)
+    expect(s.flow.state.encaminhadaGerente).toBe(false)
+    expect(s.flow.state.notice).toContain('Proposta devolvida com sucesso para a Etapa 1')
+
+    // Successful return to stage 2 (Revisão técnica de código)
+    const okStage2 = await s.flow.returnProposal({ etapaDestino: 2, motivo: 'Revisar script Python da regra 1' })
+    expect(okStage2).toBe(true)
+    expect(s.api.returnProposal).toHaveBeenCalledWith(42, {
+      etapaDestino: 2,
+      motivo: 'Revisar script Python da regra 1'
+    })
+    expect(s.flow.state.ultimaEtapa).toBe(2)
+
+    // Successful return to stage 3 (Simulação e parâmetros orçamentários)
+    const okStage3 = await s.flow.returnProposal({ etapaDestino: 3, motivo: 'Refazer simulação com meta ajustada' })
+    expect(okStage3).toBe(true)
+    expect(s.api.returnProposal).toHaveBeenCalledWith(42, {
+      etapaDestino: 3,
+      motivo: 'Refazer simulação com meta ajustada'
+    })
+    expect(s.flow.state.ultimaEtapa).toBe(3)
+
+    // Concurrency conflict (409) handling
+    s.api.returnProposal.mockRejectedValueOnce({
+      response: { status: 409, data: { message: 'Conflito de versão' } }
+    })
+    expect(await s.flow.returnProposal({ etapaDestino: 2, motivo: 'Ajuste técnico' })).toBe(false)
+    expect(s.flow.state.remoteChanged).toBe(true)
+    s.scope.stop()
+  })
+
+  it('não confirma encaminhamento nem habilita publicação por resposta vazia', async () => {
+    const s = setup({ forwardToManager: vi.fn(async () => ({})) })
+    await ready(s)
+    expect(await s.flow.forwardToManager()).toBe(false)
+    expect(s.flow.state.encaminhadaGerente).toBe(false)
+    expect(s.flow.state.error).toContain('não foi confirmado')
+    s.scope.stop()
+  })
+
+  it('updates revisaoControle on forwardToManager to prevent stale 409 on subsequent activation', async () => {
+    const s = setup({
+      forwardToManager: vi.fn(async () => ({
+        id: 42,
+        revisaoControle: 78,
+        encaminhadaGerente: true
+      }))
+    })
+    await ready(s)
+
+    s.flow.simulation.result.cenario100 = {
+      dentroDoOrcamento: true,
+      statusEnquadramento: 'ENQUADRADO',
+      excedenteOrcamento: '0.00'
+    }
+    s.flow.state.revisaoControle = 10
+    expect(await s.flow.forwardToManager()).toBe(true)
+    expect(s.flow.state.revisaoControle).toBe(78)
+    expect(s.flow.state.encaminhadaGerente).toBe(true)
+    s.scope.stop()
+  })
+
+  it('strictly blocks activation when simulation acceptance is missing even if code and budget are approved', async () => {
+    const s = setup()
+    await s.flow.save()
+    s.flow.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: true })
+    s.flow.simulation.accepted = false
+    expect(s.flow.isCodeApproved.value).toBe(true)
+    expect(s.flow.canActivate.value).toBe(false)
+    expect(await s.flow.activate()).toBe(false)
+    expect(s.api.activate).not.toHaveBeenCalled()
     s.scope.stop()
   })
 })
