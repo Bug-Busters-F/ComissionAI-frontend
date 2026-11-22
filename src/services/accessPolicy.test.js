@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canAccess, canEditStep, STEP_RESPONSIBILITIES } from './accessPolicy'
+import { canAccess, canEditStep, canParticipateStep, STEP_RESPONSIBILITIES } from './accessPolicy'
 describe('preview role permissions', () => {
   it('assigns each stage to its planned owner and gives the administrator all four', () => {
     for (const step of STEP_RESPONSIBILITIES) {
@@ -7,7 +7,11 @@ describe('preview role permissions', () => {
       expect(canEditStep('ADMINISTRADOR', step.key)).toBe(true)
       expect(canEditStep('AUDITOR', step.key)).toBe(false)
     }
-    expect(canEditStep('ANALISTA_NEGOCIOS', 'propostas')).toBe(false)
+    expect(canEditStep('ANALISTA_NEGOCIOS', 'propostas')).toBe(true)
+    expect(canEditStep('ANALISTA_CODIGO', 'propostas')).toBe(false)
+    expect(canParticipateStep('ANALISTA_CODIGO', 'propostas')).toBe(true)
+    expect(canAccess('ANALISTA_CODIGO', 'saveCampaign')).toBe(false)
+    expect(canAccess('ANALISTA_CODIGO', 'editCampaign')).toBe(true)
     expect(canEditStep('ANALISTA_CODIGO', 'simulacao')).toBe(false)
     expect(canEditStep('GERENTE_VENDAS', 'dados')).toBe(false)
     expect(canEditStep(undefined, 'dados')).toBe(false)

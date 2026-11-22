@@ -42,9 +42,12 @@ describe('isolated workflow preview', () => {
     expect(state.simulationRevision).toBeNull()
     expect(state.codeApprovedRevision).toBe(state.revision)
   })
-  it('denies auditor mutations and rate edits outside code review', () => {
+  it('reserva a edição de taxa a negócios e aprovação a código', () => {
     expect(() => advance(newWorkflowPreview(), 'AUDITOR')).toThrow('perfil')
     expect(() => editPreview(newWorkflowPreview(), 'rate', '8', 'ANALISTA_NEGOCIOS')).toThrow('campo')
+    const step2 = advance(newWorkflowPreview())
+    expect(editPreview(step2, 'rate', '8', 'ANALISTA_NEGOCIOS').campaign.rate).toBe('8')
+    expect(() => editPreview(step2, 'rate', '8', 'ANALISTA_CODIGO')).toThrow('campo')
     expect(() => simulatePreview(newWorkflowPreview(), 'AUDITOR')).toThrow('responsável')
   })
   it('restores the pending stage rather than a previously visited stage', () => {

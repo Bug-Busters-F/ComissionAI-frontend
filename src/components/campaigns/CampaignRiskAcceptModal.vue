@@ -43,7 +43,7 @@
           </span>
         </div>
         <p class="text-brand-dark font-medium leading-5">
-          {{ pendencia?.motivo || pendencia?.mensagem }}
+          {{ userFacingText(pendencia?.motivo || pendencia?.mensagem) }}
         </p>
       </div>
 
@@ -82,7 +82,7 @@
           <p class="mt-1 text-[11px] text-sage-muted">Mínimo de 5 caracteres.</p>
         </div>
 
-        <p v-if="erroMsg" class="text-danger font-bold">{{ erroMsg }}</p>
+        <p v-if="erroMsg" role="alert" class="text-danger font-bold">{{ erroMsg }}</p>
 
         <!-- Botões de Ação -->
         <div class="flex items-center justify-end gap-3 pt-3 border-t border-sage-border-light">
@@ -111,6 +111,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { ref, computed, watch } from 'vue'
 import { ShieldCheck, ShieldAlert, X, AlertOctagon, RefreshCw } from 'lucide-vue-next'
 import { useSafeAuthStore } from '@/stores/authStore'
@@ -141,7 +142,7 @@ watch(
 )
 
 const isImpeditivo = computed(() => {
-  return String(props.pendencia?.severidade || '').toUpperCase() === 'IMPEDITIVO'
+  return String(props.pendencia?.severidade || '').toUpperCase() === 'IMPEDITIVO' || String(props.pendencia?.severidade || '').toUpperCase() === 'IMPEDIMENTO'
 })
 
 const podeConfirmar = computed(() => {

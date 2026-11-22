@@ -1,6 +1,6 @@
 export const STEP_RESPONSIBILITIES = Object.freeze([
   { key: 'dados', number: 1, label: 'Proposta', role: 'ANALISTA_NEGOCIOS', owner: 'Analista de negócios' },
-  { key: 'propostas', number: 2, label: 'Interpretação', role: 'ANALISTA_CODIGO', owner: 'Analista de código' },
+  { key: 'propostas', number: 2, label: 'Interpretação', role: 'ANALISTA_NEGOCIOS', owner: 'Analista de negócios (regras) e analista de código (Python)' },
   { key: 'simulacao', number: 3, label: 'Simulação', role: 'ANALISTA_NEGOCIOS', owner: 'Analista de negócios' },
   { key: 'conferencia', number: 4, label: 'Conferência', role: 'GERENTE_VENDAS', owner: 'Gerente' }
 ])
@@ -9,15 +9,20 @@ export function canEditStep(role, step) {
   const responsibility = STEP_RESPONSIBILITIES.find(s => s.key === step)
   return Boolean(responsibility && (role === 'ADMINISTRADOR' || responsibility.role === role))
 }
+export function canParticipateStep(role, step) {
+  return canEditStep(role, step) || (role === 'ANALISTA_CODIGO' && step === 'propostas')
+}
 export function canAccess(role, action, permissions = null) {
   if (!validRoles.includes(role)) return false
   if (role === 'ADMINISTRADOR') return permissions === null || permissions.includes('ACESSO_COMPLETO')
   const matrix = {
     viewCampaigns: validRoles, viewWorkflow: validRoles,
     viewAnomalies: validRoles,
+    viewCampaignApuration: ['GERENTE_VENDAS', 'AUDITOR'],
+    runCampaignApuration: ['GERENTE_VENDAS'],
     createCampaign: ['ANALISTA_NEGOCIOS'],
     editCampaign: ['ANALISTA_NEGOCIOS', 'ANALISTA_CODIGO', 'GERENTE_VENDAS'],
-    saveCampaign: ['ANALISTA_NEGOCIOS', 'ANALISTA_CODIGO'],
+    saveCampaign: ['ANALISTA_NEGOCIOS'],
     removeCampaign: ['ANALISTA_NEGOCIOS'],
     approveCode: ['ANALISTA_CODIGO'],
     returnProposal: ['GERENTE_VENDAS'],

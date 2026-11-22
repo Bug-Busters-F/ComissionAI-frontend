@@ -33,7 +33,7 @@
       <div v-if="conflitoConcorrencia" class="rounded-xl border border-warning-border bg-warning-bg p-4 space-y-1">
         <p class="text-xs font-extrabold text-warning-text flex items-center gap-1.5">
           <AlertTriangle class="h-4 w-4 text-warning-dark" />
-          Conflito de Concorrência (409)
+          Alteração feita por outra pessoa
         </p>
         <p class="text-xs text-warning-text leading-5">
           Esta linha foi alterada por outra pessoa. Seus valores foram preservados. Compare com a versão atual antes de decidir como continuar.
@@ -53,7 +53,7 @@
         <p class="text-xs font-extrabold text-danger-dark">Inconsistências identificadas nesta linha:</p>
         <ul class="list-disc pl-4 text-xs text-danger-dark space-y-1">
           <li v-for="(err, i) in line.erros" :key="i">
-            <strong>{{ err.campo }}:</strong> {{ err.mensagem }}
+            <strong>{{ userFacingText(err.campo) }}:</strong> {{ userFacingText(err.motivo || err.mensagem) }}
             <span class="ml-1 rounded px-1.5 py-0.2 text-[10px] font-bold uppercase bg-danger text-white">
               {{ err.severidade }}
             </span>
@@ -205,6 +205,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { ref, computed, watch } from 'vue'
 import { X, AlertTriangle, RefreshCw } from 'lucide-vue-next'
 import { createLineConflictReview } from '@/services/lineConflictReview'

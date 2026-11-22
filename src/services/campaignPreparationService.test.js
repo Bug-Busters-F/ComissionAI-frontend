@@ -126,9 +126,7 @@ describe('campaignPreparationService — Correção de Bases e Aceite de Riscos 
 
   it('bloqueia aceite de risco para erros IMPEDITIVOS e aceita ADVERTENCIA com justificativa', async () => {
     const mockHttp = {
-      post: vi.fn().mockResolvedValue({
-        data: { id: 101, aceito: true, motivo: 'Aceite de divergência tolerável' }
-      })
+      post: vi.fn(async (_url, body) => ({ data: { id: 101, campanhaId: 15, status: 'ACEITA', pendenciaIdentificador: body.pendenciaIdentificador, motivoAceite: body.motivo } }))
     }
 
     const service = createCampaignPreparationService(mockHttp)
@@ -158,7 +156,8 @@ describe('campaignPreparationService — Correção de Bases e Aceite de Riscos 
       motivo: 'Divergência tolerável pelo fechamento'
     })
 
-    expect(aceito.aceito).toBe(true)
+    expect(aceito.status).toBe('ACEITA')
+    expect(mockHttp.post).toHaveBeenCalledWith('/campanhas/15/pendencias/aceite',expect.objectContaining({severidade:'AVISO'}))
   })
 })
 

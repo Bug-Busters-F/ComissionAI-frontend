@@ -4,174 +4,22 @@
     aria-labelledby="campaign-bases-heading"
   >
     <p v-if="pageError" role="alert" class="rounded-xl bg-danger-bg p-4 text-sm text-danger-dark">{{ pageError }}</p>
-    <!-- Identidade confirmada na sessão atual -->
-    <div class="flex flex-wrap items-start justify-between gap-4 border-b border-sage-border-light pb-5">
-      <div>
-        <div class="flex flex-wrap items-center gap-2.5">
-          <h2 id="campaign-bases-heading" class="text-xl font-black tracking-[-0.03em] text-brand-dark flex items-center gap-2">
-            <Database class="h-5 w-5 text-brand" aria-hidden="true" />
-            Bases da Campanha (RH e Vendas)
-          </h2>
-          <span
-            class="rounded-full px-2.5 py-0.5 text-xs font-bold"
-            :class="authStore.canUploadBases ? 'bg-success-surface text-success-dark border border-success/30' : 'bg-warning-bg text-warning-text border border-warning-border'"
-          >
-            Perfil: {{ authStore.currentUser?.nomePerfil || authStore.currentUser?.papel }}
-          </span>
-          <span
-            v-if="!authStore.canUploadBases"
-            class="rounded-full bg-sage-light px-2.5 py-0.5 text-xs font-semibold text-sage-muted"
-          >
-            Modo Somente Leitura
-          </span>
-        </div>
-        <p class="mt-1 text-sm text-sage-muted max-w-2xl">
-          Gerencie as bases de referência vinculadas à campanha. Associe bases consolidadas existentes para evitar duplicidade ou realize nova carga conjunta com diagnóstico auditado.
-        </p>
-      </div>
-
-
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 id="campaign-bases-heading" class="text-lg font-extrabold text-brand-dark">Bases da campanha</h2>
+      <p v-if="!autoSelectCompetence" class="text-xs text-sage-muted">Competência: <strong>{{ selectedCompetenciaFormatada }}</strong></p>
+      <label v-else for="bases-competence-select" class="flex items-center gap-2 text-xs font-bold text-sage-muted">Competência
+        <select id="bases-competence-select" :value="selectedCompetencia" class="focus-ring rounded-xl border border-sage-border bg-white px-3 py-2 text-brand-dark" @change="onCompetenceChange($event.target.value)">
+          <option value="">Selecione</option>
+          <option v-for="c in competenceOptions" :key="c.competencia" :value="c.competencia">{{ c.competencia }}</option>
+        </select>
+      </label>
     </div>
-
-    <!-- 1. Alerta de Bases Corporativas Globais & Impacto em Outras Campanhas (BACK-5 / BACK-6) -->
-    <div
-      class="rounded-2xl border p-5"
-      :class="impactAnalysis.possuiAtivas ? 'border-danger/30 bg-danger-bg/40' : 'border-brand/20 bg-brand-light/30'"
-    >
-      <div class="flex items-start gap-3">
-        <Globe2
-          class="h-5 w-5 mt-0.5 shrink-0"
-          :class="impactAnalysis.possuiAtivas ? 'text-danger' : 'text-brand-dark'"
-          aria-hidden="true"
-        />
-        <div class="flex-1 space-y-2">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <h3 class="text-sm font-extrabold text-brand-dark">
-              Transparência de Bases Globais Corporativas
-            </h3>
-            <span
-              v-if="impactAnalysis.totalOutrasAfetadas > 0"
-              class="rounded-full px-2.5 py-0.5 text-xs font-bold"
-              :class="impactAnalysis.possuiAtivas ? 'bg-danger text-white' : 'bg-warning-light text-warning-dark'"
-            >
-              {{ impactAnalysis.totalOutrasAfetadas }} outra(s) campanha(s) vinculada(s)
-            </span>
-          </div>
-          <p class="text-xs leading-5 text-brand-dark/80">
-            As bases de RH e Vendas possuem escopo corporativo e são compartilhadas entre todas as campanhas da mesma competência. Qualquer alteração ou nova carga na competência <strong>{{ impactAnalysis.competenciaFormatada }}</strong> reflete imediatamente em todo o sistema.
-          </p>
-
-          <!-- Lista de Campanhas Potencialmente Afetadas -->
-          <div v-if="impactAnalysis.outrasCampanhas.length > 0" class="pt-2">
-            <button
-              type="button"
-              @click="showAffectedList = !showAffectedList"
-              class="focus-ring text-xs font-bold text-brand-dark hover:underline flex items-center gap-1.5"
-            >
-              <span>{{ showAffectedList ? 'Ocultar campanhas potencialmente afetadas' : 'Ver campanhas potencialmente afetadas' }}</span>
-              <ChevronDown class="h-3.5 w-3.5 transition-transform" :class="{ 'rotate-180': showAffectedList }" />
-            </button>
-
-            <div v-if="showAffectedList" class="mt-3 overflow-hidden rounded-xl border border-sage-border bg-white shadow-sm">
-              <table class="w-full text-left text-xs">
-                <thead class="bg-sage-light text-sage-muted font-bold uppercase tracking-wider">
-                  <tr>
-                    <th class="p-2.5">Campanha</th>
-                    <th class="p-2.5">Estado</th>
-                    <th class="p-2.5">Vigência</th>
-                    <th class="p-2.5">Risco / Impacto</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-sage-border-light">
-                  <tr v-for="c in impactAnalysis.outrasCampanhas" :key="c.id" class="hover:bg-sage-light/40">
-                    <td class="p-2.5 font-bold text-brand-dark">
-                      {{ c.titulo }} <span class="text-sage-muted">#{{ c.id }}</span>
-                    </td>
-                    <td class="p-2.5">
-                      <span
-                        class="rounded px-2 py-0.5 font-bold"
-                        :class="c.estado === 'ATIVA' ? 'bg-success-surface text-success-dark' : 'bg-sage-light text-sage-muted'"
-                      >
-                        {{ c.estado }}
-                      </span>
-                    </td>
-                    <td class="p-2.5 text-sage-muted">{{ c.dataInicio }} a {{ c.dataFim }}</td>
-                    <td class="p-2.5">
-                      <span
-                        class="rounded-full px-2 py-0.5 text-[11px] font-bold"
-                        :class="c.severidade === 'CRITICA' ? 'bg-danger-bg text-danger-dark' : 'bg-warning-bg text-warning-text'"
-                      >
-                        {{ c.riscoLabel }}: {{ c.motivoImpacto }}
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. Seletor de Competência & Status de Base Consolidada Existente -->
-    <div class="grid gap-4 md:grid-cols-12">
-      <!-- Seletor de Competência (4 colunas) -->
-      <div class="rounded-2xl border border-sage-border-light bg-sage-light/60 p-4 md:col-span-4 flex flex-col justify-between">
-        <div>
-          <label for="bases-competence-select" class="block text-xs font-bold uppercase tracking-wider text-sage-muted">
-            Competência de Referência
-          </label>
-          <select
-            id="bases-competence-select"
-            :value="selectedCompetencia"
-            @change="onCompetenceChange($event.target.value)"
-            class="focus-ring mt-2 w-full rounded-xl border border-sage-border-dark bg-white px-3.5 py-2.5 text-sm font-extrabold text-brand-dark shadow-sm"
-          >
-            <option v-if="!competenceOptions.length" value="">Nenhuma competência encontrada</option>
-            <option v-else disabled value="">Selecione a competência</option>
-            <option v-for="c in competenceOptions" :key="c.competencia" :value="c.competencia">
-              {{ c.competencia }} — {{ c.label }}
-            </option>
-          </select>
-        </div>
-        <p class="mt-2 text-[11px] text-sage-muted">
-          Seleciona o ciclo mensal para validar a cobertura e anexos da campanha.
-        </p>
-      </div>
-
-      <!-- Card de Deduplicação: Base Consolidada Já Existente (8 colunas) -->
-      <div
-        class="rounded-2xl border p-4 md:col-span-8 flex flex-col justify-between"
-        :class="baseExistente ? 'border-success/40 bg-success-surface/40' : 'border-sage-border-light bg-white'"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-sage-muted flex items-center gap-1.5">
-              <CheckCircle2 v-if="baseExistente" class="h-4 w-4 text-success" />
-              <Info v-else class="h-4 w-4 text-sage-muted" />
-              Consolidação no Banco
-            </span>
-            <h4 class="mt-1 text-base font-extrabold text-brand-dark">
-              {{ baseExistente ? 'Base Consolidada Disponível no Sistema' : 'Nenhuma Base Consolidada no Período' }}
-            </h4>
-            <p v-if="baseExistente" class="mt-1 text-xs text-brand-dark/80">
-              A competência <strong>{{ selectedCompetenciaFormatada }}</strong> possui <strong>{{ baseExistente.totalVendas }} vendas</strong> cadastradas. Selecione abaixo um lote disponível para associar sem novo envio.
-            </p>
-            <p v-else class="mt-1 text-xs text-sage-muted">
-              Envie conjuntamente as planilhas de RH e Vendas para registrar esta competência no sistema.
-            </p>
-          </div>
-
-          <span
-            v-if="jaAnexadoNaCampanha"
-            class="rounded-full bg-brand-light px-3 py-1 text-xs font-bold text-brand-dark border border-brand/30 shrink-0"
-          >
-            Já Vinculada à Campanha
-          </span>
-        </div>
-
-        <!-- Botão de Ação: Associar Base Existente (Deduplicação de Cargas) -->
-        <div class="mt-4 flex flex-wrap items-center gap-3">
+    <p v-if="basesLoading" role="status" class="text-xs text-sage-muted">Consultando arquivos cadastrados…</p>
+    <details class="rounded-xl border border-sage-border-light px-4 py-3 text-sm">
+      <summary class="focus-ring w-fit cursor-pointer rounded font-semibold text-brand-dark">Usar bases já cadastradas</summary>
+      <p class="mt-3 text-xs text-sage-muted">{{ selectedCompetencia ? 'Vincule os arquivos desta competência sem reenviá-los.' : 'Selecione uma competência na simulação para consultar os arquivos disponíveis.' }}</p>
+      <p v-if="jaAnexadoNaCampanha" class="mt-2 text-xs text-success-dark">Já existem bases vinculadas à campanha nesta competência.</p>
+      <div v-if="authStore.canModifyBases" class="mt-3 flex flex-wrap gap-3">
           <button
             v-for="lote in lotesDisponiveis" :key="lote.reportId"
             type="button"
@@ -182,15 +30,11 @@
           >
             <RefreshCw v-if="isAssociating" class="h-3.5 w-3.5 animate-spin" />
             <LinkIcon v-else class="h-3.5 w-3.5" />
-            <span>{{ isAssociating ? 'Associando...' : `Associar ${lote.tipoBase === 'HR' ? 'RH' : 'Vendas'}: ${lote.nomeArquivoOriginal || 'Lote ' + lote.reportId}` }}</span>
+            <span>{{ isAssociating ? 'Associando...' : `Associar ${campaignBaseLabel(lote.tipoBase)}: ${lote.nomeArquivoOriginal || 'Lote ' + lote.reportId}` }}</span>
           </button>
-
-          <span v-if="!authStore.canModifyBases && baseExistente && !jaAnexadoNaCampanha" class="text-xs text-danger font-semibold">
-            Requer perfil de Gerente ou Administrador para associar bases.
-          </span>
-        </div>
+        <p v-if="selectedCompetencia && !basesLoading && !pageError && !lotesDisponiveis.length" class="text-xs text-sage-muted">Nenhum arquivo disponível para vincular nesta competência.</p>
       </div>
-    </div>
+    </details>
 
     <!-- 3. Anexos de Base Ativos da Campanha (BACK-6) & Correção de Inconsistências (FRONT-5) -->
     <div v-if="anexosAtivos.length > 0" class="rounded-2xl border border-sage-border-light bg-sage-light/30 p-5 space-y-3">
@@ -214,7 +58,7 @@
                 {{ anexo.nomeArquivoOriginal || `Lote #${anexo.reportId}` }}
               </p>
               <p class="text-[11px] text-sage-muted">
-                Tipo: <strong>{{ anexo.tipoBase }}</strong> · Comp: <strong>{{ anexo.competencia || 'Global' }}</strong> · {{ anexo.linhasValidas }} linhas válidas
+                Tipo: <strong>{{ campaignBaseLabel(anexo.tipoBase) }}</strong> · Comp: <strong>{{ anexo.competencia || 'Global' }}</strong> · {{ anexo.linhasValidas }} linhas válidas
               </p>
               <p v-if="anexo.totalInconsistencias > 0" class="text-[11px] font-bold text-warning-text mt-0.5">
                 {{ anexo.totalInconsistencias }} inconsistência(s) registrada(s)
@@ -258,7 +102,7 @@
       :batch="lotePreparacaoAtivo"
       @batch-committed="onBatchCommitted"
       @batch-discarded="lotePreparacaoAtivo = null"
-      @batch-updated="carregarAnexos"
+      @batch-updated="handleBatchUpdated"
     />
 
     <!-- 5. Área de Upload Conjunto de RH e Vendas com Diagnóstico por Arquivo -->
@@ -269,17 +113,10 @@
             <UploadCloud class="h-5 w-5 text-brand" />
             Envio Conjunto de Bases (RH + Vendas)
           </h3>
-          <p class="text-xs text-sage-muted">
-            Para novas competências ou atualização auditada. O RH é validado primeiro, assegurando integridade com as vendas.
-          </p>
+
         </div>
 
-        <span
-          v-if="!authStore.canUploadBases"
-          class="rounded-full bg-danger-bg px-3 py-1 text-xs font-bold text-danger-dark border border-danger/30"
-        >
-          Upload bloqueado para seu perfil
-        </span>
+
       </div>
 
       <!-- Bloqueio de Acesso para Não-Gerentes / Não-Admins -->
@@ -287,7 +124,7 @@
         <div class="flex items-start gap-2.5 text-xs text-warning-text leading-5">
           <Lock class="h-4 w-4 mt-0.5 shrink-0 text-warning-dark" />
           <div>
-            <strong>Acesso Restrito:</strong> O envio de novas bases de RH e Vendas é permitido exclusivamente a <strong>Gerente de Vendas</strong> e <strong>Administrador</strong>. Como seu perfil é <em>{{ authStore.currentUser?.nomePerfil }}</em>, as ações de upload permanecem desabilitadas para auditoria.
+            Somente gerente ou administrador pode enviar e vincular bases.
           </div>
         </div>
       </div>
@@ -366,6 +203,10 @@
         </div>
       </div>
 
+      <p v-if="authStore.canUploadBases && (rhFile || vendasFile)" role="status" class="rounded-xl border border-warning-border bg-warning-bg p-3 text-xs leading-5 text-warning-text">
+        As bases de {{ formatCompetenceCode(competenciaDetectadaNosArquivos || selectedCompetencia) || 'esta competência' }} são compartilhadas. Este envio pode afetar outras campanhas.
+        <span v-if="impactAnalysis.totalOutrasAfetadas">{{ impactAnalysis.totalOutrasAfetadas }} outra(s) campanha(s) utiliza(m) esta competência.</span>
+      </p>
       <!-- Botão de Disparo do Envio -->
       <div class="flex items-center justify-end gap-3 pt-2">
         <button
@@ -385,7 +226,7 @@
         <div class="max-w-xl">
           <p class="text-xs font-bold text-warning-text">Arquivos importados. Falta associar os lotes {{ pendenteAssociacaoLoteId.join(', ') }} à campanha.</p>
           <p v-if="mensagemFalhaAssociacao" class="text-[11px] text-danger font-semibold mt-0.5">
-            Motivo do servidor: {{ mensagemFalhaAssociacao }}
+            Motivo: {{ mensagemFalhaAssociacao }}
           </p>
           <p class="text-[11px] text-sage-muted mt-0.5">Clique para tentar associar este lote à campanha agora sem reenviar os arquivos.</p>
         </div>
@@ -480,11 +321,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, getCurrentInstance } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, getCurrentInstance } from 'vue'
 import {
-  Database,
-  Globe2,
-  CheckCircle2,
   Info,
   Link as LinkIcon,
   Trash2,
@@ -492,7 +330,6 @@ import {
   FileSpreadsheet,
   Lock,
   RefreshCw,
-  ChevronDown,
   ShieldAlert,
   Paperclip,
   SlidersHorizontal
@@ -501,7 +338,7 @@ import { useSafeAuthStore } from '@/stores/authStore'
 import { dataService } from '@/services/dataService'
 import api from '@/services/api'
 import { userFacingText } from '@/services/userFacingText'
-import { associateReports, availableCoverageLots, uploadReportIds } from '@/services/campaignBaseAssociation'
+import { associateReports, availableImportedLots, campaignBaseLabel, uploadReportIds } from '@/services/campaignBaseAssociation'
 import { campaignCoverageService } from '@/services/campaignCoverageService'
 import { campaignPreparationService } from '@/services/campaignPreparationService'
 import { findAffectedCampaigns } from '@/services/campaignBasesImpactService'
@@ -525,15 +362,15 @@ const emit = defineEmits(['competence-selected', 'base-associated', 'base-upload
 
 const authStore = useSafeAuthStore()
 const pageError = ref('')
-const cobertura = ref(null)
-const lotesDisponiveis = computed(() => availableCoverageLots(cobertura.value, selectedCompetencia.value))
+const arquivosCadastrados = ref([])
+const basesLoading = ref(false)
+const lotesDisponiveis = computed(() => availableImportedLots(arquivosCadastrados.value, selectedCompetencia.value, anexosAtivos.value))
 function showError(error) { pageError.value = userFacingText(error.response?.data?.message || error.message || 'Não foi possível concluir a operação.') }
 
 const selectedCompetencia = ref(props.competencia || '')
 const competenceOptions = ref([])
 const campaigns = ref(props.campaignsList || [])
 const anexosAtivos = ref([])
-const showAffectedList = ref(false)
 
 // Arquivos de Upload
 const rhFile = ref(null)
@@ -612,19 +449,33 @@ async function carregarCampanhas() {
   }
 }
 
+async function handleBatchUpdated() {
+  await carregarAnexos()
+  emit('base-associated', { updated: true, competencia: selectedCompetencia.value })
+}
+
+let basesRequest = 0
+onBeforeUnmount(() => { basesRequest++ })
 async function carregarAnexos() {
-  if (!props.campanhaId) return
+  const request = ++basesRequest
+  const campaignId = props.campanhaId
+  if (!campaignId) { arquivosCadastrados.value = []; anexosAtivos.value = []; basesLoading.value = false; return }
+  basesLoading.value = true
+  pageError.value = ''
+  arquivosCadastrados.value = []
   try {
-    const [anexos, diagnostico] = await Promise.all([
-      campaignCoverageService.listAttachments(props.campanhaId),
-      campaignCoverageService.getCoverage(props.campanhaId)
+    const [anexos, arquivos] = await Promise.all([
+      campaignCoverageService.listAttachments(campaignId),
+      campaignCoverageService.listImportedBases()
     ])
+    if (request !== basesRequest || campaignId !== props.campanhaId) return
     anexosAtivos.value = anexos
-    cobertura.value = diagnostico
+    arquivosCadastrados.value = arquivos
   } catch (err) {
+    if (request !== basesRequest || campaignId !== props.campanhaId) return
     showError(err)
     console.warn('Erro ao carregar anexos ativos:', err)
-  }
+  } finally { if (request === basesRequest) basesLoading.value = false }
 }
 
 const selectedCompetenciaFormatada = computed(() => {
@@ -644,7 +495,7 @@ const jaAnexadoNaCampanha = computed(() => {
 })
 
 const impactAnalysis = computed(() => {
-  return findAffectedCampaigns(selectedCompetencia.value, campaigns.value, props.campanhaId)
+  return findAffectedCampaigns(competenciaDetectadaNosArquivos.value || selectedCompetencia.value, campaigns.value, props.campanhaId)
 })
 
 function onCompetenceChange(comp) {
@@ -699,6 +550,7 @@ async function desanexarBase(anexoId) {
   try {
     await campaignCoverageService.detachBase(props.campanhaId, anexoId)
     await carregarAnexos()
+    emit('base-associated', { removed: true, competencia: selectedCompetencia.value })
   } catch (err) {
     showError(err)
     console.error('Falha ao desanexar base:', err)
@@ -793,7 +645,7 @@ watch(
 watch(
   () => props.campanhaId,
   (newId) => {
-    if (newId) carregarAnexos()
+    carregarAnexos()
   }
 )
 

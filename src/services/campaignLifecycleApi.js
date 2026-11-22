@@ -10,7 +10,7 @@ export function createCampaignLifecycleApi(http = api) {
     async competences() { return (await http.get('/referencias/competencias', config)).data },
     async cut(campanhaId, competencia) { return (await http.post('/referencias/recortar-publico', { campanhaId, competencia, limite: 1, pagina: 0 }, config)).data },
     async simulate(campanhaId, competencia) { return (await http.post('/simulacoes', { campanhaId, competencia, limite: 10, pagina: 0 }, { timeout: 300000 })).data },
-    async program(id) { return (await http.get(`/campanhas/${id}/programa-python`, config)).data },
+    async program(id, version = null) { return (await http.get(version == null ? `/campanhas/${id}/programa-python` : `/campanhas/${id}/versoes/${version}/programa-python`, config)).data },
     async programHistory(id) { return (await http.get(`/campanhas/${id}/programa-python/historico`, config)).data },
     async saveProgram(id, payload) { return (await http.put(`/campanhas/${id}/programa-python`, payload, config)).data },
     async approveProgram(id, payload) { return (await http.post(`/campanhas/${id}/programa-python/aprovar`, payload, config)).data },

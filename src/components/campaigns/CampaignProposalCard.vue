@@ -105,7 +105,7 @@ function idFor(field) {
   return 'proposal-field-' + encodeURIComponent(props.proposal.clientId) + '-' + field
 }
 function errorFor(field) {
-  return blockers.value.find((item) => item.campo === field)?.mensagem || ''
+  return userFacingText(blockers.value.find((item) => item.campo === field)?.mensagem || '')
 }
 function errorClass(field) {
   return errorFor(field) ? 'campaign-control-error' : ''

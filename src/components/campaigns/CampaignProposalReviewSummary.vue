@@ -11,13 +11,13 @@
     </div>
 
     <div v-if="!campaign.propostas.length" class="rounded-[22px] bg-white p-6 text-sm text-sage-muted">Nenhuma regra para conferir.</div>
-    <component :is="showPython || collapsible ? 'details' : 'article'" v-for="(proposal, index) in campaign.propostas" :key="proposal.clientId" class="group rounded-[22px] border p-5 sm:p-6" :class="showPython || collapsible ? 'border-sage-border-dark bg-gradient-to-br from-sage-light to-white hover:border-brand-ring motion-safe:transition-colors' : 'border-transparent bg-white'">
-      <component :is="showPython || collapsible ? 'summary' : 'div'" class="flex items-start justify-between gap-4 rounded" :class="showPython || collapsible ? 'focus-ring cursor-pointer list-none [&::-webkit-details-marker]:hidden' : ''">
+    <component :is="reviewMode || collapsible ? 'details' : 'article'" v-for="(proposal, index) in campaign.propostas" :key="proposal.clientId" class="group rounded-[22px] border p-5 sm:p-6" :class="reviewMode || collapsible ? 'border-sage-border-dark bg-gradient-to-br from-sage-light to-white hover:border-brand-ring motion-safe:transition-colors' : 'border-transparent bg-white'">
+      <component :is="reviewMode || collapsible ? 'summary' : 'div'" class="flex items-start justify-between gap-4 rounded" :class="reviewMode || collapsible ? 'focus-ring cursor-pointer list-none [&::-webkit-details-marker]:hidden' : ''">
         <div class="min-w-0">
           <h3 class="text-lg font-extrabold text-brand-dark">Regra {{ index + 1 }}</h3>
           <p class="mt-2 break-words text-sm leading-6 text-sage-subtle">{{ explainRule(proposal) }}</p>
         </div>
-        <ChevronDown v-if="showPython || collapsible" :size="20" aria-hidden="true" class="mt-1 h-7 w-7 shrink-0 rounded-full bg-sage p-1 text-sage-subtle transition-transform group-open:rotate-180 motion-reduce:transition-none" />
+        <ChevronDown v-if="reviewMode || collapsible" :size="20" aria-hidden="true" class="mt-1 h-7 w-7 shrink-0 rounded-full bg-sage p-1 text-sage-subtle transition-transform group-open:rotate-180 motion-reduce:transition-none" />
       </component>
       <div class="mt-5 border-t border-sage-border-light pt-5">
         <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold" :class="statusTone(proposal)">{{ statusLabel(proposal) }}</span>
@@ -55,10 +55,9 @@
           {{ item.severidade === 'IMPEDITIVO' ? 'Impeditiva:' : 'Aviso:' }} {{ userFacingText(item.mensagem) }}
         </li>
       </ul>
-      <CampaignRulePython v-if="showPython" :historical="historical" :rule-number="index + 1" :code="proposal.metadadosRecebidos.pythonAtualizado || ''" :current="historical || (ruleArtifactsCurrent(proposal, campaign) && !proposal.metadadosRecebidos.artefatosLegados)" />
       </div>
     </component>
-    <CampaignImpactSummary v-if="showPython && !hideImpact && campaign.propostas.length" :impact="impact" />
+    <CampaignImpactSummary v-if="reviewMode && !hideImpact && campaign.propostas.length" :impact="impact" />
   </section>
 </template>
 
@@ -70,7 +69,6 @@ import CampaignImpactSummary from './CampaignImpactSummary.vue'
 import { describeFieldOrigin } from '@/services/campaignFieldOrigins'
 import { PROPOSAL_FIELD_NAMES } from '@/services/campaignProposalModel'
 import { RULE_FIELD_LABELS as labels } from '@/services/ruleReinterpretation'
-import CampaignRulePython from './CampaignRulePython.vue'
 import { ChevronDown } from 'lucide-vue-next'
 import { parseDecimalToMinor, decimalFractionToPercent } from '@/services/campaignProposalValidation'
 import { formatCampaignValidity, proposalDisplayPendings } from '@/services/campaignProposalFormatting'
@@ -85,7 +83,7 @@ const props = defineProps({
   impact: { type: Object, default: null },
   campaign: { type: Object, required: true },
   validation: { type: Object, required: true },
-  showPython: { type: Boolean, default: false },
+  reviewMode: { type: Boolean, default: false },
   collapsible: Boolean,
   hideImpact: Boolean,
   historical: Boolean,

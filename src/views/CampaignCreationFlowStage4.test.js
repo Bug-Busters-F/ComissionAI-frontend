@@ -48,7 +48,7 @@ async function setupAndAccept(campaign, apiOverrides = {}, cenario100Overrides =
     readiness: vi.fn(async () => ({ aptaParaAtivacao: true, simulacaoId: 'sim-1', aceitoPor: 'Pessoa teste' })),
     accept: vi.fn(async () => ({ statusAceite: 'ACEITA', simulacaoId: 'sim-1', campanhaId: 42 })),
     simulation: vi.fn(async () => simulationRaw('sim-1', cenario100Overrides)),
-    forwardToManager: vi.fn(async () => ({})),
+    forwardToManager: vi.fn(async () => ({ id: 42, encaminhadaGerente: true })),
     ...apiOverrides
   }
 
@@ -57,7 +57,7 @@ async function setupAndAccept(campaign, apiOverrides = {}, cenario100Overrides =
   await lifecycle.selectCompetence('2026-09')
   expect(await lifecycle.runSimulation()).toBe(true)
   lifecycle.simulation.aceitoPor = 'Pessoa teste'
-  expect(await lifecycle.accept()).toBe(true)
+  expect(await lifecycle.accept()).toBe(lifecycle.isBudgetWithinLimit.value)
 
   return { lifecycle, api }
 }
@@ -79,6 +79,9 @@ describe('Campaign Creation Stage 4 (Conferência e Governança) — [FRONT-9]',
       })
 
       expect(lifecycle.isBudgetWithinLimit.value).toBe(false)
+      expect(lifecycle.simulation.accepted).toBe(false)
+      expect(api.accept).not.toHaveBeenCalled()
+      expect(lifecycle.simulation.error).toContain('Aceite bloqueado')
       expect(lifecycle.canActivate.value).toBe(false)
 
       const forwarded = await lifecycle.forwardToManager()

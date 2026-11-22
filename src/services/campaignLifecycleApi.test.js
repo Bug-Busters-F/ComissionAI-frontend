@@ -48,3 +48,14 @@ it('integrates code approval, manager forwarding, budget and version comparison'
   expect(http.patch).toHaveBeenCalledWith('/campanhas/7/orcamento', { orcamento: 50000, confirmar: true }, expect.any(Object))
   expect(http.post).toHaveBeenCalledWith('/campanhas/7/devolver', { etapaDestino: 1, motivo: 'Regra incorreta' }, expect.any(Object))
 })
+
+it('consulta a aprovação do programa da versão exibida sem usar o controle antigo por regra', async () => {
+  const approved = { campanhaId: 7, versaoCampanhaNumero: 1, statusAprovacao: 'APROVADO', validoParaExecucao: true }
+  const http = { get: vi.fn(async () => ({ data: approved })) }
+  const api = createCampaignLifecycleApi(http)
+  expect(await api.program(7, 1)).toEqual(approved)
+  expect(http.get).toHaveBeenLastCalledWith('/campanhas/7/versoes/1/programa-python', expect.any(Object))
+  await api.program(7)
+  expect(http.get).toHaveBeenLastCalledWith('/campanhas/7/programa-python', expect.any(Object))
+  expect(http.get.mock.calls.every(([url]) => !url.includes('aprovacao-codigo'))).toBe(true)
+})

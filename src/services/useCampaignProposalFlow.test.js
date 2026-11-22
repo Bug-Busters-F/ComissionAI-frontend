@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, nextTick, reactive } from 'vue'
+import { canAccess, canEditStep } from './accessPolicy'
 import { createCampaignProposal } from './campaignProposalModel'
 import { useCampaignProposalFlow } from './useCampaignProposalFlow'
 import { proposalToBackend } from './campaignProposalMappers'
@@ -11,7 +12,7 @@ vi.mock('vue', async (original) => ({ ...await original(), onBeforeUnmount: vi.f
 vi.mock('./campaignLifecycleApi', () => ({ createCampaignLifecycleApi: () => bindings.lifecycle }))
 vi.mock('./campaignProposalApiClient', () => ({ createCampaignProposalApiClient: () => bindings.client }))
 
-async function setup({ saved = null, lifecycleApi = {} } = {}) {
+async function setup({ saved = null, lifecycleApi = {}, permissions = {} } = {}) {
   bindings.route = reactive({ ...(saved ? { params: { id: 42 } } : {}), fullPath: '/campanhas/nova?etapa=propostas', query: saved ? {} : { etapa: 'propostas' } })
   const change = async ({ query }) => { bindings.route.query = query; bindings.route.fullPath = '/campanhas/nova?etapa=' + query.etapa; await nextTick() }
   bindings.router = { push: vi.fn(change), replace: vi.fn(change) }
@@ -29,7 +30,7 @@ async function setup({ saved = null, lifecycleApi = {} } = {}) {
     ...lifecycleApi
   }
   const scope = effectScope()
-  const flow = scope.run(useCampaignProposalFlow)
+  const flow = scope.run(() => useCampaignProposalFlow(permissions))
   if (!saved) Object.assign(flow.campaign, { titulo: 'T', textoOriginal: 'D', dataInicio: '2026-10-01', dataFim: '2026-10-31', propostas: [createCampaignProposal({ campos: { codLoja: '1', taxaPercentual: '5' }, metadadosRecebidos: { validacaoPendente: true } })] })
   for (let i = 0; i < 15; i++) await nextTick()
   return { flow, scope }
@@ -45,6 +46,46 @@ function extractionResponse(flow) {
 }
 
 describe('campaign flow integration navigation', () => {
+  it('resumes manager review from a confirmed acceptance even if only stage 3 was recorded', async () => {
+    const c=campaignFixture();c.propostas=c.propostas.slice(0,1)
+    const scenario={totalVendas:'1000',totalComissaoBase:'25',totalComissaoProposta:'35',deltaComissao:'10',deltaPercentual:'40',comissaoProjetada:'35',deltaProjetado:'10'}
+    const cut=vi.fn().mockRejectedValue({response:{status:403}})
+    const {flow,scope}=await setup({saved:{...savedResponse(c),etapaMaisAvancada:3,ultimaEtapa:3,simulacaoAceitaId:'accepted',statusAceite:'ACEITA'},permissions:{canEditStep:step=>canEditStep('GERENTE_VENDAS',step),canSave:()=>false,canSimulate:()=>false},lifecycleApi:{
+      simulation:vi.fn(async()=>({id:'accepted',protocolo:'protocol',campanhaId:42,competencia:'2025-07',totalVendasRecortadas:1,fatorProjecao:'1',diasInclusivos:30,cenario100:scenario,cenario80:scenario,cenario120:scenario,cenario150:scenario,vendas:[]})),
+      readiness:vi.fn(async()=>({aptaParaAtivacao:true,simulacaoId:'accepted'})),
+      sales:vi.fn(async()=>({simulacaoId:'accepted',paginaAtual:0,totalElementos:0,totalPaginas:1,vendas:[]})),cut
+    }})
+    expect(flow.activeStep.value).toBe('conferencia')
+    expect(flow.reachedStep.value).toBe(4)
+    expect(flow.simulation.accepted).toBe(true)
+    expect(cut).not.toHaveBeenCalled()
+    scope.stop()
+  })
+
+  it.each(['ANALISTA_NEGOCIOS', 'ANALISTA_CODIGO'])('separa parâmetros e programa na etapa 2 para %s', async role => {
+    const c = campaignFixture(); c.propostas = c.propostas.slice(0, 1)
+    const { flow, scope } = await setup({ saved: { ...savedResponse(c), etapaMaisAvancada: 2 }, permissions: {
+      canEditStep: step => canEditStep(role, step),
+      canWrite: () => canAccess(role, 'editCampaign'),
+      canSave: () => canAccess(role, 'saveCampaign'),
+      canReviewProgram: () => canAccess(role, 'approveCode')
+    } })
+    expect(flow.activeStep.value).toBe('propostas')
+    const before = JSON.stringify(flow.campaign), id = flow.campaign.propostas[0].clientId
+    flow.updateProposal(id, 'taxaPercentual', '9')
+    if (role === 'ANALISTA_NEGOCIOS') {
+      expect(flow.campaign.propostas[0].campos.taxaPercentual).toBe('9')
+      expect(flow.lifecycle.isCodeApproved.value).toBe(false)
+      flow.addProposal(); expect(flow.campaign.propostas).toHaveLength(2)
+      expect(await flow.lifecycle.reviewProgram('approve', {})).toBe(false)
+    } else {
+      flow.addProposal(); flow.requestRemoveProposal(id)
+      expect(JSON.stringify(flow.campaign)).toBe(before)
+      expect(await flow.interpretDescription()).toBe(false)
+      expect(await flow.saveDraft()).toBe(false)
+    }
+    scope.stop()
+  })
   it.each([1, 2, 3])('resumes a draft in its highest reached stage %i after returning to the first stage', async (stage) => {
     const c = campaignFixture(); c.propostas = c.propostas.slice(0, 1)
     const saved = { ...savedResponse(c), versaoProposta: 1, ultimaEtapa: 1, etapaMaisAvancada: stage }

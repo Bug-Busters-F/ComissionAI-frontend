@@ -16,6 +16,22 @@ function setup(overrides = {}, permissions = {}) {
 async function ready(s) { expect(await s.flow.save()).toBe(true); await s.flow.selectCompetence('2026-09'); expect(await s.flow.runSimulation()).toBe(true); s.flow.simulation.aceitoPor = 'Pessoa teste'; expect(await s.flow.accept()).toBe(true) }
 
 describe('draft, persisted simulation, formal acceptance and activation lifecycle', () => {
+  it('preserves the accepted result when the manager consults reference competences', async () => {
+    const s=setup({}, {canSimulate:()=>false,canSave:()=>false})
+    const saved={...savedResponse(s.campaign),simulacaoAceitaId:'sim-id',statusAceite:'ACEITA',etapaMaisAvancada:3}
+    s.api.load.mockResolvedValue(saved)
+    s.api.cut.mockRejectedValue({response:{status:403,data:{message:'Acesso negado'}}})
+    expect(await s.flow.load(42)).toBe(true)
+    expect(s.flow.canReview.value).toBe(true)
+    await s.flow.loadCompetences()
+    expect(s.api.cut).not.toHaveBeenCalled()
+    expect(await s.flow.selectCompetence('2026-08')).toBe(false)
+    expect(s.flow.simulation.selectedCompetencia).toBe('2026-09')
+    expect(s.flow.simulation.accepted).toBe(true)
+    expect(s.flow.canReview.value).toBe(true)
+    s.scope.stop()
+  })
+
   it('records progress without saving rules or invalidating an accepted simulation', async () => {
     const s = setup({ progress: vi.fn(async (id, payload) => payload) })
     await ready(s)
@@ -317,7 +333,7 @@ describe('governance, budget limits and code approval ([FRONT-9])', () => {
 
   it('blocks activation and forwarding when scenario 100% exceeds budget', async () => {
     const s = setup({
-      forwardToManager: vi.fn(async () => ({}))
+      forwardToManager: vi.fn(async () => ({ id: 42, encaminhadaGerente: true }))
     })
     await ready(s)
 
@@ -426,6 +442,15 @@ describe('governance, budget limits and code approval ([FRONT-9])', () => {
     })
     expect(await s.flow.returnProposal({ etapaDestino: 2, motivo: 'Ajuste técnico' })).toBe(false)
     expect(s.flow.state.remoteChanged).toBe(true)
+    s.scope.stop()
+  })
+
+  it('não confirma encaminhamento nem habilita publicação por resposta vazia', async () => {
+    const s = setup({ forwardToManager: vi.fn(async () => ({})) })
+    await ready(s)
+    expect(await s.flow.forwardToManager()).toBe(false)
+    expect(s.flow.state.encaminhadaGerente).toBe(false)
+    expect(s.flow.state.error).toContain('não foi confirmado')
     s.scope.stop()
   })
 

@@ -88,7 +88,7 @@
               <p v-if="!extrairErros(rev.errosAntesJson).length" class="text-sage-muted">Nenhum erro.</p>
               <ul v-else class="list-disc pl-4 space-y-0.5 text-danger-dark">
                 <li v-for="(e, i) in extrairErros(rev.errosAntesJson)" :key="i">
-                  {{ e.campo || 'Geral' }}: {{ e.mensagem }}
+                  {{ userFacingText(e.campo || 'Geral') }}: {{ userFacingText(e.mensagem) }}
                 </li>
               </ul>
             </div>
@@ -98,7 +98,7 @@
               <p v-if="!extrairErros(rev.errosDepoisJson).length" class="text-success font-bold">Todas as inconsistências foram sanadas!</p>
               <ul v-else class="list-disc pl-4 space-y-0.5 text-warning-text">
                 <li v-for="(e, i) in extrairErros(rev.errosDepoisJson)" :key="i">
-                  {{ e.campo || 'Geral' }}: {{ e.mensagem }}
+                  {{ userFacingText(e.campo || 'Geral') }}: {{ userFacingText(e.mensagem) }}
                 </li>
               </ul>
             </div>
@@ -120,6 +120,7 @@
 </template>
 
 <script setup>
+import { userFacingText } from '@/services/userFacingText'
 import { ref } from 'vue'
 import { History, X } from 'lucide-vue-next'
 import { useDialogFocus } from '@/services/dialogFocus'

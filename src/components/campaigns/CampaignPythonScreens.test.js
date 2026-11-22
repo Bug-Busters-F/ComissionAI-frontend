@@ -14,10 +14,21 @@ describe('Python review and budget screens', () => {
     const html = await renderToString(createSSRApp(CampaignProgramReview, {model:{current:programFixture(),history:[]},editable:false}))
     expect(html).not.toContain('Aprovar este programa'); expect(html).toContain('readonly'); expect(html).toContain('Copiar código')
   })
-  it('shows all four scenarios, independent alternatives and explicit lack of solution', async () => {
+  it('permite preparar dados a negócios sem oferecer edição ou aprovação do programa', async () => {
+    const html = await renderToString(createSSRApp(CampaignProgramReview, { model: {current:programFixture(),history:[]}, editable:false, canPrepare:true, needsPreparation:true }))
+    expect(html).toContain('Validar dados e preparar revisão')
+    expect(html).not.toContain('Salvar nova revisão'); expect(html).not.toContain('Aprovar este programa')
+    expect(html).toContain('bg-brand-dark-hover'); expect(html).toContain('text-brand')
+    const technical = await renderToString(createSSRApp(CampaignProgramReview, { model: {current:programFixture(),history:[]}, editable:true, needsPreparation:true }))
+    expect(technical).not.toContain('Validar dados e preparar revisão')
+    expect(technical).toContain('Após a correção por negócios')
+    expect(technical).toContain('readonly')
+  })
+  it('shows independent alternatives and the budget exceeded warning after the main scenarios', async () => {
     const scenario = {comissaoProjetada:'50',enquadramento:{dentroDoOrcamento:false,excedenteOrcamento:'10'}}
     const html = await renderToString(createSSRApp(CampaignPythonBudget, {campaign:{propostas:[{serverId:101}]},persistence:{orcamento:'40',orcamentoConfirmado:true},simulation:{result:{executadoViaPython:true,versaoProgramaPython:2,cenario80:scenario,cenario100:scenario,cenario120:scenario,cenario150:scenario,analise:{orcamento:'40',calibracoes:[{cenario:'100%',status:'ENQUADRADA',custoProjetadoOriginal:'50',custoProjetadoRecalculado:'40',folga:'0',alteracoes:[{regraId:101,campo:'taxa',antes:'0.035',depois:'0.03'}]},{cenario:'150%',status:'SEM_SOLUCAO_VIAVEL',motivo:'Piso acima do orçamento'}]}}},editable:true,approved:true}))
-    for (const key of ['80','100','120','150']) expect(html).toContain('Cenário '+key+'%')
+    expect(html).toContain('ultrapassou o orçamento')
+    expect(html).toContain('Cenário original acima do orçamento')
     expect(html).toContain('3,5%'); expect(html).toContain('3%'); expect(html).toContain('Sem solução viável'); expect(html).toContain('Revisar e aplicar alternativa')
   })
 })

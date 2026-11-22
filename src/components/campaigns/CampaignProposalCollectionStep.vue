@@ -44,6 +44,7 @@
       <component :is="provider.mode === 'api' ? CampaignApiRuleEditor : CampaignRuleEditor" v-for="(proposal, index) in proposals" :integration="integration" :key="proposal.clientId" :provider="provider" @apply-reinterpretation="$emit('apply-reinterpretation', $event)" :proposal="proposal" :campaign="campaign" :index="index" :pendencias="proposalDisplayPendings(validation, proposal.clientId)" @update-proposal="(...args) => $emit('update-proposal', ...args)" @request-remove="$emit('request-remove', $event)" @set-all-sales="(...args) => $emit('set-all-sales', ...args)" />
       <button type="button" class="focus-ring w-full rounded-full border border-sage-border-dark bg-white px-5 py-3 text-sm font-bold text-brand-dark" @click="$emit('add-proposal')">＋ Adicionar outra regra</button>
     </div>
+    <slot name="footer" />
     </div>
     <CampaignRuleScrollNav :proposals="proposals" :content-element="contentElement" />
   </div>
