@@ -22,6 +22,7 @@ const titleId = 'campaign-action-' + useId()
 let previousFocus = null
 watch(() => props.open, async (open) => {
   await nextTick()
+  if (!dialog.value) return
   if (open && !dialog.value.open) { previousFocus = document.activeElement; dialog.value.showModal(); cancelButton.value?.focus() }
   else if (!open && dialog.value.open) { dialog.value.close(); if (previousFocus?.isConnected) previousFocus.focus() }
 }, { immediate: true })

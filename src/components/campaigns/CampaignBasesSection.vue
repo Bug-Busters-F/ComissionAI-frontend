@@ -128,6 +128,7 @@
             class="focus-ring mt-2 w-full rounded-xl border border-sage-border-dark bg-white px-3.5 py-2.5 text-sm font-extrabold text-brand-dark shadow-sm"
           >
             <option v-if="!competenceOptions.length" value="">Nenhuma competência encontrada</option>
+            <option v-else disabled value="">Selecione a competência</option>
             <option v-for="c in competenceOptions" :key="c.competencia" :value="c.competencia">
               {{ c.competencia }} — {{ c.label }}
             </option>
@@ -516,6 +517,7 @@ import CampaignPreparationTable from './CampaignPreparationTable.vue'
 const props = defineProps({
   campanhaId: { type: [Number, String], default: null },
   competencia: { type: String, default: '' },
+  autoSelectCompetence: { type: Boolean, default: true },
   campaignsList: { type: Array, default: () => [] }
 })
 
@@ -589,7 +591,7 @@ async function carregarCompetencias() {
   try {
     const list = await dataService.fetchCompetenciasReferencia()
     competenceOptions.value = list || []
-    if (!selectedCompetencia.value && competenceOptions.value.length > 0) {
+    if (props.autoSelectCompetence && !selectedCompetencia.value && competenceOptions.value.length > 0) {
       selectedCompetencia.value = competenceOptions.value[0].competencia
       emit('competence-selected', selectedCompetencia.value)
     }

@@ -40,7 +40,8 @@
     <p v-if="persistence.progressError" role="status" class="rounded-2xl bg-warning-bg p-4 text-sm text-warning-text">{{ userFacingText(persistence.progressError) }} <button type="button" class="font-bold underline" @click="lifecycle.recordProgress(activeStepIndex + 1)">Tentar novamente</button></p>
     <p v-if="lifecycle.readOnly.value" class="rounded-xl bg-warning-bg p-4 text-sm text-warning-text">{{ userFacingText(persistence.motivoBloqueioEdicao || (persistence.remoteChanged ? 'A proposta está desatualizada. Consulte a versão atual antes de continuar.' : 'Campanha disponível somente para consulta.')) }}</p>
     <CampaignVersionComparison v-if="activeStep === 'conferencia' && persistence.editingPublished" :published="persistence.published" :campaign="campaign" :proposed-number="persistence.versaoProposta" :source-number="persistence.versaoOrigem" :base-competence="persistence.published?.competencia" :proposed-competence="simulation.selectedCompetencia" />
-    <CampaignApprovalGovernanceCard v-if="activeStep === 'conferencia' && provider.mode === 'api'" :approval="persistence.codeApproval" :can-approve="canApproveCode" :loading="persistence.working" @approve="handleApproveCode" @reject="handleRejectCode" @refresh="lifecycle.loadCodeApproval" />
+    <CampaignProgramReview v-if="activeStep === 'propostas' && provider.mode === 'api' && persistence.id" :model="lifecycle.program" :editable="canApproveCode && !lifecycle.readOnly.value" :busy="persistenceBusy" :unsaved="isDirty" :needs-preparation="needsProgramPreparation" @prepare="prepareProgram" @refresh="lifecycle.loadProgram" @changed="lifecycle.program.changed = $event" @decide="decideProgram" />
+    <CampaignPythonBudget v-if="activeStep === 'simulacao' && provider.mode === 'api'" :campaign="campaign" :persistence="persistence" :simulation="simulation" :editable="access.editStep('simulacao') && !lifecycle.readOnly.value" :approved="lifecycle.isCodeApproved.value" :busy="persistenceBusy" :unsaved="isDirty" @confirm-budget="confirmBudget" @apply-calibration="applyCalibration" />
     <main data-campaign-main tabindex="-1" class="outline-none">
       <CampaignProposalReviewSummary v-if="lifecycle.readOnly.value || !access.editStep(activeStep)" :campaign="campaign" :validation="validation" :show-python="true" :impact="lifecycle.currentSimulation.value && simulation.accepted ? simulation.result : null" />
       <fieldset v-else :disabled="persistenceBusy || Boolean(route.params.id && !persistence.id)" class="min-w-0 border-0 p-0">
@@ -308,7 +309,7 @@ const access = useAccessPolicy()
 const account = useAccountStore()
 const ownStep = computed(() => steps.find(step => access.editStep(step.key)))
 import { userFacingText } from '@/services/userFacingText'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter, useRoute } from 'vue-router'
 import CampaignVersionComparison from '@/components/campaigns/CampaignVersionComparison.vue'
 import CampaignVersionHistory from '@/components/campaigns/CampaignVersionHistory.vue'
@@ -325,7 +326,9 @@ import CampaignApiRuleReviewDialog from '@/components/campaigns/CampaignApiRuleR
 import CampaignReinterpretConfirmDialog from '@/components/campaigns/CampaignReinterpretConfirmDialog.vue'
 import CampaignProposalRemoveDialog from '@/components/campaigns/CampaignProposalRemoveDialog.vue'
 import CampaignProposalReviewSummary from '@/components/campaigns/CampaignProposalReviewSummary.vue'
-import CampaignApprovalGovernanceCard from '@/components/campaigns/CampaignApprovalGovernanceCard.vue'
+import { ruleArtifactsCurrent } from '@/services/campaignRuleArtifacts'
+import CampaignProgramReview from '@/components/campaigns/CampaignProgramReview.vue'
+import CampaignPythonBudget from '@/components/campaigns/CampaignPythonBudget.vue'
 import { CAMPAIGN_PROPOSAL_SCENARIOS as demoExamples } from '@/services/campaignProposalFixtures'
 import { useCampaignProposalFlow } from '@/services/useCampaignProposalFlow'
 import { useNotificationStore } from '@/stores/notificationStore'
@@ -341,7 +344,7 @@ const {
   updateProposal, setAllSales, requestRemoveProposal, confirmRemoveProposal, cancelRemoveProposal,
   interpretDescription: interpretCampaign, cancelInterpretation, applyReinterpretation, loadExample,
   campaignReinterpretationOpen, confirmCampaignReinterpretation: reinterpretCampaign, cancelCampaignReinterpretation
-} = useCampaignProposalFlow({ canEditStep: access.editStep, canWrite: () => access.can('editCampaign'), canSave: () => access.can('saveCampaign'), canStartProposal: () => access.can('createCampaign') })
+} = useCampaignProposalFlow({ canEditStep: access.editStep, canWrite: () => access.can('editCampaign'), canSave: () => access.can('saveCampaign'), canStartProposal: () => access.can('createCampaign'), canReviewProgram: () => access.can('approveCode'), canSimulate: () => access.editStep('simulacao') })
 const feedback = createCampaignActionFeedback(useNotificationStore())
 const canApproveCode = computed(() => access.can('approveCode'))
 const canReturnProposal = computed(() => access.can('returnProposal'))
@@ -388,18 +391,30 @@ function formatCurrency(val) {
   }
 }
 
-async function handleApproveCode() {
-  const user = account.user?.email || account.user?.name || 'analista.codigo'
-  await feedback('approveCode', () => lifecycle.approveCode(user), {
-    error: () => persistence.error
-  })
+watch(() => [activeStep.value, persistence.id], async ([step, id]) => {
+  if (step === 'propostas' && id && !lifecycle.program.current && !persistenceBusy.value) await lifecycle.loadProgram()
+})
+const needsProgramPreparation = computed(() => isDirty.value || !validation.value.canAdvanceLocally || campaign.propostas.some(p => !ruleArtifactsCurrent(p, campaign)))
+async function prepareProgram() {
+  await feedback('prepareProgram', async () => {
+    if (!canApproveCode.value || lifecycle.program.changed || !await integration.prepareReview()) return false
+    if (isDirty.value && !await persistDraft()) return false
+    return lifecycle.loadProgram()
+  }, { error: () => integrationState.error || persistence.error || lifecycle.program.error })
 }
-
-async function handleRejectCode() {
-  const user = account.user?.email || account.user?.name || 'analista.codigo'
-  await feedback('rejectCode', () => lifecycle.rejectCode('Rejeitado pelo analista', user), {
-    error: () => persistence.error
-  })
+async function decideProgram(action, payload) {
+  if (needsProgramPreparation.value && action !== 'reject') { lifecycle.program.error = 'Valide os dados e prepare a revisão antes de salvar ou aprovar o programa.'; return false }
+  const key = { save: 'saveProgram', approve: 'approveCode', reject: 'rejectCode' }[action]
+  if (await feedback(key, () => lifecycle.reviewProgram(action, payload), { error: () => lifecycle.program.error })) {
+    reachedStep.value = persistence.etapaMaisAvancada
+    if (action === 'reject') await navigateTo('dados')
+  }
+}
+async function confirmBudget(value) {
+  await feedback('budget', () => lifecycle.confirmBudget(value), { error: () => simulation.error })
+}
+async function applyCalibration(scenario) {
+  if (await feedback('calibration', () => lifecycle.applyCalibration(scenario), { error: () => simulation.error })) { reachedStep.value = 2; await navigateTo('propostas') }
 }
 
 async function handleForwardToManager() {
@@ -475,7 +490,7 @@ let allowLeave = false
 onBeforeRouteLeave((to) => {
   if (!account.user) return true
   if (persistenceBusy.value) return false
-  if (allowLeave || !isDirty.value) return true
+  if (allowLeave || (!isDirty.value && !lifecycle.program.changed)) return true
   pendingRoute.value = to.fullPath
   discardDialogOpen.value = true
   return false
@@ -483,7 +498,7 @@ onBeforeRouteLeave((to) => {
 
 function handleBeforeUnload(event) {
   if (!account.user) return
-  if (!isDirty.value && !persistenceBusy.value) return
+  if (!isDirty.value && !lifecycle.program.changed && !persistenceBusy.value) return
   event.preventDefault()
   event.returnValue = ''
 }
@@ -494,7 +509,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnl
 function requestLeave(path) {
   if (persistenceBusy.value) return
   pendingRoute.value = path
-  if (!isDirty.value) {
+  if (!isDirty.value && !lifecycle.program.changed) {
     allowLeave = true
     router.push(path).finally(() => { allowLeave = false })
     return

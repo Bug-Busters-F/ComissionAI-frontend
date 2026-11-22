@@ -148,3 +148,12 @@ src/
   - **Robustez e acessibilidade**: respostas obsoletas são descartadas (`createLatestGuard`), erros são traduzidos por status (`describeAlertsError`) e o modal de reprocessamento recebe foco, fecha com ESC/clique externo e devolve o foco ao botão.
   - **Modo demonstração**: `VITE_ANOMALIES_DEMO=true` habilita o botão "Carregar Dados de Exemplo" no estado vazio. Os dados (`statisticalAlertsDemo.js`) seguem o contrato real, ficam na competência selecionada e nunca são enviados ao servidor nem emitidos para outros indicadores. Desligado por padrão.
   - **Limitação conhecida (backend)**: `SEM_VENDAS_PARA_RH` considera vendas da matrícula em qualquer competência (`findByRegistrationIdIn` sem filtro de período); colaborador sem vendas no mês, mas com vendas em outro mês, não gera alerta. Correção solicitada ao time de backend.
+
+
+## FRONT-7 e FRONT-8 — revisão executável e orçamento (20/11/2026)
+
+Branch conjunta `feat/revisao-python-simulacao-calibracoes`, a partir da dev `1d22f98`. A revisão técnica na etapa 2 usa `/programa-python` (código completo, versão, assinatura, histórico, edição, aprovação por checksum e devolução justificada). Identidade vem da sessão. Não usa a aprovação legada por regra para autorizar a execução. Alterações nos campos/artefatos devem ser preparadas e salvas antes da aprovação.
+
+Na etapa 3, orçamento interpretado é preservado, mas exige confirmação explícita. A simulação usa somente `/campanhas/{id}/simulacao-python`, com versão aprovada e chave por intenção/repetição após timeout. Resultado precisa confirmar executor e assinatura. Quatro cenários consultam `enquadramento` aninhado. As alternativas persistidas só são aplicadas mediante confirmação e retornam à revisão, invalidando aprovação, simulação e aceite da proposta. Não há fallback local/Java. Calibração de código personalizado depende dos serviços; indisponibilidade e ausência de solução são distintas.
+
+O painel de bases preserva suas funcionalidades; neste fluxo não escolhe automaticamente uma competência diferente da selecionada na simulação. Guias: `docs/GUIA-FRONT-7-REVISAO-PYTHON.md` e `docs/GUIA-FRONT-8-ORCAMENTO-CALIBRACOES.md`. Dependências: backend BACK-11 em `feat/simulacao-python-calibracoes`, V45, IA dev `7b1a182` (PR #18).

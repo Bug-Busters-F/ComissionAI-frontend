@@ -3,7 +3,7 @@ import { createSSRApp } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import CampaignApprovalGovernanceCard from '@/components/campaigns/CampaignApprovalGovernanceCard.vue'
 import CampaignVersionComparison from '@/components/campaigns/CampaignVersionComparison.vue'
-import { campaignFixture, savedResponse } from '@/services/campaignLifecycleTestFixtures'
+import { campaignFixture, savedResponse, programFixture } from '@/services/campaignLifecycleTestFixtures'
 import { createCampaignProposalLifecycle } from '@/services/campaignProposalLifecycle'
 
 const baseScenario = {
@@ -19,6 +19,7 @@ const baseScenario = {
 
 function simulationRaw(id = 'sim-1', cenario100Overrides = {}) {
   return {
+    executadoViaPython: true, versaoProgramaPython: 1, checksumPython: 'a'.repeat(64),
     id,
     protocolo: 'proto-1',
     campanhaId: 42,
@@ -37,11 +38,12 @@ function simulationRaw(id = 'sim-1', cenario100Overrides = {}) {
 
 async function setupAndAccept(campaign, apiOverrides = {}, cenario100Overrides = {}) {
   const api = {
+    program: vi.fn(async () => programFixture()), programHistory: vi.fn(async () => []),
     load: vi.fn(async () => savedResponse(campaign)),
     save: vi.fn(async () => savedResponse(campaign)),
     competences: vi.fn(async () => [{ competencia: '2026-09', totalVendas: 1 }]),
     cut: vi.fn(async () => ({ competencia: '2026-09', totalVendasRecortadas: 1, totalVendasComImpedimento: 0, impedimentosGerais: [] })),
-    simulate: vi.fn(async () => simulationRaw('sim-1', cenario100Overrides)),
+    simulatePython: vi.fn(async () => simulationRaw('sim-1', cenario100Overrides)),
     sales: vi.fn(async () => ({ totalPaginas: 1, paginaAtual: 0, totalElementos: 0, vendas: [] })),
     readiness: vi.fn(async () => ({ aptaParaAtivacao: true, simulacaoId: 'sim-1', aceitoPor: 'Pessoa teste' })),
     accept: vi.fn(async () => ({ statusAceite: 'ACEITA', simulacaoId: 'sim-1', campanhaId: 42 })),
@@ -50,7 +52,7 @@ async function setupAndAccept(campaign, apiOverrides = {}, cenario100Overrides =
     ...apiOverrides
   }
 
-  const lifecycle = createCampaignProposalLifecycle({ campaign, api })
+  const lifecycle = createCampaignProposalLifecycle({ campaign, api, canSimulate: () => true })
   expect(await lifecycle.save()).toBe(true)
   await lifecycle.selectCompetence('2026-09')
   expect(await lifecycle.runSimulation()).toBe(true)
@@ -119,26 +121,17 @@ describe('Campaign Creation Stage 4 (Conferência e Governança) — [FRONT-9]',
       })
 
       // Aprovação rejeitada
-      lifecycle.state.codeApproval = {
-        statusAprovacaoCodigo: 'REJEITADO',
-        regras: [{ regraId: 1, statusAprovacaoCodigo: 'REJEITADO' }]
-      }
+      lifecycle.program.current = programFixture(42, { statusAprovacao: 'REJEITADO', validoParaExecucao: false })
       expect(lifecycle.isCodeApproved.value).toBe(false)
       expect(lifecycle.canActivate.value).toBe(false)
 
       // Regra invalidada após alteração
-      lifecycle.state.codeApproval = {
-        statusAprovacaoCodigo: 'APROVADO',
-        regras: [{ regraId: 1, statusAprovacaoCodigo: 'INVALIDADO' }]
-      }
+      lifecycle.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: false })
       expect(lifecycle.isCodeApproved.value).toBe(false)
       expect(lifecycle.canActivate.value).toBe(false)
 
       // Aprovado e limpo
-      lifecycle.state.codeApproval = {
-        statusAprovacaoCodigo: 'APROVADO',
-        regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
-      }
+      lifecycle.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: true })
       expect(lifecycle.isCodeApproved.value).toBe(true)
       expect(lifecycle.canActivate.value).toBe(true)
     })
@@ -187,10 +180,7 @@ describe('Campaign Creation Stage 4 (Conferência e Governança) — [FRONT-9]',
         statusEnquadramento: 'ENQUADRADO'
       })
 
-      lifecycle.state.codeApproval = {
-        statusAprovacaoCodigo: 'APROVADO',
-        regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
-      }
+      lifecycle.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: true })
       expect(lifecycle.canActivate.value).toBe(true)
 
       // Devolve para Etapa 1
@@ -209,10 +199,7 @@ describe('Campaign Creation Stage 4 (Conferência e Governança) — [FRONT-9]',
       expect(lifecycle.state.revisaoControle).toBe(99)
 
       // Cascata simulada vinda do backend: se o backend invalidou o código na devolução
-      lifecycle.state.codeApproval = {
-        statusAprovacaoCodigo: 'INVALIDADO',
-        regras: [{ regraId: 1, statusAprovacaoCodigo: 'INVALIDADO' }]
-      }
+      lifecycle.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: false })
       expect(lifecycle.canActivate.value).toBe(false)
     })
 
@@ -239,10 +226,7 @@ describe('Campaign Creation Stage 4 (Conferência e Governança) — [FRONT-9]',
       })
 
       // Código técnico previamente aprovado
-      lifecycle.state.codeApproval = {
-        statusAprovacaoCodigo: 'APROVADO',
-        regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
-      }
+      lifecycle.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: true })
       expect(lifecycle.canActivate.value).toBe(true)
 
       // Devolução para Etapa 3 (Simulação/Orçamento)
@@ -280,10 +264,7 @@ describe('Campaign Creation Stage 4 (Conferência e Governança) — [FRONT-9]',
         custoTotalProjetado: '50000.00'
       })
 
-      lifecycle.state.codeApproval = {
-        statusAprovacaoCodigo: 'APROVADO',
-        regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
-      }
+      lifecycle.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: true })
 
       expect(lifecycle.isBudgetWithinLimit.value).toBe(true)
       expect(lifecycle.canActivate.value).toBe(true)
@@ -322,10 +303,7 @@ describe('Campaign Creation Stage 4 (Conferência e Governança) — [FRONT-9]',
         statusEnquadramento: 'ENQUADRADO'
       })
 
-      lifecycle.state.codeApproval = {
-        statusAprovacaoCodigo: 'APROVADO',
-        regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
-      }
+      lifecycle.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: true })
       expect(lifecycle.canActivate.value).toBe(true)
 
       const ativado = await lifecycle.activate()
@@ -351,10 +329,7 @@ describe('Campaign Creation Stage 4 (Conferência e Governança) — [FRONT-9]',
         statusEnquadramento: 'ENQUADRADO'
       })
 
-      lifecycle.state.codeApproval = {
-        statusAprovacaoCodigo: 'APROVADO',
-        regras: [{ regraId: 1, statusAprovacaoCodigo: 'APROVADO' }]
-      }
+      lifecycle.program.current = programFixture(42, { statusAprovacao: 'APROVADO', validoParaExecucao: true })
 
       const ativado = await lifecycle.activate()
       expect(ativado).toBe(false)

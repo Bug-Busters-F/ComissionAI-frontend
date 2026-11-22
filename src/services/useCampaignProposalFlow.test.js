@@ -3,7 +3,7 @@ import { effectScope, nextTick, reactive } from 'vue'
 import { createCampaignProposal } from './campaignProposalModel'
 import { useCampaignProposalFlow } from './useCampaignProposalFlow'
 import { proposalToBackend } from './campaignProposalMappers'
-import { campaignFixture, savedResponse } from './campaignLifecycleTestFixtures'
+import { campaignFixture, savedResponse, programFixture } from './campaignLifecycleTestFixtures'
 
 const bindings = vi.hoisted(() => ({ route: null, router: null, client: null, lifecycle: null }))
 vi.mock('vue-router', () => ({ useRoute: () => bindings.route, useRouter: () => bindings.router }))
@@ -21,6 +21,7 @@ async function setup({ saved = null, lifecycleApi = {} } = {}) {
     validateCampaign: vi.fn(async () => ({ valida: true, erros: [], avisos: [], referenciasValidadas: [] }))
   }
   bindings.lifecycle = {
+    program: vi.fn(async id => programFixture(id)), programHistory: vi.fn(async () => []),
     save: vi.fn(async (id, payload) => ({ ...payload, id: id || 41, estado: 'DRAFT', versaoProposta: 1, regras: payload.regras.map((r, index) => ({ ...r, id: index + 101, pendencias: r.pendencias.join('; '), dataInicio: payload.dataInicio, dataFim: payload.dataFim })) })),
     load: vi.fn(async () => saved),
     progress: vi.fn(async (id, payload) => ({ ...payload })),
@@ -52,6 +53,25 @@ describe('campaign flow integration navigation', () => {
     expect(flow.reachedStep.value).toBe(stage)
     expect(bindings.lifecycle.save).not.toHaveBeenCalled()
     expect(flow.isDirty.value).toBe(false)
+    scope.stop()
+  })
+  it('blocks direct simulation navigation until the executable program is currently approved', async () => {
+    const c = campaignFixture(); c.propostas = c.propostas.slice(0, 1)
+    const {flow, scope} = await setup({saved: {...savedResponse(c), etapaMaisAvancada: 3}, lifecycleApi: {program: vi.fn(async () => programFixture(42, {statusAprovacao:'PENDENTE_REVISAO',validoParaExecucao:false}))}})
+    expect(flow.activeStep.value).toBe('propostas')
+    expect(await flow.navigateTo('simulacao')).toBe(false)
+    expect(flow.activeStep.value).toBe('propostas')
+    scope.stop()
+  })
+  it('preserves unsaved program editing when the URL requests another step', async () => {
+    const c = campaignFixture(); c.propostas = c.propostas.slice(0, 1)
+    const {flow, scope} = await setup({saved: {...savedResponse(c), etapaMaisAvancada:2}})
+    flow.lifecycle.program.changed = true
+    bindings.route.query = {etapa:'dados'}
+    for(let i=0;i<5;i++) await nextTick()
+    expect(flow.activeStep.value).toBe('propostas')
+    expect(bindings.route.query.etapa).toBe('propostas')
+    expect(flow.lifecycle.program.changed).toBe(true)
     scope.stop()
   })
   it('reopens review after leaving from the first stage when the accepted simulation is still valid', async () => {

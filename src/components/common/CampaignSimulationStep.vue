@@ -65,13 +65,14 @@
               <select
                 id="simulation-competence-select"
                 :value="simulation.selectedCompetencia"
-                :disabled="simulation.isLoadingCompetences || simulation.isRunning || !competenceOptions.length"
+                :disabled="simulation.isLoadingCompetences || simulation.isRunning || simulation.isValidatingReference || !competenceOptions.length"
                 class="focus-ring w-full rounded-xl border border-sage-border-dark bg-white px-4 py-3 text-sm font-extrabold text-brand-dark shadow-sm transition hover:border-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
                 @change="$emit('select-competence', $event.target.value)"
               >
                 <option v-if="!competenceOptions.length" value="">
                   Nenhuma competência cadastrada
                 </option>
+                <option v-else disabled value="">Selecione a competência</option>
                 <option
                   v-for="item in competenceOptions"
                   :key="item.competencia"
@@ -391,10 +392,10 @@
 
             <StatusBadge :label="executionStatusLabel" :tone="executionStatusTone" />
           </div>
-          <span class="text-xs font-extrabold text-brand-dark">{{ simulation.progress || 0 }}%</span>
+          <span v-if="!simulation.pythonExecution || !simulation.isRunning" class="text-xs font-extrabold text-brand-dark">{{ simulation.progress || 0 }}%</span>
         </div>
 
-        <div class="mt-3 h-2 overflow-hidden rounded-full bg-sage-pill">
+        <div v-if="!simulation.pythonExecution || !simulation.isRunning" class="mt-3 h-2 overflow-hidden rounded-full bg-sage-pill">
           <div
             class="h-full rounded-full transition-all duration-200"
             :class="simulation.status === 'FALHOU' ? 'bg-danger' : 'bg-brand'"
@@ -1009,6 +1010,7 @@ const otherImpediments = computed(() =>
 
 const canRunSimulation = computed(() =>
   Boolean(
+    props.simulation?.executionAllowed !== false &&
     props.simulation?.selectedCompetencia &&
       !isMissingBaseBlocked.value &&
       !isInsufficientReference.value &&

@@ -28,7 +28,7 @@ export function proposalFieldId(clientId, field) {
   return 'proposal-field-' + encodeURIComponent(clientId) + '-' + field
 }
 
-export function useCampaignProposalFlow({ canEditStep = () => true, canWrite = () => true, canSave = () => true, canStartProposal = () => true } = {}) {
+export function useCampaignProposalFlow({ canEditStep = () => true, canWrite = () => true, canSave = () => true, canStartProposal = () => true, canReviewProgram = () => false, canSimulate = () => false } = {}) {
   const route = useRoute()
   const router = useRouter()
   const campaign = reactive(createCampaignProposalForm())
@@ -54,7 +54,7 @@ export function useCampaignProposalFlow({ canEditStep = () => true, canWrite = (
     interpretation.status = 'ready'
   } })
   const integrationState = integration.state
-  const lifecycle = createCampaignProposalLifecycle({ campaign, canWrite, canSave, canStartProposal, canRecordProgress: step => canEditStep(CAMPAIGN_PROPOSAL_STEPS[step - 1]?.key), enabled: provider.mode === 'api', currentStep: () => activeStepIndex.value + 1, processing: () => interpretation.isProcessing || integrationState.busy || Boolean(integrationState.review) || campaignReinterpretationOpen.value, onLoaded: () => {
+  const lifecycle = createCampaignProposalLifecycle({ campaign, canWrite, canSave, canStartProposal, canReviewProgram, canSimulate, canRecordProgress: step => canEditStep(CAMPAIGN_PROPOSAL_STEPS[step - 1]?.key), enabled: provider.mode === 'api', currentStep: () => activeStepIndex.value + 1, processing: () => interpretation.isProcessing || integrationState.busy || Boolean(integrationState.review) || campaignReinterpretationOpen.value, onLoaded: () => {
     descriptionAtProposalSource.value = campaign.textoOriginal
     descriptionNeedsConfirmation.value = false
   } })
@@ -106,6 +106,11 @@ export function useCampaignProposalFlow({ canEditStep = () => true, canWrite = (
       if (persistence.loading) return
       const navigation = ++navigationSequence
       const normalized = normalizeProposalStep(requested)
+      if (lifecycle.program.changed && normalized !== activeStep.value) {
+        message.value = 'Salve ou descarte a edição do programa antes de mudar de etapa.'
+        await router.replace({ query: { ...route.query, etapa: activeStep.value } })
+        return
+      }
       if (normalized !== 'dados' && commonValidation.value.pending.some((item) => item.severidade === 'IMPEDITIVO')) {
         commonValidationAttempted.value = true
       }
@@ -129,7 +134,7 @@ export function useCampaignProposalFlow({ canEditStep = () => true, canWrite = (
   function requiredStep(target) {
     if (provider.mode === 'api' && !lifecycle.readOnly.value) {
       if (target === 'conferencia' && !lifecycle.canReview.value) target = 'simulacao'
-      if (['simulacao', 'conferencia'].includes(target) && (!persistence.id || lifecycle.dirty.value)) return 'propostas'
+      if (['simulacao', 'conferencia'].includes(target) && (!persistence.id || lifecycle.dirty.value || !lifecycle.isCodeApproved.value)) return 'propostas'
     }
     return getRequiredProposalStep(target, validation.value, campaign, {
       descriptionNeedsConfirmation: descriptionNeedsConfirmation.value,
@@ -162,6 +167,7 @@ export function useCampaignProposalFlow({ canEditStep = () => true, canWrite = (
 
   async function navigateTo(step, { replace = false } = {}) {
     if (campaignReinterpretationOpen.value || lifecycle.busy.value) return false
+    if (lifecycle.program.changed && step !== activeStep.value) { message.value = 'Salve a revisão do código antes de mudar de etapa.'; return false }
     const navigation = ++navigationSequence
     const target = normalizeProposalStep(step)
     if (target !== 'dados' && commonValidation.value.pending.some((item) => item.severidade === 'IMPEDITIVO')) {
@@ -175,6 +181,7 @@ export function useCampaignProposalFlow({ canEditStep = () => true, canWrite = (
     if (navigation !== navigationSequence) return false
     if (provider.mode === 'api' && canSave() && (canEditStep(activeStep.value) || canEditStep(target)) && ['simulacao', 'conferencia'].includes(target) && !descriptionNeedsConfirmation.value && validation.value.canAdvanceLocally && !integrationState.review && !lifecycle.readOnly.value) {
       if (lifecycle.dirty.value && !await lifecycle.save()) return false
+      if (!lifecycle.program.current && persistence.id) await lifecycle.loadProgram()
       if (target === 'simulacao' && !simulation.competences.length) void lifecycle.loadCompetences()
     }
     const allowed = requiredStep(target)
@@ -194,6 +201,8 @@ export function useCampaignProposalFlow({ canEditStep = () => true, canWrite = (
         message.value = 'Informe uma vigência comum no texto da campanha e reinterprete.'
       } else if (provider.mode === 'api' && campaign.propostas.some((p) => !ruleArtifactsCurrent(p, campaign))) {
         message.value = 'Valide as regras alteradas antes de continuar. Seus dados foram preservados.'
+      } else if (provider.mode === 'api' && !lifecycle.isCodeApproved.value) {
+        message.value = 'Salve a proposta e conclua a revisão técnica do programa antes de simular.'
       } else {
         const blockingCount = validation.value.blockers.length
         message.value = 'Corrija ' + blockingCount + (blockingCount === 1 ? ' pendência impeditiva' : ' pendências impeditivas') + ' antes de continuar.'

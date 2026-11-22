@@ -18,12 +18,14 @@ function message(error) {
   return error?.message || normalizeCampaignError(error).message
 }
 
-export function createCampaignProposalLifecycle({ campaign, enabled = true, api = createCampaignLifecycleApi(), processing = () => false, onLoaded = () => {}, currentStep = () => 1, canWrite = () => true, canSave = () => true, canStartProposal = () => true, canRecordProgress = () => true }) {
+export function createCampaignProposalLifecycle({ campaign, enabled = true, api = createCampaignLifecycleApi(), processing = () => false, onLoaded = () => {}, currentStep = () => 1, canWrite = () => true, canSave = () => true, canStartProposal = () => true, canRecordProgress = () => true, canReviewProgram = () => false, canSimulate = () => false }) {
   const state = reactive({ id: null, estado: 'DRAFT', loading: false, saving: false, working: false, error: '', notice: '', baseline: null, defaultsOpen: false, activationOpen: false, uncertainCreate: false, readiness: null, savedAt: null, remoteChanged: false, serverSnapshot: null, ultimaEtapa: 1, etapaMaisAvancada: 1, versaoProposta: null, progressError: '', versaoVigente: null, versaoOrigem: null, revisaoControle: null, motivoBloqueioEdicao: '', published: null, editingPublished: false, codeApproval: null, orcamento: null, orcamentoConfirmado: false, encaminhadaGerente: false })
-  const simulation = reactive({ competences: [], selectedCompetencia: '', referenceValidation: null, isLoadingCompetences: false, isValidatingReference: false, isRunning: false, error: '', result: null, page: 1, pageSize: 10, totalItems: 0, totalPages: 1, executionId: '', status: '', progress: 0, stageMessage: '', accepted: false, acceptance: null, invalidationReasons: [], acceptOpen: false, aceitoPor: '', motivo: '', loadingSales: false, pageError: '' })
+  const simulation = reactive({ pythonExecution: true, competences: [], selectedCompetencia: '', referenceValidation: null, isLoadingCompetences: false, isValidatingReference: false, isRunning: false, error: '', result: null, page: 1, pageSize: 10, totalItems: 0, totalPages: 1, executionId: '', status: '', progress: 0, stageMessage: '', accepted: false, acceptance: null, invalidationReasons: [], acceptOpen: false, aceitoPor: '', motivo: '', loadingSales: false, pageError: '' })
+  const program = reactive({ current: null, history: [], loading: false, error: '', changed: false })
+  let simulationRequest = null
   const fingerprint = computed(() => draftFingerprint(campaign))
   const dirty = computed(() => state.baseline === null ? hasCampaignContent(campaign) : fingerprint.value !== state.baseline)
-  const busy = computed(() => state.loading || state.saving || state.working || simulation.isRunning || simulation.isValidatingReference)
+  const busy = computed(() => state.loading || state.saving || state.working || program.loading || simulation.isRunning || simulation.isValidatingReference)
   const readOnly = computed(() => Boolean(!canWrite() || state.motivoBloqueioEdicao || state.remoteChanged || !['DRAFT', 'ATIVA', 'INATIVA'].includes(state.estado) || (state.estado !== 'DRAFT' && !state.editingPublished)))
   let requestSequence = 0
   let referenceSequence = 0
@@ -53,15 +55,12 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
 
   const canReview = computed(() => !busy.value && !processing() && !state.remoteChanged && currentSimulation.value && simulation.accepted && isSimulationAccepted(state.readiness, simulation.result?.id))
 
-  const isCodeApproved = computed(() => {
-    if (!state.codeApproval) return true
-    if (state.codeApproval.statusAprovacaoCodigo !== 'APROVADO') return false
-    const hasInvalidRule = state.codeApproval.regras?.some((r) => r.statusAprovacaoCodigo === 'INVALIDADO') === true
-    return !hasInvalidRule
-  })
+  const isCodeApproved = computed(() => enabled ? Boolean(program.current?.statusAprovacao === 'APROVADO' && program.current?.validoParaExecucao === true && !program.changed && !dirty.value) : true)
+
+  simulation.executionAllowed = computed(() => isCodeApproved.value && state.orcamentoConfirmado && canSimulate() && !dirty.value && !readOnly.value)
 
   const isBudgetWithinLimit = computed(() => {
-    const c100 = simulation.result?.cenario100
+    const c100 = simulation.result?.cenario100?.enquadramento || simulation.result?.cenario100
     if (!c100) return true
     if (c100.dentroDoOrcamento === false) return false
     if (c100.statusEnquadramento === 'ACIMA_DO_TETO') return false
@@ -73,6 +72,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
   watch(fingerprint, (value) => {
     if (simulationFingerprint && simulationFingerprint !== value) {
       simulation.accepted = false; state.readiness = null
+      program.current = null; simulationRequest = null
       simulation.invalidationReasons = ['A campanha foi alterada. Salve e execute uma nova simulação antes de aceitar.']
     }
   }, { flush: 'sync' })
@@ -154,6 +154,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
         if (disposed || request !== requestSequence) return false
       }
       applySaved(raw)
+      if (raw.id && api.program) await loadProgram()
       if (raw.id && api.getCodeApproval) {
         try {
           state.codeApproval = await api.getCodeApproval(id)
@@ -181,6 +182,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     finally { if (request === requestSequence) state.loading = false }
   }
   async function save({ confirmDefaults = false } = {}) {
+    if (program.changed) { state.error = 'Salve ou descarte a edição do programa antes de salvar os dados da campanha.'; return false }
     if (!enabled || !canSave() || busy.value || processing() || readOnly.value || state.uncertainCreate) return false
     state.error = ''; state.notice = ''
     const errors = validateDraftForPersistence(campaign)
@@ -205,7 +207,8 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
         state.id = raw.id; campaign.id = raw.id; state.baseline = draftFingerprint(persisted); state.serverSnapshot = serverSignature(raw)
         state.notice = 'A versão enviada foi salva. Há alterações posteriores ainda não salvas.'
       } else { applySaved(raw, previous); state.notice = `${state.editingPublished ? 'Proposta de alteração salva' : 'Rascunho salvo'} com ${raw.regras.length} regra(s).` }
-      simulation.accepted = false; state.readiness = null
+      simulation.accepted = false; state.readiness = null; program.current = null; program.changed = false; simulationRequest = null
+      if (api.program) await loadProgram()
       await recordProgress(currentStep())
       return true
     } catch (error) {
@@ -254,14 +257,19 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     finally { if (request === referenceSequence) simulation.isValidatingReference = false }
   }
   async function runSimulation() {
-    if (!enabled || busy.value || processing() || !rulesReady.value || dirty.value || readOnly.value || !state.id || !simulation.selectedCompetencia) { simulation.error = 'Salve o rascunho e escolha a competência antes de simular.'; return false }
+    if (!enabled || !canSimulate() || !isCodeApproved.value || !state.orcamentoConfirmado || busy.value || processing() || !rulesReady.value || dirty.value || readOnly.value || !state.id || !simulation.selectedCompetencia) { simulation.error = 'Salve a proposta, confirme o orçamento e aguarde a aprovação do programa antes de simular.'; return false }
     const competence = simulation.selectedCompetencia
     if (!await selectCompetence(competence)) return false
     const before = fingerprint.value, id = state.id, request = ++requestSequence
     simulation.isRunning = true; simulation.error = ''; simulation.accepted = false; simulation.result = null; simulation.status = 'PROCESSANDO'; simulation.progress = 0; state.readiness = null
     simulation.stageMessage = 'Calculando os cenários. Aguarde a conclusão.'
     try {
-      const raw = await api.simulate(id, competence)
+      const approved = assertProgram(await api.program(id))
+      if (!approved.validoParaExecucao || approved.checksumSha256 !== program.current?.checksumSha256 || approved.versaoPrograma !== program.current?.versaoPrograma) throw new Error('O programa foi alterado ou deixou de estar aprovado. Atualize a revisão técnica.')
+      const signature = JSON.stringify([id, competence, approved.checksumSha256, state.revisaoControle, state.orcamento])
+      if (simulationRequest?.signature !== signature) simulationRequest = { signature, id: crypto.randomUUID() }
+      const raw = await api.simulatePython(id, { competencia: competence, versaoPrograma: approved.versaoPrograma, limite: simulation.pageSize, pagina: 0, calibrar: true, solicitacaoId: simulationRequest.id })
+      if (raw.executadoViaPython !== true || raw.checksumPython !== approved.checksumSha256 || raw.versaoProgramaPython !== approved.versaoPrograma) throw new Error('A execução não confirmou a versão aprovada do programa. Nenhum resultado foi aceito.')
       if (!await verifySavedVersion()) return false
       if (disposed || request !== requestSequence || before !== fingerprint.value || competence !== simulation.selectedCompetencia) { simulation.status = 'INVALIDADA'; simulation.stageMessage = 'A campanha mudou durante a execução. Salve e simule novamente.'; return false }
       assertSimulation(raw, id, competence)
@@ -269,8 +277,9 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
       simulation.status = 'CONCLUIDA'; simulation.progress = 100; simulation.stageMessage = 'Simulação concluída. Protocolo: ' + raw.protocolo; simulation.invalidationReasons = []
       simulation.totalItems = raw.totalVendasRecortadas; simulation.totalPages = Math.max(1, Math.ceil(raw.totalVendasRecortadas / simulation.pageSize)); simulation.page = 1
       await changePage(1)
+      simulationRequest = null
       return true
-    } catch (error) { simulation.error = message(error); simulation.status = 'FALHOU'; simulation.stageMessage = 'Nenhum resultado foi aceito.'; return false }
+    } catch (error) { simulation.error = message(error); simulation.status = 'FALHOU'; simulation.stageMessage = 'Não foi possível confirmar a execução. Tentar novamente reutiliza a solicitação para evitar duplicidade.'; return false }
     finally { simulation.isRunning = false }
   }
   async function changePage(page, size = simulation.pageSize) {
@@ -339,6 +348,94 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     finally { state.working = false }
   }
 
+  function assertProgram(raw) {
+    if (!raw?.id || String(raw.campanhaId) !== String(state.id) || !Number.isInteger(raw.versaoPrograma) || !raw.codigoFonte || !/^[a-f0-9]{64}$/i.test(raw.checksumSha256 || '') || !['PENDENTE_REVISAO', 'APROVADO', 'REJEITADO'].includes(raw.statusAprovacao)) throw new Error('O programa retornado é incompleto ou pertence a outra campanha.')
+    return raw
+  }
+  async function loadProgram() {
+    if (program.changed || !state.id || !api.program) return false
+    const id = state.id, before = fingerprint.value
+    program.loading = true; program.error = ''
+    try {
+      const [current, history] = await Promise.all([api.program(id), api.programHistory(id)])
+      if (disposed || id !== state.id || before !== fingerprint.value) return false
+      assertProgram(current)
+      if (!Array.isArray(history)) throw new Error('Não foi possível conferir o histórico do programa.')
+      history.forEach(assertProgram)
+      program.current = current; program.history = history; program.changed = false
+      return true
+    } catch (error) { program.error = message(error); program.current = null; return false }
+    finally { program.loading = false }
+  }
+  function invalidateExecution() {
+    simulation.accepted = false; simulation.result = null; simulationFingerprint = ''; state.readiness = null; simulationRequest = null
+  }
+  async function refreshProgramHistory() {
+    try { const history = await api.programHistory(state.id); if (!Array.isArray(history)) throw new Error(); history.forEach(assertProgram); program.history = history }
+    catch { program.history = []; program.error = 'O programa foi atualizado, mas o histórico não pôde ser carregado. Atualize a revisão para consultar as versões.' }
+  }
+  async function reviewProgram(action, payload) {
+    if ((action !== 'save' && program.changed) || !['save', 'approve', 'reject'].includes(action) || !canReviewProgram() || busy.value || dirty.value || processing() || readOnly.value || !program.current) return false
+    if (action === 'save') payload = { ...payload, codigoFonte: String(payload.codigoFonte || '').trim() }
+    const current = program.current
+    let mutationConfirmed = false
+    state.working = true; program.error = ''
+    try {
+      if (!await verifySavedVersion()) return false
+      const latest = assertProgram(await api.program(state.id))
+      if (latest.checksumSha256 !== current.checksumSha256 || latest.versaoPrograma !== current.versaoPrograma) throw new Error('Há uma revisão mais recente do programa. Atualize antes de decidir; seu texto foi preservado.')
+      if (action === 'reject' && !payload.justificativa?.trim()) throw new Error('Informe o motivo da devolução.')
+      const raw = assertProgram(await (action === 'save' ? api.saveProgram(state.id, payload) : action === 'approve' ? api.approveProgram(state.id, { checksumEsperado: current.checksumSha256, justificativa: payload.justificativa }) : api.rejectProgram(state.id, { justificativa: payload.justificativa })))
+      const expected = { save: 'PENDENTE_REVISAO', approve: 'APROVADO', reject: 'REJEITADO' }[action]
+      if (raw.statusAprovacao !== expected || (action === 'approve' && (!raw.validoParaExecucao || raw.checksumSha256 !== current.checksumSha256)) || (action === 'save' && raw.codigoFonte !== payload.codigoFonte)) throw new Error('A operação não foi confirmada. Consulte a revisão antes de tentar novamente.')
+      mutationConfirmed = true; program.current = raw; program.changed = false; invalidateExecution()
+      const saved = await api.load(state.id)
+      applySaved(saved, campaign)
+      state.ultimaEtapa = saved.ultimaEtapa || state.ultimaEtapa; state.etapaMaisAvancada = saved.etapaMaisAvancada || state.etapaMaisAvancada
+      await refreshProgramHistory()
+      return true
+    } catch (error) {
+      if (mutationConfirmed) state.remoteChanged = true
+      program.error = mutationConfirmed ? 'A decisão foi registrada, mas não foi possível conferir o estado atualizado. Recarregue a proposta antes de continuar.' : message(error)
+      return false
+    }
+    finally { state.working = false }
+  }
+  async function confirmBudget(value, justificativa = '') {
+    if (!canSimulate() || busy.value || readOnly.value || dirty.value || !state.id) return false
+    const amount = String(value).trim().replace(',', '.')
+    if (!/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) { simulation.error = 'Informe um orçamento positivo, com até duas casas decimais.'; return false }
+    let mutationConfirmed = false
+    state.working = true; simulation.error = ''
+    try {
+      if (!await verifySavedVersion()) return false
+      const raw = await api.updateBudget(state.id, { orcamento: amount, justificativa: justificativa.trim() || null, versaoEsperada: state.versaoProposta || state.versaoVigente })
+      if (String(raw?.campanhaId) !== String(state.id) || raw.orcamentoConfirmado !== true || Number(raw.orcamento) !== Number(amount)) throw new Error('A confirmação do orçamento não foi recebida.')
+      mutationConfirmed = true; invalidateExecution()
+      applySaved(await api.load(state.id), campaign)
+      await loadProgram()
+      return true
+    } catch (error) { if (mutationConfirmed) state.remoteChanged = true; simulation.error = mutationConfirmed ? 'O orçamento foi confirmado, mas o estado atualizado não pôde ser consultado. Recarregue a proposta antes de continuar.' : message(error); return false }
+    finally { state.working = false }
+  }
+  async function applyCalibration(scenario) {
+    if (!canSimulate() || busy.value || readOnly.value || !currentSimulation.value || !simulation.result?.analise || !isCodeApproved.value) return false
+    const result = simulation.result, analysis = result.analise
+    let mutationConfirmed = false
+    if (!analysis.calibracoes?.some(item => item.cenario === scenario && item.status === 'ENQUADRADA')) return false
+    state.working = true; simulation.error = ''
+    try {
+      if (!await verifySavedVersion()) return false
+      const raw = assertProgram(await api.applyCalibration(result.id, { cenario: scenario, revisaoEsperada: state.revisaoControle, assinaturaProgramaEsperada: analysis.assinaturaPrograma }))
+      if (raw.statusAprovacao !== 'PENDENTE_REVISAO' || raw.validoParaExecucao) throw new Error('A aplicação não confirmou a necessidade de nova revisão.')
+      mutationConfirmed = true; program.current = raw; program.changed = false; invalidateExecution()
+      applySaved(await api.load(state.id))
+      await refreshProgramHistory()
+      return true
+    } catch (error) { if (mutationConfirmed) state.remoteChanged = true; simulation.error = mutationConfirmed ? 'A alternativa foi aplicada, mas o estado atualizado não pôde ser consultado. Recarregue a proposta antes de continuar.' : message(error); return false }
+    finally { state.working = false }
+  }
+
   async function loadCodeApproval() {
     if (!state.id || !api.getCodeApproval) return null
     try {
@@ -404,6 +501,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
       if (raw && raw.id) {
         applySaved(raw, campaign)
       }
+      if (api.program) await loadProgram()
       state.ultimaEtapa = raw?.ultimaEtapa || destinoNum
       state.notice = `Proposta devolvida com sucesso para a Etapa ${destinoNum}.`
       return true
@@ -419,7 +517,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
   async function forwardToManager() {
     if (!state.id || !api.forwardToManager) return false
     if (!isBudgetWithinLimit.value) {
-      const excedente = simulation.result?.cenario100?.excedenteOrcamento || '0.00'
+      const excedente = simulation.result?.cenario100?.enquadramento?.excedenteOrcamento || simulation.result?.cenario100?.excedenteOrcamento || '0.00'
       state.error = `Não é permitido encaminhar ao gerente: o cenário de 100% da meta excede o orçamento estabelecido (excedente: R$ ${excedente}).`
       return false
     }
@@ -439,7 +537,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
   }
 
   return {
-    state, simulation, cancelProposal, dirty, busy, readOnly, currentSimulation,
+    state, simulation, program, loadProgram, reviewProgram, confirmBudget, applyCalibration, cancelProposal, dirty, busy, readOnly, currentSimulation,
     canReview, canActivate, isCodeApproved, isBudgetWithinLimit,
     loadCodeApproval, approveCode, rejectCode, forwardToManager, returnProposal,
     load, save, recordProgress, loadCompetences, selectCompetence, runSimulation,
