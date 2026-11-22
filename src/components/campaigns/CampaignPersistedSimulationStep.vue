@@ -15,6 +15,7 @@
 
     <CampaignSimulationStep
       :form="form"
+      :budget="budget"
       :simulation="simulation"
       :server-pagination="pagination"
       :show-decision-actions="false"
@@ -25,7 +26,9 @@
       @change-page="$emit('change-page', $event)"
       @change-page-size="$emit('change-page-size', $event)"
       @back-to-rules="$emit('back-to-rules')"
-    />
+    >
+      <template #after-results><slot name="after-results" /></template>
+    </CampaignSimulationStep>
   </div>
 </template>
 
@@ -37,6 +40,7 @@ import CampaignBasesSection from '@/components/campaigns/CampaignBasesSection.vu
 import { persistedSimulationPagination } from '@/services/campaignPersistedSimulation'
 
 const props = defineProps({
+  budget: { type: [Number, String], default: null },
   form: { type: Object, required: true },
   simulation: { type: Object, required: true }
 })

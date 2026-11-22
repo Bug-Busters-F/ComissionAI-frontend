@@ -1,4 +1,5 @@
 import api from './api'
+import { riskSeverity } from './campaignRiskAcceptance'
 
 export function createCampaignPreparationService(http = api) {
   return {
@@ -179,11 +180,9 @@ export function createCampaignPreparationService(http = api) {
      * Registra o aceite formal rastreável de uma pendência/risco (BACK-7).
      * Bloqueia severidade IMPEDITIVO (apenas ADVERTENCIA/AVISO pode ser aceito).
      */
-    async acceptRisk(campanhaId, { pendenciaIdentificador, codigo, campo, mensagem, severidade, motivo, aceitoPor = null }) {
+    async acceptRisk(campanhaId, { pendenciaIdentificador, codigo, campo, mensagem, severidade, motivo, aceitoPor = null, inconsistenciaImportacaoId = null }) {
       if (!campanhaId) throw new Error('campanhaId é obrigatório.')
-      if (!['ADVERTENCIA', 'AVISO'].includes(String(severidade).toUpperCase())) {
-        throw new Error('Erros impeditivos exigem correção do dado e não admitem aceite de risco.')
-      }
+      const severity = riskSeverity(severidade)
       if (!motivo || motivo.trim().length < 5) {
         throw new Error('A justificativa do aceite é obrigatória (mínimo de 5 caracteres).')
       }
@@ -193,10 +192,12 @@ export function createCampaignPreparationService(http = api) {
           codigo: codigo || 'PENDENCIA_GERAL',
           campo: campo || 'geral',
           mensagem: mensagem || 'Pendência aceita sob justificativa',
-          severidade: severidade || 'ADVERTENCIA',
+          severidade: severity,
+          ...(inconsistenciaImportacaoId != null ? { inconsistenciaImportacaoId } : {}),
           motivo: motivo.trim(),
           aceitoPor
         })
+      if (!res.data?.id || String(res.data.campanhaId) !== String(campanhaId) || res.data.status !== 'ACEITA' || res.data.pendenciaIdentificador !== String(pendenciaIdentificador || codigo || campo)) throw new Error('O aceite não foi confirmado. Atualize as pendências antes de tentar novamente.')
       return res.data
     },
 

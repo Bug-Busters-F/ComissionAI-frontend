@@ -21,6 +21,7 @@ function setup(permissions = {}) {
     updateBudget: vi.fn(async (id, payload) => { saved = {...saved, orcamento: payload.orcamento, orcamentoConfirmado: true }; return { campanhaId: id, orcamento: payload.orcamento, orcamentoConfirmado: true } }),
     cut: vi.fn(async () => ({ competencia: '2025-07', totalVendasRecortadas: 1, totalVendasComImpedimento: 0, impedimentosGerais: [] })),
     simulatePython: vi.fn(async () => clone(result)), simulate: vi.fn(),
+    accept: vi.fn(),
     sales: vi.fn(async () => ({ simulacaoId: 'sim-1', paginaAtual: 0, totalElementos: 0, totalPaginas: 1, vendas: [] })),
     applyCalibration: vi.fn(async () => { program = {...programFixture(), versaoPrograma: 2, statusAprovacao: 'PENDENTE_REVISAO', validoParaExecucao: false }; saved = {...saved, revisaoControle: 8, ultimaEtapa: 2, etapaMaisAvancada: 2 }; saved.regras[0].taxa = '0.03'; return clone(program) })
   }
@@ -31,6 +32,18 @@ function setup(permissions = {}) {
 async function prepared(s) { expect(await s.flow.load(42)).toBe(true); expect(await s.flow.selectCompetence('2025-07')).toBe(true) }
 
 describe('FRONT-7 executable program review', () => {
+  it('bloqueia aprovação e edição do programa até negócios validar as regras salvas, mas permite devolução com motivo', async () => {
+    const s = setup(); await prepared(s)
+    s.campaign.propostas[0].metadadosRecebidos.validacaoPendente = true
+    s.api.load.mockResolvedValue(savedResponse(s.campaign))
+    expect(await s.flow.load(42)).toBe(true)
+    expect(await s.flow.reviewProgram('approve', {})).toBe(false)
+    expect(s.flow.program.error).toContain('validações atualizadas')
+    expect(s.api.approveProgram).not.toHaveBeenCalled()
+    expect(await s.flow.reviewProgram('reject', { justificativa: 'Validar regras antes da conferência' })).toBe(true)
+    s.scope.stop()
+  })
+
   it('approves the exact displayed checksum without supplying a user identity', async () => {
     const s = setup(); await prepared(s)
     expect(await s.flow.reviewProgram('approve', { justificativa: 'Conferido' })).toBe(true)
@@ -68,6 +81,18 @@ describe('FRONT-7 executable program review', () => {
 })
 
 describe('FRONT-8 approved execution, budget and calibration', () => {
+  it('blocks an over-budget acceptance even without the enrollment flag', async () => {
+    const s = setup(); await prepared(s)
+    s.result.analise.orcamento = '30'
+    s.result.cenario100 = {...s.result.cenario100, enquadramento:undefined}
+    expect(await s.flow.runSimulation()).toBe(true)
+    expect(s.flow.isBudgetWithinLimit.value).toBe(false)
+    expect(await s.flow.accept()).toBe(false)
+    expect(s.api.accept).not.toHaveBeenCalled()
+    expect(s.flow.simulation.error).toContain('Aceite bloqueado')
+    s.scope.stop()
+  })
+
   it('confirms the budget against the specific response contract and reloads the campaign', async () => {
     const s = setup(); await prepared(s)
     expect(await s.flow.confirmBudget('85000,50')).toBe(true)
@@ -118,7 +143,8 @@ describe('FRONT-8 approved execution, budget and calibration', () => {
     s.scope.stop()
   })
   it('denies simulation, budget and calibration to consultation-only users', async () => {
-    const s = setup({ canSimulate: () => false }); await prepared(s)
+    const s = setup({ canSimulate: () => false }); expect(await s.flow.load(42)).toBe(true)
+    expect(await s.flow.selectCompetence('2025-07')).toBe(false); expect(s.api.cut).not.toHaveBeenCalled()
     expect(await s.flow.runSimulation()).toBe(false); expect(await s.flow.confirmBudget('50')).toBe(false); expect(await s.flow.applyCalibration('150%')).toBe(false); expect(s.api.simulatePython).not.toHaveBeenCalled(); s.scope.stop()
   })
   it('maps extracted budget without confirming it on behalf of the user', () => {

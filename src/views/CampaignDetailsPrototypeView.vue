@@ -37,22 +37,28 @@
       </div>
       <p v-if="campaign.motivoBloqueioEdicao" class="rounded-xl bg-warning-bg p-4 text-sm text-warning-text">{{ campaign.motivoBloqueioEdicao }}</p>
       <p v-if="campaign.versaoProposta && campaign.versaoVigente" class="rounded-xl bg-sage-light p-4 text-sm">Existe uma proposta de alteração separada (versão {{ campaign.versaoProposta }}). A versão vigente é {{ campaign.versaoVigente }}. Use o seletor abaixo para consultar as versões publicadas.</p>
-      <CampaignApprovalGovernanceCard v-if="!isDemo && campaign.id && codeApproval" :approval="codeApproval" :can-approve="canApproveCode" :loading="isApproving" @approve="handleApproveCode" @reject="handleRejectCode" />
+      <CampaignApprovalGovernanceCard v-if="!isDemo && campaign.id" :program="codeProgram" :loading="programLoading" :error="programError" :review-url="codeReviewUrl" @refresh="loadCodeProgram" />
       <CampaignVersionHistory v-if="!isDemo && campaign.versaoVigente != null" :campaign-id="campaign.id" :current-version="campaign.versaoVigente" />
       <div v-if="isDemo" class="rounded-[22px] border border-success/20 bg-success-bg p-5"><p class="font-bold text-success-dark">Campanha pronta para consulta</p><p class="mt-1 text-sm leading-6 text-success-dark/80">Confira os dados da regra vinculada.</p></div>
       <div v-else-if="campaign.versaoVigente == null" class="rounded-[22px] border border-success/20 bg-success-bg p-5"><p class="font-bold text-success-dark">Campanha salva como {{ formatCampaignState(campaign.estado).toLocaleLowerCase() }}</p><p class="mt-1 text-sm leading-6 text-success-dark/80">Texto original, vigência e todas as regras abaixo são os dados salvos.</p></div>
 
       <CampaignSummary v-if="isDemo" :title="'Revisão consolidada'" :subtitle="isDemo ? 'Regra vinculada à campanha.' : 'Dados salvos da regra vinculada à campanha.'" :badge="formatCampaignState(campaign.estado)" :summary-items="summaryItems" :original-text="campaign.textoOriginal" />
 
-      <CampaignProposalReviewSummary v-if="!isDemo && campaign.versaoVigente == null && proposalCampaign" :campaign="proposalCampaign" :validation="proposalValidation" :show-python="true" hide-impact />
+      <CampaignProposalReviewSummary v-if="!isDemo && campaign.versaoVigente == null && proposalCampaign" :campaign="proposalCampaign" :validation="proposalValidation" :review-mode="true" hide-impact />
       
       <!-- Seção de Bases e Cobertura da Campanha ([FRONT-4]) -->
       <CampaignBasesSection
         v-if="!isDemo && campaign?.id"
         :campanha-id="campaign.id"
+        :competencia="apurationCompetence || campaign.dataInicio?.slice(0, 7) || ''"
         @competence-selected="handleBasesCompetenceSelected"
+        id="campaign-bases"
+        @base-associated="refreshApuration"
+        @base-uploaded="refreshApuration"
         @base-effective="handleBaseEffective"
       />
+
+      <CampaignApurationSection v-if="!isDemo && campaign?.id && access.can('viewCampaignApuration')" :key="campaign.id" ref="apurationSection" :campaign="campaign" @competence-selected="handleApurationCompetenceSelected" />
 
       <!-- Seção de Alertas Estatísticos e Anomalias de Vendas ([FRONT-6]) -->
       <CampaignAnomaliesSection
@@ -78,12 +84,11 @@
 </template>
 
 <script setup>
-import { useAccountStore } from '@/stores/accountStore'
 import { useAccessPolicy } from '@/services/useAccessPolicy'
 const access = useAccessPolicy()
-const account = useAccountStore()
 import { createCampaignLifecycleApi } from '@/services/campaignLifecycleApi'
 import CampaignVersionHistory from '@/components/campaigns/CampaignVersionHistory.vue'
+import CampaignApurationSection from '@/components/campaigns/CampaignApurationSection.vue'
 import CampaignApprovalGovernanceCard from '@/components/campaigns/CampaignApprovalGovernanceCard.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -120,6 +125,13 @@ const isClosingStatusRestricted = ref(false)
 const hasClosedCompetenceInVigencia = computed(() => closedCompetencesInVigencia.value.length > 0)
 const proposalCampaign = computed(() => campaign.value && !isDemo ? persistedCampaignToProposal(campaign.value) : null)
 const proposalValidation = computed(() => proposalCampaign.value ? validateCampaignProposalSet(proposalCampaign.value) : null)
+const apurationCompetence = ref('')
+const apurationSection = ref(null)
+function handleApurationCompetenceSelected(comp) {
+  apurationCompetence.value = comp
+  if (isCompetenceWithinVigencia(comp, campaign.value?.dataInicio, campaign.value?.dataFim)) anomalyCompetence.value = comp
+}
+function refreshApuration() { apurationSection.value?.refresh() }
 const anomaliesSectionRef = ref(null)
 const anomalyCompetence = ref('')
 const anomalyLots = ref([])
@@ -140,7 +152,11 @@ async function loadAnomalyLots() {
 
 // A seção de bases pré-seleciona a competência mais recente do sistema; só sincroniza quando ela pertence à vigência
 function handleBasesCompetenceSelected(comp) {
-  if (isCompetenceWithinVigencia(comp, campaign.value?.dataInicio, campaign.value?.dataFim)) anomalyCompetence.value = comp
+  if (isCompetenceWithinVigencia(comp, campaign.value?.dataInicio, campaign.value?.dataFim)) {
+    anomalyCompetence.value = comp
+    apurationCompetence.value = comp
+    apurationSection.value?.selectCompetence(comp)
+  }
 }
 
 watch(anomalyCompetence, () => {
@@ -148,6 +164,7 @@ watch(anomalyCompetence, () => {
 })
 
 async function handleBaseEffective() {
+  refreshApuration()
   await loadAnomalyLots()
   // A análise estatística passou a rodar no back depois do commit: acompanha até os alertas aparecerem.
   anomaliesSectionRef.value?.reloadAfterEffective()
@@ -170,35 +187,32 @@ const summaryItems = computed(() => {
   ]
 })
 
-const codeApproval = ref(null)
-const isApproving = ref(false)
-const canApproveCode = computed(() => access.can('approveCode'))
+const codeProgram = ref(null)
+const programLoading = ref(false)
+const programError = ref('')
+const codeReviewUrl = computed(() => access.can('approveCode') && !campaign.value?.versaoVigente && !campaign.value?.motivoBloqueioEdicao && !hasClosedCompetenceInVigencia.value
+  ? `/campanhas/${campaign.value.id}/editar?etapa=propostas` : '')
+let programRequest = 0
 
-async function handleApproveCode() {
-  if (!campaign.value?.id) return
-  isApproving.value = true
+async function loadCodeProgram() {
+  const id = campaign.value?.id
+  if (!id) return
+  const request = ++programRequest
+  const version = campaign.value.versaoVigente ?? campaign.value.versaoProposta
+  programLoading.value = true
+  programError.value = ''
+  codeProgram.value = null
   try {
-    const user = account.user?.email || account.user?.name || 'analista.codigo'
-    await createCampaignLifecycleApi().approveCode(campaign.value.id, { aprovado: true, aprovadoPor: user })
-    codeApproval.value = await createCampaignLifecycleApi().getCodeApproval(campaign.value.id)
-  } catch (err) {
-    console.error('Erro ao aprovar código:', err)
+    const program = await createCampaignLifecycleApi().program(id, version)
+    if (request !== programRequest) return
+    if (!program || String(program.campanhaId) !== String(id) || (version != null && String(program.versaoCampanhaNumero) !== String(version)) || !['APROVADO', 'PENDENTE_REVISAO', 'REJEITADO'].includes(program.statusAprovacao)) {
+      throw new Error('Resposta de revisão inválida')
+    }
+    codeProgram.value = program
+  } catch {
+    if (request === programRequest) programError.value = 'Não foi possível consultar a revisão do código. Tente novamente.'
   } finally {
-    isApproving.value = false
-  }
-}
-
-async function handleRejectCode() {
-  if (!campaign.value?.id) return
-  isApproving.value = true
-  try {
-    const user = account.user?.email || account.user?.name || 'analista.codigo'
-    await createCampaignLifecycleApi().approveCode(campaign.value.id, { aprovado: false, aprovadoPor: user, motivo: 'Rejeitado pelo analista' })
-    codeApproval.value = await createCampaignLifecycleApi().getCodeApproval(campaign.value.id)
-  } catch (err) {
-    console.error('Erro ao rejeitar código:', err)
-  } finally {
-    isApproving.value = false
+    if (request === programRequest) programLoading.value = false
   }
 }
 
@@ -221,11 +235,7 @@ async function loadCampaign() {
       // Competência inicial dos alertas: início da vigência, até a seção de bases sincronizar a sua seleção
       if (!anomalyCompetence.value && campaign.value.dataInicio) anomalyCompetence.value = String(campaign.value.dataInicio).slice(0, 7)
       void checkVigenciaClosings(campaign.value)
-      try {
-        codeApproval.value = await createCampaignLifecycleApi().getCodeApproval(campaign.value.id)
-      } catch {
-        codeApproval.value = null
-      }
+      await loadCodeProgram()
     }
   } catch (error) {
     loadError.value = normalizeCampaignError(error).message

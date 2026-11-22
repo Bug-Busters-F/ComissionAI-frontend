@@ -455,6 +455,7 @@
             </div>
           </div>
 
+          <p v-if="budgetStatus.known" class="mt-4 rounded-xl border px-4 py-3 text-sm font-bold" :class="budgetStatus.exceeded ? 'border-danger/40 bg-danger-bg text-danger-dark' : 'border-brand/30 text-brand'" role="status">{{ budgetStatus.exceeded ? 'Acima do orçamento' : 'Dentro do orçamento' }} · Cenário de referência (100%)<span v-if="budgetStatus.budget != null"> · Teto: {{ currency(budgetStatus.budget) }}</span><span v-if="budgetStatus.exceeded && budgetStatus.excess != null"> · Excedente: {{ currency(budgetStatus.excess) }}</span></p>
           <!-- Métrica Principal em Destaque: Diferença / Impacto Financeiro da Proposta -->
           <div class="mt-7 flex flex-wrap items-baseline gap-4 sm:gap-6">
             <div>
@@ -603,6 +604,7 @@
             </div>
 
             <div class="mt-4 rounded-xl bg-sage-light/80 px-3.5 py-2 text-xs text-sage-muted">
+              <p v-if="scenarioBudgetStatus(scenario.key).known" class="mb-2 text-xs font-bold" :class="scenarioBudgetStatus(scenario.key).exceeded ? 'text-danger-dark' : 'text-success-dark'">{{ scenarioBudgetStatus(scenario.key).exceeded ? 'Acima do orçamento' : 'Dentro do orçamento' }}<span v-if="scenarioBudgetStatus(scenario.key).exceeded && scenarioBudgetStatus(scenario.key).excess != null"> · Excedente: {{ currency(scenarioBudgetStatus(scenario.key).excess) }}</span></p>
               <span v-if="scenario.vendasQueMudaramDeFaixa > 0" class="font-bold text-brand-dark">
                 {{ scenario.vendasQueMudaramDeFaixa }} venda(s) migraram de faixa monetária neste cenário.
               </span>
@@ -665,6 +667,8 @@
           </div>
         </div>
       </section>
+
+      <slot name="after-results" />
 
       <!-- 7.3 TABELA PAGINADA DE VENDAS DO PÚBLICO -->
       <section class="rounded-[24px] border border-sage-border-light bg-white p-6 shadow-sm sm:p-7" aria-labelledby="simulation-table-heading">
@@ -789,6 +793,7 @@
           </div>
         </div>
 
+        <p v-if="budgetStatus.exceeded && showDecisionActions" role="alert" class="mt-5 rounded-xl border border-danger/30 bg-danger-bg p-4 text-sm font-bold text-danger-dark">Aceite bloqueado: o custo do cenário de referência (100%) ultrapassa o orçamento. Ajuste a proposta ou confirme outro orçamento e execute uma nova simulação.</p>
         <!-- 7.4 RODAPÉ DE DECISÃO DA SIMULAÇÃO ([FRONT-6]) -->
         <div class="mt-7 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-sage-border-light bg-sage-light/70 p-5">
           <div>
@@ -817,7 +822,7 @@
               type="button"
               data-testid="accept-simulation-btn"
               class="focus-ring inline-flex items-center gap-2 rounded-full bg-brand px-6 py-2.5 text-sm font-black text-brand-dark shadow-md transition hover:bg-brand-hover hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="simulation.isRunning || hasInvalidation"
+              :disabled="simulation.isRunning || hasInvalidation || budgetStatus.exceeded"
               @click="$emit('accept-simulation')"
             >
               <CheckCircle2 class="h-4 w-4" aria-hidden="true" />
@@ -869,6 +874,7 @@
 
 <script setup>
 import { userFacingText } from '@/services/userFacingText'
+import { simulationBudgetStatus } from '@/services/campaignSimulationBudget'
 import { computed, ref, nextTick } from 'vue'
 import CampaignSimulationMemory from '@/components/campaigns/CampaignSimulationMemory.vue'
 import {
@@ -896,6 +902,7 @@ import { checkProposalCoverage } from '@/services/coverageService'
 const showPremises = ref(false)
 
 const props = defineProps({
+  budget: { type: [Number, String], default: null },
   showDecisionActions: { type: Boolean, default: true },
   demo: { type: Object, default: () => ({}) },
   serverPagination: { type: Object, default: null },
@@ -1019,6 +1026,8 @@ const canRunSimulation = computed(() =>
   )
 )
 
+const budgetStatus = computed(() => simulationBudgetStatus(props.simulation?.result, props.budget ?? props.form?.orcamento))
+const scenarioBudgetStatus = key => simulationBudgetStatus(props.simulation?.result, props.budget ?? props.form?.orcamento, String(key))
 const simulationResult = computed(() => props.simulation?.result || null)
 const hasValidSimulationResult = computed(() =>
   Boolean(

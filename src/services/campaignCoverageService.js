@@ -1,7 +1,24 @@
 import api from './api'
+import { normalizeAuditPage } from './auditModel'
 
 export function createCampaignCoverageService(http = api) {
   return {
+    async listImportedBases() {
+      const items = []
+      let page = 0
+      let totalPages
+      do {
+        const response = await http.get('/imports', { params: { status: 'CONCLUIDO', page, size: 100 }, timeout: 30000 })
+        const result = normalizeAuditPage(response.data)
+        if (result.number !== page || result.content.some(item => !Number.isSafeInteger(item.reportId) || item.reportId <= 0)) {
+          throw new Error('Não foi possível confirmar a lista de arquivos cadastrados.')
+        }
+        items.push(...result.content)
+        totalPages = result.totalPages
+        page++
+      } while (page < totalPages)
+      return items
+    },
     /**
      * Consulta o diagnóstico consolidado de cobertura da campanha para fechamento (BACK-6).
      * Avalia competências da vigência, RH, Vendas, Taxas e bloqueios impeditivos.

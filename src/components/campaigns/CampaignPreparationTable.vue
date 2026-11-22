@@ -206,8 +206,8 @@
                   >
                     {{ err.severidade }}
                   </span>
-                  <span class="font-bold text-brand-dark">{{ err.campo }}:</span>
-                  <span class="text-danger-dark truncate max-w-xs" :title="err.mensagem">{{ err.mensagem }}</span>
+                  <span class="font-bold text-brand-dark">{{ userFacingText(err.campo) }}:</span>
+                  <span class="text-danger-dark truncate max-w-xs" :title="userFacingText(err.motivo || err.mensagem)">{{ userFacingText(err.motivo || err.mensagem) }}</span>
                 </div>
               </div>
             </td>
@@ -323,6 +323,7 @@
       :open="modalRiscoAberto"
       :pendencia="pendenciaSelecionada"
       :processando="processandoRisco"
+      :erro-msg="operationError"
       @confirm-accept="confirmarAceiteRisco"
       @cancel="modalRiscoAberto = false"
     />
@@ -330,6 +331,8 @@
 </template>
 
 <script setup>
+import { findImportRisk } from '@/services/campaignRiskAcceptance'
+import { campaignCoverageService } from '@/services/campaignCoverageService'
 import { ref, watch, onMounted } from 'vue'
 import {
   SlidersHorizontal,
@@ -496,7 +499,7 @@ function abrirAceiteRisco(line) {
   pendenciaSelecionada.value = {
     linha: line.numeroLinha,
     campo: primeiroErro?.campo || 'geral',
-    motivo: primeiroErro?.mensagem || 'Inconsistência identificada no registro',
+    motivo: primeiroErro?.motivo || primeiroErro?.mensagem || 'Inconsistência identificada no registro',
     severidade: primeiroErro?.severidade || 'ADVERTENCIA'
   }
   modalRiscoAberto.value = true
@@ -507,16 +510,22 @@ async function confirmarAceiteRisco({ pendencia, motivo }) {
   operationError.value = ''
   processandoRisco.value = true
   try {
+    const original = await findImportRisk(campaignCoverageService, props.campanhaId, {
+      reportId: props.batch?.envioArquivoEfetivadoReportId || props.batch?.envioArquivoOrigemReportId,
+      linha: pendencia.linha, campo: pendencia.campo, mensagem: pendencia.motivo, tipoBase: props.batch?.tipoBase, competencia: props.batch?.competencia
+    })
     await campaignPreparationService.acceptRisk(props.campanhaId, {
-      pendenciaIdentificador: `linha-${pendencia.linha}-${pendencia.campo}`,
+      pendenciaIdentificador: `inconsistencia:${original.inconsistenciaId}`,
+      inconsistenciaImportacaoId: original.inconsistenciaId,
+      codigo: 'INCONSISTENCIA_IMPORTACAO',
       campo: pendencia.campo,
-      mensagem: pendencia.motivo,
-      severidade: pendencia.severidade,
-      motivo,
-      aceitoPor: authStore.currentUser?.email
+      mensagem: original.motivo,
+      severidade: original.severidade,
+      motivo
     })
     modalRiscoAberto.value = false
     await carregarLinhas()
+    emit('batch-updated')
   } catch (err) {
     showError(err)
     console.error('Falha ao registrar aceite de risco:', err)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createSSRApp } from 'vue'
+import { createSSRApp, h } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import Memory from '../components/campaigns/CampaignSimulationMemory.vue'
 import Simulation from '../components/common/CampaignSimulationStep.vue'
@@ -67,4 +67,16 @@ describe('fontes da simulação e linguagem da interface', () => {
     expect(html).not.toContain('accept-simulation-btn')
     expect(html).not.toContain('Simulação aceita — Ir para revisão')
   })
+  it('marks the exceeded budget, blocks the decision and places alternatives after the scenarios', async () => {
+    const scenario = { totalVendas: '1000', totalComissaoBase: '25', totalComissaoProposta: '35', deltaComissao: '10', deltaPercentual: '40', comissaoProjetada: '36.17', deltaProjetado: '10.33', qtdVendasComMudancaFaixa: 0 }
+    const simulation = {selectedCompetencia:'2025-07',accepted:false,invalidationReasons:[],status:'CONCLUIDA',progress:100,result:simulationViewModel({...result,analise:{orcamento:'30'},vendas:[sale()],totalVendasRecortadas:1,cenario100:scenario,cenario80:scenario,cenario120:scenario,cenario150:scenario})}
+    const app=createSSRApp({render:()=>h(Simulation,{simulation,form:{dataInicio:'2025-07-01',dataFim:'2025-07-31'}},{'after-results':()=>h('div',{id:'test-alternatives'},'Alternativas')})})
+    app.component('RouterLink',{template:'<a><slot /></a>'})
+    const html=await renderToString(app)
+    expect(html).toContain('Acima do orçamento'); expect(html).toContain('Aceite bloqueado')
+    expect(html.match(/<button[^>]*data-testid="accept-simulation-btn"[^>]*>/)?.[0]).toContain('disabled')
+    expect(html.indexOf('id="test-alternatives"')).toBeGreaterThan(html.indexOf('Análise de Sensibilidade Orçamentária'))
+    expect(html.indexOf('id="test-alternatives"')).toBeLessThan(html.indexOf('id="simulation-table-heading"'))
+  })
+
 })

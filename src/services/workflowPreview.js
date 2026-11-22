@@ -1,4 +1,4 @@
-import { canEditStep, STEP_RESPONSIBILITIES } from './accessPolicy'
+import { canEditStep, canParticipateStep, STEP_RESPONSIBILITIES } from './accessPolicy'
 const clone = value => JSON.parse(JSON.stringify(value))
 const KEY = 'comissionai.workflow.preview.v1'
 export function newWorkflowPreview() {
@@ -6,10 +6,10 @@ export function newWorkflowPreview() {
     campaign: { title: 'Incentivo de julho · exemplo', description: 'Comissão de 3,5% para vendedores da marca PRETO na loja 16, de 1 a 31 de julho de 2025.', rate: '3,5', budget: '5000' } }
 }
 export function previewCanAct(role, state) {
-  return state.status !== 'PUBLISHED' && canEditStep(role, STEP_RESPONSIBILITIES[state.step - 1]?.key)
+  return state.status !== 'PUBLISHED' && canParticipateStep(role, STEP_RESPONSIBILITIES[state.step - 1]?.key)
 }
 export function transitionPreview(state, { action, role, name, reason = '' }) {
-  if (!previewCanAct(role, state)) throw Error('Seu perfil não pode realizar esta ação na etapa atual.')
+  if (!previewCanAct(role, state) || (state.step === 2 && !['ADMINISTRADOR', 'ANALISTA_CODIGO'].includes(role))) throw Error('Seu perfil não pode realizar esta ação na etapa atual.')
   const next = clone(state)
   if (action === 'return') {
     if (![2, 4].includes(state.step)) throw Error('Esta etapa não permite devolução.')
@@ -39,7 +39,7 @@ export function transitionPreview(state, { action, role, name, reason = '' }) {
   return next
 }
 export function editPreview(state, field, value, role) {
-  if (!previewCanAct(role, state) || !((state.step === 1 && ['title', 'description'].includes(field)) || (state.step === 2 && field === 'rate') || (state.step === 3 && field === 'budget'))) throw Error('Este campo não está disponível para edição nesta etapa.')
+  if (!canEditStep(role, STEP_RESPONSIBILITIES[state.step - 1]?.key) || state.status === 'PUBLISHED' || !((state.step === 1 && ['title', 'description'].includes(field)) || (state.step === 2 && field === 'rate') || (state.step === 3 && field === 'budget'))) throw Error('Este campo não está disponível para edição nesta etapa.')
   const next = clone(state)
   if (next.campaign[field] === value) return next
   next.campaign[field] = value

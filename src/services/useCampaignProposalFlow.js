@@ -66,11 +66,12 @@ export function useCampaignProposalFlow({ canEditStep = () => true, canWrite = (
     if (!id || String(id) === String(persistence.id)) return
     if (await lifecycle.load(id)) {
       reachedStep.value = persistence.etapaMaisAvancada
-      const resumed = CAMPAIGN_PROPOSAL_STEPS[(persistence.etapaMaisAvancada || 1) - 1].key
+      const resumeNumber = lifecycle.canReview.value && canEditStep('conferencia') ? 4 : (persistence.etapaMaisAvancada || 1)
+      const resumed = CAMPAIGN_PROPOSAL_STEPS[resumeNumber - 1].key
       activeStep.value = requiredStep(normalizeProposalStep(route.query.etapa || resumed))
       reachedStep.value = Math.max(reachedStep.value, activeStepIndex.value + 1)
       void lifecycle.recordProgress(activeStepIndex.value + 1)
-      if (activeStep.value === 'simulacao') void lifecycle.loadCompetences()
+      if (activeStep.value === 'simulacao' && canSimulate()) void lifecycle.loadCompetences()
       await router.replace({ query: { ...route.query, etapa: activeStep.value } })
     }
   }, { immediate: true })

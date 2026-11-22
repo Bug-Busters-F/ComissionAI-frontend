@@ -1,3 +1,4 @@
+import { simulationBudgetStatus } from './campaignSimulationBudget'
 import { computed, reactive, watch } from 'vue'
 import { ruleArtifactsCurrent } from './campaignRuleArtifacts'
 import { isCoverageImpediment, parseCoverageDetails } from './coverageService'
@@ -53,20 +54,13 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     return readiness.statusAceite === 'ACEITA' && !hasSimulationBlockers(readiness)
   }
 
-  const canReview = computed(() => !busy.value && !processing() && !state.remoteChanged && currentSimulation.value && simulation.accepted && isSimulationAccepted(state.readiness, simulation.result?.id))
+  const canReview = computed(() => !busy.value && !processing() && !state.remoteChanged && currentSimulation.value && simulation.accepted && isBudgetWithinLimit.value && isSimulationAccepted(state.readiness, simulation.result?.id))
 
   const isCodeApproved = computed(() => enabled ? Boolean(program.current?.statusAprovacao === 'APROVADO' && program.current?.validoParaExecucao === true && !program.changed && !dirty.value) : true)
 
   simulation.executionAllowed = computed(() => isCodeApproved.value && state.orcamentoConfirmado && canSimulate() && !dirty.value && !readOnly.value)
 
-  const isBudgetWithinLimit = computed(() => {
-    const c100 = simulation.result?.cenario100?.enquadramento || simulation.result?.cenario100
-    if (!c100) return true
-    if (c100.dentroDoOrcamento === false) return false
-    if (c100.statusEnquadramento === 'ACIMA_DO_TETO') return false
-    if (c100.excedenteOrcamento && Number(c100.excedenteOrcamento) > 0) return false
-    return true
-  })
+  const isBudgetWithinLimit = computed(() => !simulationBudgetStatus(simulation.result, state.orcamento).exceeded)
 
   const canActivate = computed(() => canReview.value && !readOnly.value && Boolean(state.id) && isCodeApproved.value && isBudgetWithinLimit.value)
   watch(fingerprint, (value) => {
@@ -227,10 +221,11 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
       if (!Array.isArray(rows) || rows.some((r) => !r.competencia || !Number.isInteger(r.totalVendas))) throw new Error('A consulta de competências retornou dados inválidos.')
       if (disposed) return
       simulation.competences = rows.map((r) => ({ ...r, label: r.statusReferencia || 'Referência cadastrada' }))
-      if (simulation.selectedCompetencia) await selectCompetence(simulation.selectedCompetencia, { preserveAccepted: true })
+      if (simulation.selectedCompetencia && canSimulate()) await selectCompetence(simulation.selectedCompetencia, { preserveAccepted: true })
     } catch (error) { simulation.error = message(error) } finally { simulation.isLoadingCompetences = false }
   }
   async function selectCompetence(value, { preserveAccepted = false } = {}) {
+    if (!canSimulate()) return false
     if (busy.value || processing()) return false
     if (!preserveAccepted || value !== simulation.selectedCompetencia) {
       simulation.accepted = false; state.readiness = null; simulation.result = null; simulationFingerprint = ''; simulation.status = ''; simulation.executionId = ''; simulation.progress = 0
@@ -295,6 +290,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     } catch (error) { if (request === pageSequence) simulation.pageError = message(error); return false } finally { if (request === pageSequence) simulation.loadingSales = false }
   }
   async function accept() {
+    if (!isBudgetWithinLimit.value) { simulation.error = 'Aceite bloqueado: o custo do cenário de referência (100%) ultrapassa o orçamento. Ajuste a proposta ou o orçamento e simule novamente.'; return false }
     if (busy.value || processing() || !currentSimulation.value || readOnly.value) return false
     const before = fingerprint.value, id = simulation.result.id, competence = simulation.selectedCompetencia
     state.working = true; simulation.error = ''
@@ -376,6 +372,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
   }
   async function reviewProgram(action, payload) {
     if ((action !== 'save' && program.changed) || !['save', 'approve', 'reject'].includes(action) || !canReviewProgram() || busy.value || dirty.value || processing() || readOnly.value || !program.current) return false
+    if (action !== 'reject' && !rulesReady.value) { program.error = 'As regras precisam ter suas explicações e validações atualizadas e salvas antes da revisão técnica.'; return false }
     if (action === 'save') payload = { ...payload, codigoFonte: String(payload.codigoFonte || '').trim() }
     const current = program.current
     let mutationConfirmed = false
@@ -524,6 +521,7 @@ export function createCampaignProposalLifecycle({ campaign, enabled = true, api 
     state.working = true; state.error = ''
     try {
       const raw = await api.forwardToManager(state.id, { versaoEsperada: state.versaoProposta || state.versaoVigente })
+      if (String(raw?.id) !== String(state.id) || raw.encaminhadaGerente !== true) throw new Error('O encaminhamento não foi confirmado. Atualize a campanha antes de continuar.')
       if (raw?.revisaoControle != null) state.revisaoControle = raw.revisaoControle
       state.encaminhadaGerente = true
       state.notice = 'Campanha encaminhada ao gerente com sucesso.'
