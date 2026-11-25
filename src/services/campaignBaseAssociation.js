@@ -30,3 +30,14 @@ export function availableImportedLots(imports, competence, attachments = []) {
     ...item, nomeArquivoOriginal: item.nomeArquivo, linhasValidas: item.totalLinhas
   }])).values()]
 }
+
+// A competência reúne os três tipos, sem escolher silenciosamente entre importações concorrentes.
+export function competenceBaseGroups(imports, competence, attachments = []) {
+  const available = availableImportedLots(imports, competence, attachments)
+  const inMonth = item => item.competencia === competence || (item.tipoBase === 'HR' && !item.competencia)
+  return ['HR', 'SALES', 'COMISSIONS'].map(type => ({
+    type, label: campaignBaseLabel(type),
+    attached: attachments.filter(item => item.tipoBase === type && !item.excluidoEm && inMonth(item)),
+    available: available.filter(item => item.tipoBase === type)
+  }))
+}

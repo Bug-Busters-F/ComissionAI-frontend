@@ -37,3 +37,27 @@ describe('arquivos cadastrados para rascunhos e referência histórica', () => {
     expect(availableImportedLots(imports,'')).toEqual([])
   })
 })
+
+describe('conjunto de bases por competência', () => {
+  it('reúne RH global, vendas e taxas do mês sem misturar outras competências', async () => {
+    const { competenceBaseGroups } = await import('./campaignBaseAssociation')
+    const imports = [
+      {reportId:1,tipoBase:'HR',competencia:null,status:'CONCLUIDO'},
+      {reportId:2,tipoBase:'SALES',competencia:'2025-12',status:'CONCLUIDO'},
+      {reportId:3,tipoBase:'COMISSIONS',competencia:'2025-12',status:'CONCLUIDO'},
+      {reportId:4,tipoBase:'SALES',competencia:'2025-11',status:'CONCLUIDO'}
+    ]
+    const groups = competenceBaseGroups(imports, '2025-12', [{reportId:1,tipoBase:'HR',competencia:null}])
+    expect(groups.map(group => group.type)).toEqual(['HR','SALES','COMISSIONS'])
+    expect(groups[0].attached.map(item => item.reportId)).toEqual([1])
+    expect(groups.flatMap(group => group.available.map(item => item.reportId))).toEqual([2,3])
+  })
+  it('mantém opções ambíguas para escolha explícita e não considera anexo de outro mês', async () => {
+    const { competenceBaseGroups } = await import('./campaignBaseAssociation')
+    const imports = [2,3].map(reportId => ({reportId,tipoBase:'SALES',competencia:'2025-12',status:'CONCLUIDO'}))
+    const groups = competenceBaseGroups(imports, '2025-12', [{reportId:4,tipoBase:'SALES',competencia:'2025-11'}])
+    expect(groups[1].attached).toEqual([])
+    expect(groups[1].available).toHaveLength(2)
+    expect(groups[2].available).toEqual([])
+  })
+})

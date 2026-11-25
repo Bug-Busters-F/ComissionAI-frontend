@@ -1,10 +1,10 @@
 <template>
   <section
-    class="rounded-[24px] border border-sage-border-light bg-white p-6 shadow-sm sm:p-7 space-y-6"
-    aria-labelledby="campaign-bases-heading"
+    :class="compact ? 'mt-5 space-y-4' : 'rounded-[24px] border border-sage-border-light bg-white p-6 shadow-sm sm:p-7 space-y-6'"
+    :aria-label="compact ? 'Bases da competência' : undefined" :aria-labelledby="compact ? undefined : 'campaign-bases-heading'"
   >
-    <p v-if="pageError" role="alert" class="rounded-xl bg-danger-bg p-4 text-sm text-danger-dark">{{ pageError }}</p>
-    <div class="flex flex-wrap items-center justify-between gap-3">
+    <p v-if="pageError" role="alert" class="rounded-xl bg-danger-bg p-4 text-sm text-danger-dark">{{ pageError }} <button v-if="compact" type="button" class="rounded font-bold underline" :disabled="actionBusy || basesLoading" @click="carregarAnexos">Atualizar arquivos</button></p>
+    <div v-if="!compact" class="flex flex-wrap items-center justify-between gap-3">
       <h2 id="campaign-bases-heading" class="text-lg font-extrabold text-brand-dark">Bases da campanha</h2>
       <p v-if="!autoSelectCompetence" class="text-xs text-sage-muted">Competência: <strong>{{ selectedCompetenciaFormatada }}</strong></p>
       <label v-else for="bases-competence-select" class="flex items-center gap-2 text-xs font-bold text-sage-muted">Competência
@@ -15,7 +15,26 @@
       </label>
     </div>
     <p v-if="basesLoading" role="status" class="text-xs text-sage-muted">Consultando arquivos cadastrados…</p>
-    <details class="rounded-xl border border-sage-border-light px-4 py-3 text-sm">
+    <div v-if="compact && !basesLoading" class="space-y-3">
+      <p class="text-xs text-sage-muted">Confira as três bases da competência antes de apurar.</p>
+      <div v-for="group in baseGroups" :key="group.type" class="rounded-xl border border-sage-border bg-sage-light/30 p-3">
+        <div class="flex items-center justify-between gap-2"><p class="text-sm font-bold text-brand-dark">{{ group.label }}</p><span v-if="group.attached.length" class="text-xs font-semibold text-success-dark">Vinculada</span></div>
+        <template v-if="group.attached.length">
+          <p v-for="item in group.attached" :key="item.reportId" class="mt-1 break-words text-xs text-sage-muted">{{ item.nomeArquivoOriginal || item.nomeArquivo || 'Arquivo cadastrado' }}</p>
+        </template>
+        <label v-else-if="group.available.length" class="mt-2 block text-xs text-sage-muted">{{ group.available.length > 1 ? 'Escolha o arquivo que deseja usar' : 'Arquivo selecionado automaticamente' }}
+          <select v-model="selectedReports[group.type]" class="focus-ring mt-1 w-full rounded-lg border border-sage-border bg-white px-3 py-2 text-xs text-brand-dark" :disabled="!authStore.canModifyBases || actionBusy">
+            <option value="">Selecione</option>
+            <option v-for="item in group.available" :key="item.reportId" :value="item.reportId">{{ item.nomeArquivoOriginal || item.nomeArquivo || 'Arquivo ' + item.reportId }}</option>
+          </select>
+        </label>
+        <p v-else class="mt-1 text-xs text-warning-text">Nenhum arquivo cadastrado para esta competência. Cadastre a base abaixo.</p>
+      </div>
+      <p v-if="!authStore.canModifyBases" class="text-xs text-sage-muted">Somente gerente ou administrador pode enviar e vincular bases.</p>
+      <p v-else-if="completeSelection && !pendingSelectedReports.length && !pageError" class="text-xs font-semibold text-success-dark">Os três tipos de base já estão vinculados. A apuração também verificará as pendências dos arquivos.</p>
+      <button type="button" class="focus-ring rounded text-xs font-bold text-brand-dark underline" :disabled="actionBusy" @click="showAdvanced = !showAdvanced">{{ showAdvanced ? 'Ocultar cadastro e correções' : 'Cadastrar ou corrigir bases' }}</button>
+    </div>
+    <details v-if="!compact" class="rounded-xl border border-sage-border-light px-4 py-3 text-sm">
       <summary class="focus-ring w-fit cursor-pointer rounded font-semibold text-brand-dark">Usar bases já cadastradas</summary>
       <p class="mt-3 text-xs text-sage-muted">{{ selectedCompetencia ? 'Vincule os arquivos desta competência sem reenviá-los.' : 'Selecione uma competência na simulação para consultar os arquivos disponíveis.' }}</p>
       <p v-if="jaAnexadoNaCampanha" class="mt-2 text-xs text-success-dark">Já existem bases vinculadas à campanha nesta competência.</p>
@@ -36,19 +55,20 @@
       </div>
     </details>
 
+    <template v-if="!compact || showAdvanced">
     <!-- 3. Anexos de Base Ativos da Campanha (BACK-6) & Correção de Inconsistências (FRONT-5) -->
-    <div v-if="anexosAtivos.length > 0" class="rounded-2xl border border-sage-border-light bg-sage-light/30 p-5 space-y-3">
+    <div v-if="displayedAttachments.length > 0" class="rounded-2xl border border-sage-border-light bg-sage-light/30 p-5 space-y-3">
       <div class="flex items-center justify-between">
         <h4 class="text-xs font-bold uppercase tracking-wider text-sage-muted flex items-center gap-1.5">
           <Paperclip class="h-4 w-4 text-brand-dark" />
           Bases Anexadas a esta Campanha
         </h4>
-        <span class="text-xs font-bold text-brand-dark">{{ anexosAtivos.length }} anexo(s) ativo(s)</span>
+        <span class="text-xs font-bold text-brand-dark">{{ displayedAttachments.length }} anexo(s) ativo(s)</span>
       </div>
 
       <div class="grid gap-3 sm:grid-cols-2">
         <div
-          v-for="anexo in anexosAtivos"
+          v-for="anexo in displayedAttachments"
           :key="anexo.id || anexo.reportId"
           class="rounded-xl border border-sage-border bg-white p-3.5 shadow-sm flex flex-col justify-between gap-3"
         >
@@ -69,7 +89,7 @@
               v-if="authStore.canModifyBases"
               type="button"
               @click="desanexarBase(anexo.id)"
-              :disabled="!authStore.canModifyBases || isDetaching === anexo.id"
+              :disabled="!authStore.canModifyBases || actionBusy"
               class="focus-ring text-sage-muted hover:text-danger p-1 rounded-lg transition"
               title="Desanexar este lote da campanha"
             >
@@ -82,7 +102,7 @@
             <button
               type="button"
               @click="abrirPreparacaoLote(anexo.reportId)"
-              :disabled="!authStore.canModifyBases || abrindoLote === anexo.reportId"
+              :disabled="!authStore.canModifyBases || actionBusy"
               class="focus-ring inline-flex items-center gap-1.5 text-xs font-extrabold text-brand-dark hover:underline"
             >
               <RefreshCw v-if="abrindoLote === anexo.reportId" class="h-3.5 w-3.5 animate-spin text-brand" />
@@ -211,7 +231,7 @@
       <div class="flex items-center justify-end gap-3 pt-2">
         <button
           type="button"
-          :disabled="!authStore.canUploadBases || !rhFile || !vendasFile || isUploading"
+          :disabled="!authStore.canUploadBases || !rhFile || !vendasFile || actionBusy"
           @click="executarUploadCiclo"
           class="focus-ring inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-xs font-black text-brand-dark shadow-sm transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -317,11 +337,19 @@
         </div>
       </div>
     </div>
+    <div v-if="compact && authStore.canUploadBases" class="space-y-3 rounded-xl border border-sage-border p-4">
+      <label class="block text-sm font-bold text-brand-dark">Taxas de comissão (.xlsx)
+        <input type="file" accept=".xlsx" class="focus-ring mt-2 block w-full text-xs" :disabled="actionBusy" @change="commissionFile = $event.target.files?.[0] || null" />
+      </label>
+      <p class="text-xs text-sage-muted">Envio para {{ selectedCompetenciaFormatada }}. As taxas desta competência são compartilhadas entre as campanhas.</p>
+      <button type="button" class="focus-ring rounded-full bg-brand px-4 py-2 text-xs font-bold text-brand-dark disabled:opacity-50" :disabled="!commissionFile || actionBusy" @click="uploadCommissions">{{ uploadingCommissions ? 'Enviando taxas…' : 'Enviar taxas de comissão' }}</button>
+    </div>
+    </template>
   </section>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch, getCurrentInstance } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, getCurrentInstance } from 'vue'
 import {
   Info,
   Link as LinkIcon,
@@ -338,7 +366,7 @@ import { useSafeAuthStore } from '@/stores/authStore'
 import { dataService } from '@/services/dataService'
 import api from '@/services/api'
 import { userFacingText } from '@/services/userFacingText'
-import { associateReports, availableImportedLots, campaignBaseLabel, uploadReportIds } from '@/services/campaignBaseAssociation'
+import { associateReports, availableImportedLots, competenceBaseGroups, campaignBaseLabel, uploadReportIds } from '@/services/campaignBaseAssociation'
 import { campaignCoverageService } from '@/services/campaignCoverageService'
 import { campaignPreparationService } from '@/services/campaignPreparationService'
 import { findAffectedCampaigns } from '@/services/campaignBasesImpactService'
@@ -352,18 +380,23 @@ import CampaignPreparationTable from './CampaignPreparationTable.vue'
 
 
 const props = defineProps({
+  compact: { type: Boolean, default: false },
   campanhaId: { type: [Number, String], default: null },
   competencia: { type: String, default: '' },
   autoSelectCompetence: { type: Boolean, default: true },
   campaignsList: { type: Array, default: () => [] }
 })
 
-const emit = defineEmits(['competence-selected', 'base-associated', 'base-uploaded', 'base-effective'])
+const emit = defineEmits(['competence-selected', 'base-associated', 'base-uploaded', 'base-effective', 'busy-change', 'selection-ready'])
 
 const authStore = useSafeAuthStore()
 const pageError = ref('')
+const showAdvanced = ref(false)
+const commissionFile = ref(null)
+const uploadingCommissions = ref(false)
+const selectedReports = reactive({})
 const arquivosCadastrados = ref([])
-const basesLoading = ref(false)
+const basesLoading = ref(Boolean(props.compact))
 const lotesDisponiveis = computed(() => availableImportedLots(arquivosCadastrados.value, selectedCompetencia.value, anexosAtivos.value))
 function showError(error) { pageError.value = userFacingText(error.response?.data?.message || error.message || 'Não foi possível concluir a operação.') }
 
@@ -384,6 +417,53 @@ const mensagemFalhaAssociacao = ref('')
 
 const isAssociating = ref(false)
 const isDetaching = ref(null)
+const actionBusy = computed(() => isUploading.value || isAssociating.value || isDetaching.value != null || uploadingCommissions.value || abrindoLote.value != null)
+const displayedAttachments = computed(() => props.compact ? anexosAtivos.value.filter(item => item.competencia === selectedCompetencia.value || (item.tipoBase === 'HR' && !item.competencia)) : anexosAtivos.value)
+const baseGroups = computed(() => competenceBaseGroups(arquivosCadastrados.value, selectedCompetencia.value, anexosAtivos.value))
+const completeSelection = computed(() => Boolean(selectedCompetencia.value) && baseGroups.value.every(group => group.attached.length || group.available.some(item => String(item.reportId) === String(selectedReports[group.type]))))
+const pendingSelectedReports = computed(() => baseGroups.value.filter(group => !group.attached.length).flatMap(group => group.available.filter(item => String(item.reportId) === String(selectedReports[group.type])).map(item => item.reportId)))
+watch(baseGroups, groups => {
+  for (const group of groups) {
+    if (group.attached.length) selectedReports[group.type] = ''
+    else if (!group.available.some(item => String(item.reportId) === String(selectedReports[group.type]))) selectedReports[group.type] = group.available.length === 1 ? group.available[0].reportId : ''
+  }
+}, { immediate: true })
+
+async function associarCompetencia() {
+  if (!authStore.canModifyBases || !completeSelection.value || actionBusy.value || basesLoading.value || pageError.value) return
+  const ids = [...pendingSelectedReports.value]
+  isAssociating.value = true
+  let failure = ''
+  try { await associateReports(campaignCoverageService, props.campanhaId, ids) }
+  catch (err) { failure = userFacingText(err.response?.data?.message || err.message || 'Não foi possível vincular todas as bases. Confira o conjunto e tente novamente.') }
+  finally {
+    await carregarAnexos()
+    if (failure) pageError.value = failure
+    isAssociating.value = false
+    emit('base-associated', { competencia: selectedCompetencia.value, partial: Boolean(failure) })
+  }
+}
+
+async function uploadCommissions() {
+  if (!authStore.canUploadBases || !commissionFile.value || actionBusy.value || !selectedCompetencia.value) return
+  uploadingCommissions.value = true
+  pageError.value = ''
+  let imported = false
+  let failure = ''
+  try {
+    const result = await dataService.uploadBase({ tipoBase: 'COMISSIONS', file: commissionFile.value, competencia: selectedCompetencia.value })
+    if (result.status !== 'SUCESSO' || !Number.isSafeInteger(result.reportId) || result.reportId <= 0) throw new Error(result.inconsistencias?.[0]?.motivo || 'O envio das taxas não foi confirmado.')
+    imported = true
+    await campaignCoverageService.attachBase(props.campanhaId, { reportId: result.reportId })
+    commissionFile.value = null
+  } catch (err) { failure = (imported ? 'Taxas importadas, mas o vínculo não foi confirmado. Selecione o arquivo cadastrado acima. ' : '') + userFacingText(err.response?.data?.message || err.message) }
+  finally {
+    await carregarAnexos()
+    if (failure) pageError.value = failure
+    uploadingCommissions.value = false
+    emit('base-uploaded')
+  }
+}
 
 // Auto-detecção de competência com base nas planilhas selecionadas
 const competenciaDetectadaNosArquivos = computed(() => {
@@ -397,6 +477,7 @@ function verificarEAtualizarCompetenciaDetectada(file) {
   const raw = extractCompetenceFromFileName(file.name)
   const norm = normalizeCompetence(raw)
   if (norm) {
+    if (props.compact && norm !== props.competencia) { pageError.value = 'O arquivo indica outra competência. Selecione o mês correspondente antes de enviar.'; return }
     if (!competenceOptions.value.some((c) => c.competencia === norm)) {
       competenceOptions.value.push({
         competencia: norm,
@@ -423,6 +504,17 @@ function onVendasFileSelect(event) {
 // FRONT-5: Lote em Preparação Ativo
 const lotePreparacaoAtivo = ref(null)
 const abrindoLote = ref(null)
+watch(actionBusy, busy => emit('busy-change', busy))
+watch(() => completeSelection.value && !basesLoading.value && !pageError.value && !actionBusy.value, ready => emit('selection-ready', ready), { immediate: true })
+async function confirmSelection() {
+  if (basesLoading.value || actionBusy.value || pageError.value || !completeSelection.value) return false
+  if (pendingSelectedReports.value.length) {
+    if (!authStore.canModifyBases) return false
+    await associarCompetencia()
+  }
+  return completeSelection.value && !pageError.value
+}
+defineExpose({ confirmSelection, refresh: carregarAnexos })
 
 async function carregarCompetencias() {
   try {
@@ -512,7 +604,7 @@ function formatFileSize(bytes) {
 }
 
 async function associarBaseExistente(lote) {
-  if (!authStore.canModifyBases || !lotesDisponiveis.value.some(item => item.reportId === lote?.reportId) || !props.campanhaId || isAssociating.value) return
+  if (!authStore.canModifyBases || !lotesDisponiveis.value.some(item => item.reportId === lote?.reportId) || !props.campanhaId || actionBusy.value) return
   isAssociating.value = true
   try {
     const reportId = lote.reportId
@@ -545,7 +637,7 @@ async function tentarAssociarLotePendente() {
 }
 
 async function desanexarBase(anexoId) {
-  if (!authStore.canModifyBases || !props.campanhaId || !anexoId) return
+  if (!authStore.canModifyBases || !props.campanhaId || !anexoId || actionBusy.value) return
   isDetaching.value = anexoId
   try {
     await campaignCoverageService.detachBase(props.campanhaId, anexoId)
@@ -561,7 +653,7 @@ async function desanexarBase(anexoId) {
 
 // FRONT-5: Abertura de lote em preparação para edição de linhas
 async function abrirPreparacaoLote(reportId) {
-  if (!authStore.canModifyBases || !props.campanhaId || !reportId) return
+  if (!authStore.canModifyBases || !props.campanhaId || !reportId || actionBusy.value) return
   abrindoLote.value = reportId
   try {
     const lote = await campaignPreparationService.openFromBatch(props.campanhaId, reportId)
@@ -583,9 +675,10 @@ function onBatchCommitted() {
 }
 
 async function executarUploadCiclo() {
-  if (!authStore.canUploadBases || !rhFile.value || !vendasFile.value || isUploading.value) return
+  if (!authStore.canUploadBases || !rhFile.value || !vendasFile.value || actionBusy.value) return
 
   const targetCompetencia = competenciaDetectadaNosArquivos.value || selectedCompetencia.value
+  if (props.compact && targetCompetencia !== props.competencia) { pageError.value = 'Os arquivos devem corresponder à competência selecionada para apuração.'; return }
   selectedCompetencia.value = targetCompetencia
 
   isUploading.value = true
@@ -638,6 +731,7 @@ watch(
   (newComp) => {
     if (newComp && newComp !== selectedCompetencia.value) {
       selectedCompetencia.value = newComp
+      if (props.compact) { rhFile.value = null; vendasFile.value = null; commissionFile.value = null; pageError.value = ''; diagnosticoEnvio.value = null; lotePreparacaoAtivo.value = null; void carregarAnexos() }
     }
   }
 )

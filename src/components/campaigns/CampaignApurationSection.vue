@@ -7,14 +7,17 @@
     <p v-if="!campaign.versaoVigente" class="rounded-xl bg-sage-light p-4 text-sm text-sage-muted">Publique a campanha para disponibilizar a apuração definitiva. Os resultados anteriores, quando existentes, continuam disponíveis no histórico.</p>
     <div v-else class="grid items-end gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
       <label class="text-sm font-bold text-brand-dark">Competência da apuração
-        <select class="control mt-2" :value="state.month" :disabled="state.working || !flow.periods.value.length" @change="changeMonth($event.target.value)"><option v-for="p in flow.periods.value" :key="p.competencia" :value="p.competencia">{{ month(p.competencia) }}</option></select>
-        <span v-if="flow.period.value" class="mt-2 block text-xs font-normal text-sage-muted">Versão vigente {{ campaign.versaoVigente }} · {{ date(flow.period.value.dataInicio) }} → {{ date(flow.period.value.dataFim) }}</span>
+        <select class="control mt-2 h-12" :value="state.month" :disabled="state.working || !flow.periods.value.length" @change="changeMonth($event.target.value)"><option v-for="p in flow.periods.value" :key="p.competencia" :value="p.competencia">{{ month(p.competencia) }}</option></select>
       </label>
-      <button v-if="access.can('runCampaignApuration')" type="button" class="primary" :disabled="!flow.canRun.value" @click="confirmOpen = true">{{ state.working ? 'Apurando campanha…' : 'Apurar competência' }}</button>
+      <div v-if="access.can('runCampaignApuration')" class="flex flex-wrap items-center justify-center gap-3 sm:justify-end">
+        <button type="button" class="secondary inline-flex h-12 items-center justify-center" :disabled="state.working || !state.month" @click="openBases">Selecionar bases</button>
+        <button type="button" class="primary inline-flex h-12 items-center justify-center" :disabled="!flow.canRun.value" @click="confirmOpen = true">{{ state.working ? 'Apurando campanha…' : 'Apurar competência' }}</button>
+      </div>
+      <p v-if="flow.period.value" class="-mt-2 text-xs text-sage-muted sm:col-span-2">Versão vigente {{ campaign.versaoVigente }} · {{ date(flow.period.value.dataInicio) }} → {{ date(flow.period.value.dataFim) }}</p>
     </div>
     <p v-if="state.checking" role="status" class="text-sm text-sage-muted">Conferindo bases, revisão do código e fechamento…</p>
     <p v-if="state.ready && !state.working" class="text-sm text-success-dark">Bases conferidas e código aprovado para esta competência.</p>
-    <div v-if="state.checkError" class="rounded-xl bg-warning-bg p-4 text-sm text-warning-text" role="alert"><p>{{ state.checkError }}</p><ul v-if="state.coverageIssues?.length" class="mt-3 space-y-2"><li v-for="issue in state.coverageIssues" :key="issue.area"><strong>{{ issue.area }}:</strong> {{ issue.message }}<ul v-if="issue.references?.length" class="mt-1 list-inside list-disc"><li v-for="reference in issue.references" :key="reference">{{ reference }}</li></ul></li></ul><a v-if="state.checkError.includes('bases')" href="#campaign-bases" class="mt-2 inline-block rounded font-bold underline">Conferir bases da campanha</a></div>
+    <div v-if="state.checkError" class="rounded-xl bg-warning-bg p-4 text-sm text-warning-text" role="alert"><p>{{ state.checkError }}</p><ul v-if="state.coverageIssues?.length" class="mt-3 space-y-2"><li v-for="issue in state.coverageIssues" :key="issue.area"><strong>{{ issue.area }}:</strong> {{ issue.message }}<ul v-if="issue.references?.length" class="mt-1 list-inside list-disc"><li v-for="reference in issue.references" :key="reference">{{ reference }}</li></ul></li></ul><button v-if="state.checkError.includes('bases')" type="button" :disabled="state.working" class="mt-2 inline-block rounded font-bold underline" @click="openBases">Selecionar ou corrigir bases</button></div>
     <p v-if="!access.can('runCampaignApuration')" class="text-sm text-sage-muted">Seu perfil permite consultar os resultados. A execução é realizada pelo gerente ou administrador.</p>
     <div v-if="state.error" role="alert" class="rounded-xl bg-danger-bg p-4 text-sm text-danger-dark"><p>{{ state.error }}</p><button v-if="!state.uncertain" type="button" class="mt-2 rounded font-bold underline" :disabled="state.working" @click="refresh">Consultar novamente</button></div>
     <div v-if="state.uncertain" class="space-y-3 rounded-xl bg-warning-bg p-4 text-sm text-warning-text" role="alert">
@@ -40,6 +43,12 @@
       <details v-if="result.totalImpedimentos || result.impedimentos.length" class="rounded-xl border border-warning/40 p-4"><summary class="cursor-pointer text-sm font-bold text-warning-text">Impedimentos da apuração ({{ result.totalImpedimentos }})</summary><p v-if="result.impedimentos.length < result.totalImpedimentos" class="mt-3 text-sm text-sage-muted">O histórico informa os impedimentos, mas não devolveu todos os motivos individuais. Os totais permanecem registrados.</p><ul class="mt-3 max-h-72 space-y-3 overflow-auto text-sm"><li v-for="(item, index) in result.impedimentos" :key="index"><strong>{{ item.matricula || 'Matrícula não informada' }} · {{ date(item.dataVenda) }}</strong><p>{{ userFacingText(item.motivo) }}</p></li></ul></details>
       <footer class="space-y-1 border-t border-sage-border pt-4 text-xs text-sage-muted"><p>Executada por {{ result.executadoPor || 'Responsável não informado' }} em {{ dateTime(result.executadoEm) }}</p><p class="break-all">Protocolo: {{ result.protocolo }}</p><p v-if="result.observacoes">{{ userFacingText(result.observacoes) }}</p></footer>
     </div>
+    <CampaignLifecycleDialog v-if="basesMounted" :open="basesOpen" title="Bases para apuração" confirm-label="Confirmar bases" :disabled="!basesReady" :busy="basesBusy" @cancel="closeBases" @confirm="confirmBases">
+      <label class="block text-sm font-bold">Competência
+        <select class="control mt-2" :value="state.month" :disabled="basesBusy || state.working" @change="changeMonth($event.target.value)"><option v-for="p in flow.periods.value" :key="p.competencia" :value="p.competencia">{{ month(p.competencia) }}</option></select>
+      </label>
+      <CampaignBasesSection ref="basesSection" :campanha-id="campaign.id" :competencia="state.month" :auto-select-competence="false" compact @selection-ready="basesReady = $event" @busy-change="basesBusy = $event" @base-associated="basesChanged" @base-uploaded="basesChanged" @base-effective="baseEffective" />
+    </CampaignLifecycleDialog>
     <CampaignLifecycleDialog :open="confirmOpen" title="Apurar esta campanha?" confirm-label="Confirmar apuração" :busy="state.working" :disabled="!flow.canRun.value" @cancel="confirmOpen = false" @confirm="execute">
       <p>Será apurada a versão {{ campaign.versaoVigente }} para {{ month(state.month) }}, de {{ date(flow.period.value?.dataInicio) }} a {{ date(flow.period.value?.dataFim) }}.</p>
       <p class="mt-3">Esta operação grava resultados definitivos e pode substituir cálculos anteriores dessas vendas. Não é uma simulação.</p>
@@ -58,7 +67,8 @@ import { createCampaignApurationService } from '@/services/campaignApurationServ
 import { createCampaignApuration } from '@/services/campaignApuration'
 import { userFacingText } from '@/services/userFacingText'
 import CampaignLifecycleDialog from './CampaignLifecycleDialog.vue'
-const emit = defineEmits(['competence-selected'])
+import CampaignBasesSection from './CampaignBasesSection.vue'
+const emit = defineEmits(['competence-selected', 'base-effective'])
 const props = defineProps({ campaign: { type: Object, required: true } })
 const access = useAccessPolicy(), account = useAccountStore(), notifications = useNotificationStore()
 const api = createCampaignApurationService()
@@ -66,6 +76,17 @@ let storage
 try { storage = window.sessionStorage } catch { /* Storage availability checked again before a financial request. */ }
 const flow = createCampaignApuration({ campaign: () => props.campaign, api, canView: () => access.can('viewCampaignApuration'), canExecute: () => access.can('runCampaignApuration'), userId: account.user?.id, storage, notify: (type, title, message) => notifications[type](title, message) })
 const state = flow.state, result = computed(() => state.detail), confirmOpen = ref(false), notes = ref(''), page = ref(1)
+const basesOpen = ref(false), basesMounted = ref(false), basesBusy = ref(false), basesReady = ref(false), basesSection = ref(null)
+async function openBases() {
+  if (state.working || !state.month || !access.can('runCampaignApuration')) return
+  const mounted = basesMounted.value
+  basesMounted.value = true; basesOpen.value = true
+  if (mounted) await basesSection.value?.refresh()
+}
+async function confirmBases() { if (!basesReady.value || basesBusy.value) return; if (await basesSection.value?.confirmSelection()) await closeBases() }
+async function closeBases() { if (basesBusy.value) return; basesOpen.value = false; await refresh() }
+async function basesChanged() { await flow.check() }
+function baseEffective() { emit('base-effective'); void basesChanged() }
 const pages = computed(() => Math.max(1, Math.ceil((result.value?.itens.length || 0) / 10)))
 const visibleItems = computed(() => result.value?.itens.slice((page.value - 1) * 10, page.value * 10) || [])
 const incompleteItems = computed(() => result.value && result.value.itens.length !== result.value.totalCalculados)

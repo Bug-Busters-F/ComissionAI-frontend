@@ -27,8 +27,9 @@ watch(() => props.open, async (open) => {
   else if (!open && dialog.value.open) { dialog.value.close(); if (previousFocus?.isConnected) previousFocus.focus() }
 }, { immediate: true })
 function trapFocus(event) {
-  if (event.key !== 'Tab') return
-  const controls = [...dialog.value.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled])')]
+  if (event.key !== 'Tab' || event.defaultPrevented) return
+  if (event.target?.closest?.('[role="dialog"]')) return
+  const controls = [...dialog.value.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), summary, a[href]')]
   if (!controls.length) { event.preventDefault(); return }
   const first = controls[0], last = controls.at(-1)
   if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }

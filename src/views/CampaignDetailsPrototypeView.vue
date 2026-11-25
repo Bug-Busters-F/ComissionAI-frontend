@@ -46,19 +46,9 @@
 
       <CampaignProposalReviewSummary v-if="!isDemo && campaign.versaoVigente == null && proposalCampaign" :campaign="proposalCampaign" :validation="proposalValidation" :review-mode="true" hide-impact />
       
-      <!-- Seção de Bases e Cobertura da Campanha ([FRONT-4]) -->
-      <CampaignBasesSection
-        v-if="!isDemo && campaign?.id"
-        :campanha-id="campaign.id"
-        :competencia="apurationCompetence || campaign.dataInicio?.slice(0, 7) || ''"
-        @competence-selected="handleBasesCompetenceSelected"
-        id="campaign-bases"
-        @base-associated="refreshApuration"
-        @base-uploaded="refreshApuration"
-        @base-effective="handleBaseEffective"
-      />
+      <CampaignAcceptedSimulation v-if="!isDemo && campaign?.id" :key="`${campaign.id}-${campaign.simulacaoAceitaId || 'none'}`" :campaign="campaign" />
 
-      <CampaignApurationSection v-if="!isDemo && campaign?.id && access.can('viewCampaignApuration')" :key="campaign.id" ref="apurationSection" :campaign="campaign" @competence-selected="handleApurationCompetenceSelected" />
+      <CampaignApurationSection v-if="!isDemo && campaign?.id && access.can('viewCampaignApuration')" :key="campaign.id" ref="apurationSection" :campaign="campaign" @competence-selected="handleApurationCompetenceSelected" @base-effective="handleBaseEffective" />
 
       <!-- Seção de Alertas Estatísticos e Anomalias de Vendas ([FRONT-6]) -->
       <CampaignAnomaliesSection
@@ -88,6 +78,7 @@ import { useAccessPolicy } from '@/services/useAccessPolicy'
 const access = useAccessPolicy()
 import { createCampaignLifecycleApi } from '@/services/campaignLifecycleApi'
 import CampaignVersionHistory from '@/components/campaigns/CampaignVersionHistory.vue'
+import CampaignAcceptedSimulation from '@/components/campaigns/CampaignAcceptedSimulation.vue'
 import CampaignApurationSection from '@/components/campaigns/CampaignApurationSection.vue'
 import CampaignApprovalGovernanceCard from '@/components/campaigns/CampaignApprovalGovernanceCard.vue'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -95,7 +86,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { Lock, Info } from 'lucide-vue-next'
 import CampaignDeleteDialog from '@/components/common/CampaignDeleteDialog.vue'
 import CampaignProposalReviewSummary from '@/components/campaigns/CampaignProposalReviewSummary.vue'
-import CampaignBasesSection from '@/components/campaigns/CampaignBasesSection.vue'
 import CampaignAnomaliesSection from '@/components/anomalies/CampaignAnomaliesSection.vue'
 import { persistedCampaignToProposal } from '@/services/campaignProposalPersistence'
 import { validateCampaignProposalSet } from '@/services/campaignProposalValidation'
@@ -125,10 +115,8 @@ const isClosingStatusRestricted = ref(false)
 const hasClosedCompetenceInVigencia = computed(() => closedCompetencesInVigencia.value.length > 0)
 const proposalCampaign = computed(() => campaign.value && !isDemo ? persistedCampaignToProposal(campaign.value) : null)
 const proposalValidation = computed(() => proposalCampaign.value ? validateCampaignProposalSet(proposalCampaign.value) : null)
-const apurationCompetence = ref('')
 const apurationSection = ref(null)
 function handleApurationCompetenceSelected(comp) {
-  apurationCompetence.value = comp
   if (isCompetenceWithinVigencia(comp, campaign.value?.dataInicio, campaign.value?.dataFim)) anomalyCompetence.value = comp
 }
 function refreshApuration() { apurationSection.value?.refresh() }
@@ -148,15 +136,6 @@ async function loadAnomalyLots() {
   if (token !== anomalyLotsRequest) return
   anomalyLots.value = lots
   if (error) console.warn('Não foi possível carregar os lotes efetivados para os alertas estatísticos:', error)
-}
-
-// A seção de bases pré-seleciona a competência mais recente do sistema; só sincroniza quando ela pertence à vigência
-function handleBasesCompetenceSelected(comp) {
-  if (isCompetenceWithinVigencia(comp, campaign.value?.dataInicio, campaign.value?.dataFim)) {
-    anomalyCompetence.value = comp
-    apurationCompetence.value = comp
-    apurationSection.value?.selectCompetence(comp)
-  }
 }
 
 watch(anomalyCompetence, () => {
@@ -232,7 +211,7 @@ async function loadCampaign() {
     campaign.value = current
     if (!campaign.value) loadError.value = 'A campanha não foi encontrada ou já foi removida.'
     else if (!isDemo) {
-      // Competência inicial dos alertas: início da vigência, até a seção de bases sincronizar a sua seleção
+      // Competência inicial dos alertas: início da vigência, sincronizada com a apuração
       if (!anomalyCompetence.value && campaign.value.dataInicio) anomalyCompetence.value = String(campaign.value.dataInicio).slice(0, 7)
       void checkVigenciaClosings(campaign.value)
       await loadCodeProgram()
