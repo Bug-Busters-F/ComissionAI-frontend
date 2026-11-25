@@ -6,6 +6,18 @@ import CampaignPythonBudget from './CampaignPythonBudget.vue'
 import { programFixture } from '@/services/campaignLifecycleTestFixtures'
 
 describe('Python review and budget screens', () => {
+  it('exibe orçamento extraído no campo da etapa 3 e ainda exige confirmação', async () => {
+    const html = await renderToString(createSSRApp(CampaignPythonBudget, {
+      panel: 'budget', campaign: { propostas: [], orcamentoExtraidoIa: '130000.00' },
+      persistence: { orcamento: '130000.00', orcamentoConfirmado: false },
+      simulation: {}, editable: true, approved: true
+    }))
+    expect(html).toContain('value="130000,00"')
+    expect(html).toContain('Valor identificado no texto')
+    expect(html).toContain('Confirmar orçamento')
+    expect(html).toContain('É necessário confirmar o orçamento antes de executar a simulação')
+  })
+
   it('shows the executable source, declared premises, status and server reviewer', async () => {
     const html = await renderToString(createSSRApp(CampaignProgramReview, { model: {current:programFixture(42,{aprovadoPor:'Revisor real'}),history:[],changed:false},editable:true }))
     expect(html).toContain('def calcular_comissao'); expect(html).toContain('Taxa fixa'); expect(html).toContain('Revisor real'); expect(html).toContain('Aprovado para execução')

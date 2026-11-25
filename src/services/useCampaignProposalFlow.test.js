@@ -46,6 +46,30 @@ function extractionResponse(flow) {
 }
 
 describe('campaign flow integration navigation', () => {
+  it('persiste o orçamento extraído e o disponibiliza na simulação sem confirmação automática', async () => {
+    const { flow, scope } = await setup()
+    const received = extractionResponse(flow)
+    const texto = 'Em dezembro de 2025 todos da marca VERMELHO recebem 5% de comissão. O orçamento total para a campanha é R$130000.'
+    received.orcamentoExtraido = { valor: '130000.00', trechoOriginal: 'orçamento total para a campanha é R$130000' }
+    received.orcamentoSugerido = '130000.00'
+    received.propostas[0].vigencia = { dataInicio: '2025-12-01', dataFim: '2025-12-31' }
+    Object.assign(flow.campaign, { titulo: 'Incentivo dezembro', textoOriginal: texto, propostas: [] })
+    bindings.client.interpretCampaign.mockResolvedValue(received)
+    expect(await flow.interpretDescription()).toBe(true)
+    expect(bindings.lifecycle.save).toHaveBeenCalledWith(null, expect.objectContaining({
+      orcamento: '130000.00', orcamentoExtraidoIa: '130000.00', orcamentoConfirmado: false
+    }), null)
+    expect(flow.campaign.orcamentoExtraidoIa).toBe('130000.00')
+    expect(flow.persistence.orcamento).toBe('130000.00')
+    expect(flow.persistence.orcamentoConfirmado).toBe(false)
+    const saved = await bindings.lifecycle.save.mock.results[0].value
+    bindings.lifecycle.load.mockResolvedValue(saved)
+    expect(await flow.lifecycle.load(saved.id)).toBe(true)
+    expect(flow.persistence.orcamento).toBe('130000.00')
+    expect(flow.campaign.orcamentoExtraidoIa).toBe('130000.00')
+    scope.stop()
+  })
+
   it('resumes manager review from a confirmed acceptance even if only stage 3 was recorded', async () => {
     const c=campaignFixture();c.propostas=c.propostas.slice(0,1)
     const scenario={totalVendas:'1000',totalComissaoBase:'25',totalComissaoProposta:'35',deltaComissao:'10',deltaPercentual:'40',comissaoProjetada:'35',deltaProjetado:'10'}
